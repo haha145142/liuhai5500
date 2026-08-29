@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Tone } from "@/components/ui/Glass";
 import { analyzeMarket } from "@/lib/data/server";
@@ -110,6 +111,7 @@ export function SwingPlan({ holding, fund, price, officialToday }: Props) {
       <button type="button" onClick={reset} className="rounded-xl bg-bg-elevated px-3 py-2 text-xs">重设基准</button>
     </div>
     {aiText ? <div className="mt-2 rounded-xl bg-white/60 p-3 text-[11px] leading-relaxed text-muted"><b className="text-fg">AI复核：</b><span className="whitespace-pre-wrap">{aiText}</span></div> : null}
+    <Link to="/market" className="mt-3 flex w-full items-center justify-center rounded-2xl bg-white/60 py-2 text-xs font-semibold text-muted ring-1 ring-white/70">⚙ 管理关注板块</Link>
     <div className="mt-2 text-[10px] leading-relaxed text-muted">仅作规则化辅助，不代表保证收益；场外基金按确认日/赎回费规则执行，实际成交净值以基金公司确认结果为准。</div>
   </section>;
 }
