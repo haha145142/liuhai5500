@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { BarChart3, Briefcase, House, Newspaper, SquareGrid2X2 } from "lucide-react";
+import { BarChart3, Briefcase, House, Newspaper, Grid2X2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const TABS = [
@@ -7,7 +7,7 @@ const TABS = [
   { to: "/portfolio", label: "持仓", icon: Briefcase, match: (p: string) => p.startsWith("/portfolio") || p.startsWith("/band") },
   { to: "/market", label: "大盘", icon: BarChart3, match: (p: string) => p.startsWith("/market") },
   { to: "/news", label: "资讯", icon: Newspaper, match: (p: string) => p.startsWith("/news") },
-  { to: "/more", label: "更多", icon: SquareGrid2X2, match: (p: string) => ["/more", "/funds", "/ai", "/settings"].some((x) => p.startsWith(x)) },
+  { to: "/more", label: "更多", icon: Grid2X2, match: (p: string) => ["/more", "/funds", "/ai", "/settings"].some((x) => p.startsWith(x)) },
 ] as const;
 
 export function TabBar() {

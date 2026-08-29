@@ -104,9 +104,3 @@
 .tone-down { color: var(--color-down); }
 .tone-flat { color: var(--color-muted); }
 
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation: none !important;
-    transition: none !important;
-  }
-}

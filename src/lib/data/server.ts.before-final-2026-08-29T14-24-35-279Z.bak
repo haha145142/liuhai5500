@@ -5,7 +5,6 @@ import { calcIndicators } from "../calc/indicators";
 import type {
   BoardQuote,
   DataSource,
-  FundHistoryPoint,
   FundQuote,
   GlobalQuote,
   IndexQuote,
@@ -434,7 +433,7 @@ export const getFund = createServerFn({ method: "POST" })
     const empty: FundQuote = {
       code, name: code, type: "基金", nav: null, navDate: null,
       estimate: null, estimatePct: null, estimateTime: null,
-      dayPct: null, weekPct: null, monthPct: null, history: [], historyPoints: [], metrics: null, source: "数据源暂不可用",
+      dayPct: null, weekPct: null, monthPct: null, history: [], metrics: null, source: "数据源暂不可用",
     };
     if (!/^\d{6}$/.test(code)) return empty;
 
@@ -443,27 +442,19 @@ export const getFund = createServerFn({ method: "POST" })
     let navDate: string | null = null;
     let dayPct: number | null = null;
     const history: number[] = [];
-    const historyPoints: FundHistoryPoint[] = [];
     let source = "数据源暂不可用";
 
     try {
       const j = (await emJson(
-        `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=400`,
-        12000,
+        `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=60`,
+        10000,
       )) as { Data?: { LSJZList?: Record<string, unknown>[] } };
-      const rawRows = j?.Data?.LSJZList || [];
-      const rows = rawRows.slice().reverse();
+      const rows = (j?.Data?.LSJZList || []).slice().reverse();
       for (const r of rows) {
         const v = n(r.DWJZ);
-        if (v == null) continue;
-        history.push(v);
-        historyPoints.push({
-          date: String(r.FSRQ || ""),
-          nav: v,
-          changePct: n(r.JZZZL),
-        });
+        if (v != null) history.push(v);
       }
-      const last = rawRows[0];
+      const last = j?.Data?.LSJZList?.[0];
       if (last) {
         nav = n(last.DWJZ);
         navDate = String(last.FSRQ || "") || null;
@@ -508,20 +499,30 @@ export const getFund = createServerFn({ method: "POST" })
     }
 
     const metrics = calcIndicators(history);
-    const latest = history[history.length - 1] ?? null;
-    const periodPct = (days: number) => {
-      if (latest == null || history.length <= days) return null;
-      const base = history[history.length - 1 - days];
-      return base ? ((latest - base) / base) * 100 : null;
-    };
-    const weekPct = periodPct(5);
-    const monthPct = periodPct(20);
+    const weekPct =
+      history.length >= 6 && history[history.length - 1]
+        ? ((history[history.length - 1] - history[history.length - 6]) / history[history.length - 6]) * 100
+        : null;
+    const monthPct =
+      history.length >= 21 && history[history.length - 1]
+        ? ((history[history.length - 1] - history[history.length - 21]) / history[history.length - 21]) * 100
+        : null;
 
     return {
       ...empty,
-      code, name, nav, navDate, dayPct, weekPct, monthPct,
-      history, historyPoints, metrics, source,
-      estimate: empty.estimate, estimatePct: empty.estimatePct, estimateTime: empty.estimateTime,
+      code,
+      name,
+      nav,
+      navDate,
+      dayPct,
+      weekPct,
+      monthPct,
+      history,
+      metrics,
+      source,
+      estimate: empty.estimate,
+      estimatePct: empty.estimatePct,
+      estimateTime: empty.estimateTime,
     };
   });
 

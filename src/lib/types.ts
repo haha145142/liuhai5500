@@ -104,6 +104,12 @@ export type SwingAdvice = {
   reason: string;
 };
 
+export type FundHistoryPoint = {
+  date: string;
+  nav: number;
+  changePct: number | null;
+};
+
 export type FundQuote = {
   code: string;
   name: string;
@@ -117,6 +123,7 @@ export type FundQuote = {
   weekPct: number | null;
   monthPct: number | null;
   history: number[];
+  historyPoints: FundHistoryPoint[];
   metrics: FundMetrics | null;
   source: string;
 };
