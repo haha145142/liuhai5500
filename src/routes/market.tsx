@@ -26,20 +26,20 @@ function MarketPage() {
     return () => { alive = false; };
   }, []);
 
-  if (!snapshot) return <EmptyNote>正在接入行情…</EmptyNote>;
-
-  const bench = snapshot.indices[0]?.pct ?? null;
-  const flow = snapshot.flow;
-  const knownById = new Map(snapshot.sectors.map((s) => [s.id, s]));
+  const bench = snapshot?.indices[0]?.pct ?? null;
+  const flow = snapshot?.flow ?? null;
+  const knownById = new Map((snapshot?.sectors ?? []).map((s) => [s.id, s]));
   const allByCode = new Map(allSectors.map((s) => [s.bkCode, s]));
   const selectedCodes = selected.map((id) => SECTOR_RULES.find((r) => r.id === id)?.bkCode || id);
   const watched = selectedCodes.map((code) => allByCode.get(code) || knownById.get(code)).filter((s): s is SectorQuote => !!s);
 
   const managerRows = useMemo(() => {
-    const rows = allSectors.length ? allSectors : snapshot.boards.map((b) => ({ id: b.code, name: b.name, bkCode: b.code, change: b.change, flow: b.flow, super: null, large: null, mid: null, small: null, turnover: null, available: b.change != null, streak: 0 } as SectorQuote));
+    const rows = allSectors.length ? allSectors : (snapshot?.boards ?? []).map((b) => ({ id: b.code, name: b.name, bkCode: b.code, change: b.change, flow: b.flow, super: null, large: null, mid: null, small: null, turnover: null, available: b.change != null, streak: 0 } as SectorQuote));
     const q = sectorQuery.trim().toLowerCase();
     return q ? rows.filter((s) => s.name.toLowerCase().includes(q)) : rows;
-  }, [allSectors, snapshot.boards, sectorQuery]);
+  }, [allSectors, snapshot?.boards, sectorQuery]);
+
+  if (!snapshot) return <EmptyNote>正在接入行情…</EmptyNote>;
 
   return (
     <div>
@@ -67,15 +67,8 @@ function MarketPage() {
               const r = calcSixFactor(s, bench);
               return (
                 <div key={s.bkCode} className="rounded-2xl bg-bg-elevated p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <b className="text-sm">{s.name}</b>
-                    <Tone v={s.change} className="font-semibold">{s.available ? fmtPctShort(s.change) : "暂无可靠数据"}</Tone>
-                  </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-center text-[10px]">
-                    <Mini label="综合分" value={`${r.position}/100`} />
-                    <Mini label="判断" value={r.advice} />
-                    <Mini label="置信" value={`${r.confidence}%`} />
-                  </div>
+                  <div className="flex items-center justify-between gap-2"><b className="text-sm">{s.name}</b><Tone v={s.change} className="font-semibold">{s.available ? fmtPctShort(s.change) : "暂无可靠数据"}</Tone></div>
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-center text-[10px]"><Mini label="综合分" value={`${r.position}/100`} /><Mini label="判断" value={r.advice} /><Mini label="置信" value={`${r.confidence}%`} /></div>
                   <div className="mt-2 text-[11px] text-muted">资金 {s.flow == null ? "—" : fmtYi(s.flow)} · {r.basis}</div>
                 </div>
               );
