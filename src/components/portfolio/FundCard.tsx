@@ -5,12 +5,28 @@ import { calcSwingTrade } from "@/lib/calc/indicators";
 import { matchFundSector } from "@/lib/data/sectors";
 import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
 import { isTradeTime } from "@/lib/market-hours";
+import { cnTime } from "@/lib/format";
 import type { FundQuote, Holding, SectorQuote } from "@/lib/types";
 
 function periodReturn(fund: FundQuote | undefined, tradingDays: number, current: number | null) {
   if (!fund || current == null || fund.history.length <= tradingDays) return null;
   const base = fund.history[fund.history.length - 1 - tradingDays];
   return base ? ((current - base) / base) * 100 : null;
+}
+
+function isOfficialNavForToday(fund: FundQuote | undefined) {
+  if (!fund?.navDate) return false;
+  const now = cnTime();
+  const [y, m, d] = fund.navDate.split(/[-/]/).map(Number);
+  return y === now.getUTCFullYear() && m === now.getUTCMonth() + 1 && d === now.getUTCDate();
+}
+
+function isAfterClose(d = new Date()) {
+  const t = cnTime(d);
+  const day = t.getUTCDay();
+  if (day === 0 || day === 6) return false;
+  const mins = t.getUTCHours() * 60 + t.getUTCMinutes();
+  return mins > 15 * 60;
 }
 
 export function FundCard({
@@ -34,8 +50,10 @@ export function FundCard({
   const [cost, setCost] = useState(String(holding.cost));
   const name = fund?.name || holding.name || holding.code;
   const live = isTradeTime();
-  const px = live ? (fund?.estimate ?? fund?.nav ?? null) : (fund?.nav ?? fund?.estimate ?? null);
-  const day = live ? (fund?.estimatePct ?? fund?.dayPct ?? null) : (fund?.dayPct ?? fund?.estimatePct ?? null);
+  const officialToday = isOfficialNavForToday(fund);
+  const useEstimate = !officialToday && (live || isAfterClose());
+  const px = useEstimate ? (fund?.estimate ?? fund?.nav ?? null) : (fund?.nav ?? fund?.estimate ?? null);
+  const day = useEstimate ? (fund?.estimatePct ?? fund?.dayPct ?? null) : (fund?.dayPct ?? fund?.estimatePct ?? null);
   const value = px != null ? px * holding.shares : null;
   const costVal = holding.cost * holding.shares;
   const pnl = value != null ? value - costVal : null;
@@ -64,6 +82,9 @@ export function FundCard({
     }
   };
 
+  const quoteLabel = officialToday ? "今日官方净值" : useEstimate ? "盘中估值 / 收盘估值" : "最近官方净值";
+  const quoteSourceLabel = officialToday ? "官方净值已发布，优先采用" : useEstimate ? "官方今日净值尚未发布，继续采用估值" : "等待今日净值或盘中估值";
+
   return (
     <article className="glass mb-3 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -72,14 +93,14 @@ export function FundCard({
             {name} <span className="text-xs font-normal text-muted">{holding.code}</span>
           </div>
           <div className="mt-1 text-xs text-muted">
-            {live ? "盘中实时估值" : "收盘后官方净值"} · {fund?.source || "等待数据"}
+            {quoteLabel} · {fund?.source || "等待数据"}
           </div>
         </div>
         <div className="text-right">
           <Tone v={day} className="text-2xl font-semibold">
             {fmtPctShort(day)}
           </Tone>
-          <div className="text-[10px] text-muted">{live ? "今日估值涨跌" : "最近交易日涨跌"}</div>
+          <div className="text-[10px] text-muted">{officialToday ? "官方净值涨跌" : useEstimate ? "盘中/收盘估值涨跌" : "最近交易日涨跌"}</div>
         </div>
       </div>
 
@@ -98,6 +119,7 @@ export function FundCard({
           {fund?.nav != null ? `官方净值 ${fmtPrice(fund.nav, 4)} · ${fund.navDate || "日期未知"}` : "官方净值暂无"}
           {fund?.estimate != null ? ` · 盘中估值 ${fmtPrice(fund.estimate, 4)}${fund.estimateTime ? ` · ${fund.estimateTime}` : ""}` : ""}
         </div>
+        <div className="mt-1 text-[11px] font-semibold text-fg">口径：{quoteSourceLabel}</div>
         {estimateGap != null ? (
           <div className="mt-1 text-[11px] text-muted">
             估值校验：相对最近官方净值 <Tone v={estimateGap}>{fmtPctShort(estimateGap)}</Tone>
