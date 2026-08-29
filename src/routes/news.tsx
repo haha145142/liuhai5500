@@ -153,14 +153,16 @@ function NewsPage() {
 
 function NewsCard({ item, holdings }: { item: NewsItem; holdings: string[] }) {
   const hitHold = holdings.filter((n) => n && (item.title.includes(n.slice(0, 4)) || item.relatedSectors.some((s) => n.includes(s))));
+  const hasSourceUrl = /^https?:\/\//i.test(item.url);
   return (
     <article className="glass-tight mb-2 p-3">
       <div className="flex items-center gap-2 text-[11px] text-muted"><span>{item.source}</span><span>·</span><span>{formatPublishedAt(item.publishedAt)}</span><span className="ml-auto">{ageLabel(item.publishedAt)}</span></div>
       <h3 className="mt-1 text-sm font-semibold leading-snug text-fg">{item.title}</h3>
       {item.summary ? <p className="mt-1 text-xs leading-relaxed text-muted">{item.summary}</p> : null}
-      <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <Tone v={item.sentiment === "bull" ? 1 : item.sentiment === "bear" ? -1 : 0} className="rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-semibold">{item.sentiment === "bull" ? "偏利好" : item.sentiment === "bear" ? "偏利空" : "中性"}</Tone>
         {item.relatedSectors.slice(0, 3).map((s) => <span key={s} className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">{s}</span>)}
+        {hasSourceUrl ? <a href={item.url} target="_blank" rel="noopener noreferrer" className="ml-auto rounded-full bg-bg-elevated px-2.5 py-1 text-[10px] font-semibold text-accent">查看原文</a> : null}
       </div>
       {hitHold.length ? <p className="mt-2 rounded-xl bg-warn/10 px-2 py-1 text-[11px] font-semibold text-warn">可能关联持仓：{hitHold.join("、")}</p> : null}
     </article>

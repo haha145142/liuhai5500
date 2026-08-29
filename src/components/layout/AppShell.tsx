@@ -7,6 +7,8 @@ import { clockStr } from "@/lib/format";
 import { isTradeTime, sessionLabel } from "@/lib/market-hours";
 import { cn } from "@/lib/cn";
 
+const NEWS_REFRESH_MS = 60_000;
+
 export function AppShell({ children }: { children: ReactNode }) {
   const hydrate = useApp((s) => s.hydrate);
   const refreshSnapshot = useApp((s) => s.refreshSnapshot);
@@ -32,6 +34,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     }, settings.autoRefreshMs);
     return () => window.clearInterval(id);
   }, [refreshSnapshot, refreshFunds, settings.autoRefreshMs]);
+
+  // 新闻不能跟随行情刷新节奏无限频繁请求，也不能只在首次进入时冻结。
+  // 仅在首页/资讯页保持 60 秒轻量更新，服务端本身还有 60 秒缓存。
+  useEffect(() => {
+    if (pathname !== "/" && !pathname.startsWith("/news")) return;
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      void refreshNews();
+    }, NEWS_REFRESH_MS);
+    return () => window.clearInterval(id);
+  }, [pathname, refreshNews]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
