@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.cache/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+coverage/
+playwright-report/
+test-results/
+.tmp/
+*.local

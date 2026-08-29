@@ -1,0 +1,135 @@
+import { useState } from "react";
+import { Glass, SectionTitle, Tone } from "@/components/ui/Glass";
+import { buildEvidence, moneyBehavior } from "@/lib/calc/evidence";
+import { analyzeMarket } from "@/lib/data/server";
+import { fmtPctShort, fmtYi } from "@/lib/format";
+import type { NewsItem, Snapshot } from "@/lib/types";
+
+export function Cockpit({ snap, news }: { snap: Snapshot; news: NewsItem[] }) {
+  const ev = buildEvidence(snap, news);
+  const mb = moneyBehavior(news);
+  const avg =
+    snap.indices.length && snap.indices.every((i) => i.pct != null)
+      ? snap.indices.reduce((s, i) => s + (i.pct || 0), 0) / snap.indices.length
+      : null;
+  const boards = snap.boards.filter((b) => b.change != null);
+  const strongest = boards[0];
+  const weakest = boards[boards.length - 1];
+  const up = snap.indices.filter((i) => (i.pct || 0) > 0).length;
+  const dn = snap.indices.length - up;
+  const [aiText, setAiText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const deep = async () => {
+    setBusy(true);
+    const prompt = `证据：指数 ${JSON.stringify(snap.indices)}；板块 ${JSON.stringify(snap.sectors.slice(0, 8))}；资金 ${JSON.stringify(snap.flow)}；外围 ${JSON.stringify(snap.global)}；新闻标题 ${news.slice(0, 8).map((n) => n.title).join("；")}。请按7步输出中文结论。`;
+    const r = await analyzeMarket({ data: { prompt } });
+    setAiText(r.ok ? r.text : r.error || "AI 接口暂不可用，已使用规则版判断");
+    setBusy(false);
+  };
+
+  return (
+    <>
+      <Glass>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-medium text-muted">今日投资结论</div>
+            <h3 className="mt-1 text-lg font-semibold tracking-tight">{ev.verdict}</h3>
+            <p className="mt-1 text-sm leading-relaxed text-muted">{ev.summary}</p>
+          </div>
+          <div className="text-right">
+            <div className={`text-2xl font-semibold tabular-nums ${ev.score >= 60 ? "tone-up" : ev.score <= 40 ? "tone-down" : "text-fg"}`}>
+              {ev.score}
+            </div>
+            <div className="text-[10px] text-subtle">规则评分</div>
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <Mini label="市场情绪" value={ev.verdict} />
+          <Mini label="上涨 / 下跌" value={`${up} / ${dn}`} tone={avg} />
+          <Mini label="风险" value={ev.risk} />
+        </div>
+        <p className="mt-3 text-sm text-fg">{ev.steps[6]?.body}</p>
+        <button
+          type="button"
+          onClick={() => void deep()}
+          disabled={busy}
+          className="mt-3 w-full rounded-2xl bg-accent py-2.5 text-sm font-semibold text-accent-fg transition-transform active:scale-[0.98] disabled:opacity-60"
+        >
+          {busy ? "分析中…" : "深度分析"}
+        </button>
+        {aiText ? <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-muted">{aiText}</p> : null}
+        <p className="mt-2 text-[10px] text-subtle">规则引擎基于已抓取证据；深度分析按需调用。不构成投资建议。</p>
+      </Glass>
+
+      <Glass>
+        <SectionTitle title="市场温度计" hint="情绪" />
+        <div className="flex items-end justify-between">
+          <div>
+            <Tone v={avg} className="text-xl font-semibold">
+              {avg == null ? "暂无可靠数据" : avg > 1 ? "偏热" : avg > 0 ? "温和" : avg < -1 ? "偏冷" : "中性"}
+            </Tone>
+            <div className="text-xs text-muted">{fmtPctShort(avg)}</div>
+          </div>
+          <div className="text-xs text-muted">
+            <b className="tone-up">{up} 涨</b> / <b className="tone-down">{dn} 跌</b>
+          </div>
+        </div>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border">
+          <i
+            className="block h-full rounded-full bg-accent"
+            style={{ width: `${Math.min(100, Math.max(0, 50 + (avg || 0) * 10))}%` }}
+          />
+        </div>
+      </Glass>
+
+      <Glass>
+        <SectionTitle title="市场扫描" hint="最强 / 最弱" />
+        {strongest && weakest ? (
+          <div className="space-y-2 text-sm">
+            <Row k="最强" v={`${strongest.name} ${fmtPctShort(strongest.change)}`} tone={strongest.change} />
+            <Row k="最弱" v={`${weakest.name} ${fmtPctShort(weakest.change)}`} tone={weakest.change} />
+            <Row
+              k="资金"
+              v={snap.flow ? `主力 ${fmtYi(snap.flow.main)}` : "暂无可靠数据"}
+              tone={snap.flow?.main}
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-muted">暂无可靠数据</p>
+        )}
+      </Glass>
+
+      <Glass>
+        <SectionTitle title="资金行为" hint="消息面统计" />
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <Mini label="机构" value={String(mb.inst)} />
+          <Mini label="游资" value={String(mb.hot)} />
+          <Mini label="散户" value={String(mb.retail)} />
+        </div>
+        <p className="mt-3 text-sm leading-relaxed text-muted">{mb.judge}</p>
+      </Glass>
+    </>
+  );
+}
+
+function Mini({ label, value, tone }: { label: string; value: string; tone?: number | null }) {
+  const cls =
+    tone == null || tone === 0 ? "text-fg" : tone > 0 ? "tone-up" : "tone-down";
+  return (
+    <div className="rounded-2xl bg-bg-elevated px-2 py-2">
+      <div className="text-[10px] text-subtle">{label}</div>
+      <div className={`mt-0.5 text-sm font-semibold ${cls}`}>{value}</div>
+    </div>
+  );
+}
+
+function Row({ k, v, tone }: { k: string; v: string; tone?: number | null }) {
+  const cls = tone == null || tone === 0 ? "text-fg" : tone > 0 ? "tone-up" : "tone-down";
+  return (
+    <div className="flex items-center justify-between rounded-2xl bg-bg-elevated px-3 py-2">
+      <span className="text-muted">{k}</span>
+      <span className={`font-semibold tabular-nums ${cls}`}>{v}</span>
+    </div>
+  );
+}
