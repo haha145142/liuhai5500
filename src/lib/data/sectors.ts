@@ -8,7 +8,7 @@ export type SectorRule = {
   etf?: { code: string; name: string };
 };
 
-/** Default watch set: 8 tech boards from V4/V5 + extras from later versions. */
+/** Watchable sector universe. Only selected sectors are shown in the personal watch panel. */
 export const SECTOR_RULES: SectorRule[] = [
   { id: "semi", name: "半导体", bkCode: "BK0917", prefer: "industry", searchKeys: ["半导体"], keys: ["半导体", "芯片", "集成电路", "晶圆"], etf: { code: "512480", name: "半导体ETF" } },
   { id: "semi_eq", name: "半导体材料设备", bkCode: "BK1059", prefer: "concept", searchKeys: ["半导体材料", "半导体设备"], keys: ["半导体设备", "半导体材料", "光刻", "刻蚀"], etf: { code: "159516", name: "半导体材料ETF" } },
@@ -25,6 +25,9 @@ export const SECTOR_RULES: SectorRule[] = [
   { id: "pharma", name: "创新药", bkCode: "BK1143", prefer: "concept", searchKeys: ["创新药"], keys: ["创新药", "生物医药", "CXO"], etf: { code: "159992", name: "创新药ETF" } },
   { id: "gold", name: "黄金", bkCode: "BK0547", prefer: "concept", searchKeys: ["黄金"], keys: ["黄金", "金"], etf: { code: "518880", name: "黄金ETF" } },
   { id: "defense", name: "军工", bkCode: "BK0490", prefer: "industry", searchKeys: ["军工", "国防"], keys: ["军工", "国防", "航空"], etf: { code: "512660", name: "军工ETF" } },
+  { id: "space", name: "商业航天", bkCode: "BK0963", prefer: "concept", searchKeys: ["商业航天", "卫星互联网"], keys: ["商业航天", "卫星互联网", "卫星", "航天"], etf: { code: "563380", name: "卫星互联网ETF" } },
+  { id: "nonferrous", name: "有色金属", bkCode: "BK0478", prefer: "industry", searchKeys: ["有色金属"], keys: ["有色金属", "有色"], etf: { code: "512400", name: "有色金属ETF" } },
+  { id: "lithium", name: "锂矿", bkCode: "BK1173", prefer: "concept", searchKeys: ["锂矿", "锂资源"], keys: ["锂矿", "锂资源", "盐湖提锂"], etf: { code: "159840", name: "锂电池ETF" } },
 ];
 
 export const DEFAULT_SECTOR_IDS = SECTOR_RULES.slice(0, 8).map((s) => s.id);
