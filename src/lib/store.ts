@@ -17,6 +17,7 @@ type AppState = {
   ready: boolean;
   loading: boolean;
   newsLoading: boolean;
+  fundsLoading: boolean;
   snapshot: Snapshot | null;
   news: NewsFeed | null;
   portfolio: Holding[];
@@ -41,6 +42,7 @@ export const useApp = create<AppState>((set, get) => ({
   ready: false,
   loading: false,
   newsLoading: false,
+  fundsLoading: false,
   snapshot: null,
   news: null,
   portfolio: [],
@@ -84,21 +86,28 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   refreshFunds: async () => {
+    if (get().fundsLoading) return;
     const list = get().portfolio;
     if (!list.length) return;
-    const entries = await Promise.all(
-      list.map(async (h) => {
-        try {
-          const q = await getFund({ data: { code: h.code } });
-          return [h.code, q] as const;
-        } catch {
-          return null;
-        }
-      }),
-    );
-    const funds = { ...get().funds };
-    for (const e of entries) if (e) funds[e[0]] = e[1];
-    set({ funds });
+    set({ fundsLoading: true });
+    try {
+      const codes = [...new Set(list.map((h) => h.code))];
+      const entries = await Promise.all(
+        codes.map(async (code) => {
+          try {
+            const q = await getFund({ data: { code } });
+            return [code, q] as const;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const funds = { ...get().funds };
+      for (const e of entries) if (e) funds[e[0]] = e[1];
+      set({ funds });
+    } finally {
+      set({ fundsLoading: false });
+    }
   },
 
   addHolding: (h) => {
