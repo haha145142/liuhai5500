@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { EmptyNote, Glass, SectionTitle, Tone } from "@/components/ui/Glass";
 import { ageLabel, clockStr, formatPublishedAt } from "@/lib/format";
+import { analyzeNews } from "@/lib/data/server";
 import { useApp } from "@/lib/store";
 import type { NewsItem } from "@/lib/types";
 
@@ -19,10 +20,13 @@ function NewsPage() {
   const news = useApp((s) => s.news);
   const newsLoading = useApp((s) => s.newsLoading);
   const refreshNews = useApp((s) => s.refreshNews);
+  const snapshot = useApp((s) => s.snapshot);
   const portfolio = useApp((s) => s.portfolio);
   const funds = useApp((s) => s.funds);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
   const [tab, setTab] = useState<"flash" | "deep" | "mood">("flash");
+  const [aiText, setAiText] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
 
   const names = portfolio.map((p) => funds[p.code]?.name || p.name).filter(Boolean);
 
@@ -32,6 +36,34 @@ function NewsPage() {
     if (filter === "all") return list;
     return list.filter((n) => n.category === filter);
   }, [news, filter, tab]);
+
+  const runNewsAI = async () => {
+    if (!items.length || aiBusy) return;
+    setAiBusy(true);
+    const evidence = items.slice(0, 10).map((n, i) => ({
+      no: i + 1,
+      title: n.title,
+      summary: n.summary,
+      source: n.source,
+      publishedAt: n.publishedAt ? formatPublishedAt(n.publishedAt) : "暂无可靠时间",
+      category: n.category,
+      sentiment: n.sentiment,
+      relatedSectors: n.relatedSectors,
+    }));
+    const prompt = [
+      "请解读下面最新新闻。重点回答哪些新闻真正可能影响A股、影响哪个板块，以及影响逻辑。",
+      `新闻：${JSON.stringify(evidence)}`,
+      snapshot ? `指数：${JSON.stringify(snapshot.indices)}` : "指数：暂无可靠数据",
+      snapshot ? `板块资金：${JSON.stringify(snapshot.sectors)}` : "板块资金：暂无可靠数据",
+      snapshot ? `市场资金：${JSON.stringify(snapshot.flow)}` : "市场资金：暂无可靠数据",
+      snapshot ? `外围：${JSON.stringify(snapshot.global)}` : "外围：暂无可靠数据",
+      "请优先挑出最值得关注的3—5条，不要把每条新闻机械重复一遍。",
+      "输出结构：\n【今日新闻结论】一句话总判断\n【最重要的新闻】按重要性列3—5条，每条包含：发生了什么｜影响谁｜影响逻辑｜利好/利空/中性｜需要验证什么\n【板块影响】指出最值得关注的板块和原因；没有证据就写暂无可靠数据\n【一句话提醒】告诉普通投资者今天最应该盯什么。",
+    ].join("\n");
+    const r = await analyzeNews({ data: { prompt } });
+    setAiText(r.ok ? r.text : `AI 解读暂时不可用：${r.error}`);
+    setAiBusy(false);
+  };
 
   return (
     <div>
@@ -78,7 +110,28 @@ function NewsPage() {
       </Glass>
 
       {items.length ? (
-        items.map((n) => <NewsCard key={n.id + n.source} item={n} holdings={names} />)
+        <>
+          <Glass className="mb-2 border border-accent/15">
+            <SectionTitle title="AI解读新闻" hint="基于当前新闻 + 行情证据" />
+            <p className="text-xs leading-relaxed text-muted">
+              不重新抓新闻，只对当前已经显示的资讯做二次分析：筛出真正重要的新闻、对应板块和可能的市场影响。
+            </p>
+            <button
+              type="button"
+              onClick={() => void runNewsAI()}
+              disabled={aiBusy}
+              className="mt-3 w-full rounded-2xl bg-accent py-2.5 text-sm font-semibold text-accent-fg disabled:opacity-60"
+            >
+              {aiBusy ? "正在解读…" : aiText ? "重新解读最新新闻" : "一键生成 AI 解读"}
+            </button>
+            {aiText ? (
+              <div className="mt-3 rounded-2xl bg-bg-elevated/80 p-3">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-fg">{aiText}</p>
+              </div>
+            ) : null}
+          </Glass>
+          {items.map((n) => <NewsCard key={n.id + n.source} item={n} holdings={names} />)}
+        </>
       ) : (
         <EmptyNote>{newsLoading ? "正在抓取资讯…" : "暂无可靠资讯，请稍后刷新"}</EmptyNote>
       )}
