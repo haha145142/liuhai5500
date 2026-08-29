@@ -126,6 +126,12 @@ export type FundQuote = {
   historyPoints: FundHistoryPoint[];
   metrics: FundMetrics | null;
   source: string;
+  /** true only when navDate is today's date and the NAV is confirmed official */
+  officialNavPublished?: boolean;
+  /** Human-readable state used by the portfolio UI. */
+  valuationStatus?: "estimate" | "waiting_official_nav" | "official_nav" | "stale" | "unavailable";
+  /** Confidence in the intraday estimate; never implies a guarantee of accuracy. */
+  estimateConfidence?: "high" | "medium" | "low";
 };
 
 export type RankRow = {
