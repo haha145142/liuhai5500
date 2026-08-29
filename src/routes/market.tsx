@@ -1,10 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { IndexGrid } from "@/components/market/IndexGrid";
 import { EmptyNote, Glass, SectionTitle, Tone } from "@/components/ui/Glass";
 import { calcSixFactor } from "@/lib/calc/six-factor";
 import { SECTOR_RULES } from "@/lib/data/sectors";
+import { getAllSectorWatch } from "@/lib/data/sector-watch";
 import { fmtPctShort, fmtYi } from "@/lib/format";
 import { useApp } from "@/lib/store";
+import type { SectorQuote } from "@/lib/types";
 
 export const Route = createFileRoute("/market")({ component: MarketPage });
 
@@ -12,11 +15,31 @@ function MarketPage() {
   const snapshot = useApp((s) => s.snapshot);
   const selected = useApp((s) => s.selectedSectors);
   const setSectors = useApp((s) => s.setSectors);
+  const [allSectors, setAllSectors] = useState<SectorQuote[]>([]);
+  const [sectorLoading, setSectorLoading] = useState(false);
+  const [sectorQuery, setSectorQuery] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    setSectorLoading(true);
+    void getAllSectorWatch().then((rows) => { if (alive) setAllSectors(rows); }).finally(() => { if (alive) setSectorLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
   if (!snapshot) return <EmptyNote>正在接入行情…</EmptyNote>;
 
   const bench = snapshot.indices[0]?.pct ?? null;
-  const watched = snapshot.sectors.filter((s) => selected.includes(s.id));
   const flow = snapshot.flow;
+  const knownById = new Map(snapshot.sectors.map((s) => [s.id, s]));
+  const allByCode = new Map(allSectors.map((s) => [s.bkCode, s]));
+  const selectedCodes = selected.map((id) => SECTOR_RULES.find((r) => r.id === id)?.bkCode || id);
+  const watched = selectedCodes.map((code) => allByCode.get(code) || knownById.get(code)).filter((s): s is SectorQuote => !!s);
+
+  const managerRows = useMemo(() => {
+    const rows = allSectors.length ? allSectors : snapshot.boards.map((b) => ({ id: b.code, name: b.name, bkCode: b.code, change: b.change, flow: b.flow, super: null, large: null, mid: null, small: null, turnover: null, available: b.change != null, streak: 0 } as SectorQuote));
+    const q = sectorQuery.trim().toLowerCase();
+    return q ? rows.filter((s) => s.name.toLowerCase().includes(q)) : rows;
+  }, [allSectors, snapshot.boards, sectorQuery]);
 
   return (
     <div>
@@ -43,7 +66,7 @@ function MarketPage() {
             {watched.map((s) => {
               const r = calcSixFactor(s, bench);
               return (
-                <div key={s.id} className="rounded-2xl bg-bg-elevated p-3">
+                <div key={s.bkCode} className="rounded-2xl bg-bg-elevated p-3">
                   <div className="flex items-center justify-between gap-2">
                     <b className="text-sm">{s.name}</b>
                     <Tone v={s.change} className="font-semibold">{s.available ? fmtPctShort(s.change) : "暂无可靠数据"}</Tone>
@@ -58,21 +81,24 @@ function MarketPage() {
               );
             })}
           </div>
-        ) : <p className="text-sm text-muted">还没有关注板块，请在下方添加。</p>}
+        ) : <p className="text-sm text-muted">还没有关注板块，请在下方添加。你不添加，就不会显示它的数据。</p>}
       </Glass>
 
       <Glass>
-        <SectionTitle title="管理关注板块" hint="自由添加 / 移除" />
-        <p className="mb-3 text-[11px] leading-relaxed text-muted">只显示你选择的板块数据。这个月关注商业航天，下个月换锂矿/有色金属，都可以直接调整；取消关注后不再出现在“我的关注板块”。</p>
-        <div className="flex flex-wrap gap-2">
-          {SECTOR_RULES.map((r) => {
-            const on = selected.includes(r.id);
+        <SectionTitle title="管理关注板块" hint={sectorLoading ? "正在加载全部板块…" : `${managerRows.length} 个可选`} />
+        <p className="mb-2 text-[11px] leading-relaxed text-muted">这里是市场全部可选板块，不是让你全部添加。搜索一个板块，点一下“＋”即可加入；只有你主动选择的板块才会出现在上面的关注区。</p>
+        <input value={sectorQuery} onChange={(e) => setSectorQuery(e.target.value)} placeholder="搜索板块，例如：医药、黄金、商业航天、锂矿…" className="mb-3 h-10 w-full rounded-xl bg-bg-elevated px-3 text-xs ring-1 ring-border outline-none" />
+        <div className="max-h-[420px] space-y-1.5 overflow-y-auto pr-1">
+          {managerRows.map((s) => {
+            const on = selectedCodes.includes(s.bkCode);
             return (
-              <button key={r.id} type="button" onClick={() => setSectors(on ? selected.filter((x) => x !== r.id) : [...selected, r.id])} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${on ? "bg-accent text-accent-fg" : "bg-bg-elevated text-muted"}`}>
-                {on ? "✓ " : "+ "}{r.name}
+              <button key={s.bkCode} type="button" onClick={() => setSectors(on ? selected.filter((x) => (SECTOR_RULES.find((r) => r.id === x)?.bkCode || x) !== s.bkCode) : [...selected, s.bkCode])} className="flex w-full items-center justify-between rounded-xl bg-bg-elevated px-3 py-2 text-left">
+                <span className="min-w-0"><b className="text-xs">{on ? "✓ " : "+ "}{s.name}</b><span className="ml-2 text-[10px] text-subtle">板块</span></span>
+                <Tone v={s.change} className="ml-2 shrink-0 text-xs font-semibold">{s.available ? fmtPctShort(s.change) : "—"}</Tone>
               </button>
             );
           })}
+          {!managerRows.length && !sectorLoading ? <p className="py-4 text-center text-xs text-muted">没有找到这个板块</p> : null}
         </div>
       </Glass>
 
