@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { SwingPlan } from "@/components/portfolio/SwingPlan";
 import { Tone } from "@/components/ui/Glass";
 import { calcSixFactor } from "@/lib/calc/six-factor";
 import { calcSwingTrade } from "@/lib/calc/indicators";
@@ -183,6 +184,8 @@ export function FundCard({
       ) : (
         <p className="mt-3 text-xs text-muted">净值历史不足 35 个交易日，暂不生成可靠波段信号。</p>
       )}
+
+      <SwingPlan holding={holding} fund={fund} price={px} officialToday={officialToday} />
 
       {mapped ? (
         <div className="mt-3 rounded-2xl bg-accent/8 p-3 text-xs text-muted">
