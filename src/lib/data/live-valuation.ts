@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { calcIndicators } from "../calc/indicators";
+import { policyForFund } from "../calc/fund-type-policy";
 import type { FundHistoryPoint, FundMetrics, FundQuote } from "../types";
 import { fetchText, n, parseMaybeJsonp } from "./fetch-util";
 
@@ -91,9 +92,6 @@ function buildEstimate(nav:number|null,holdings:LiveHolding[],externalPct:number
   const usableWeight = usable.reduce((s,h)=>s+h.weight,0);
   if (nav==null || usableWeight<=0 || totalDisclosed<=0) return {estimate:null,pct:null,disclosedWeight:totalDisclosed,usableWeight,coverage:usableWeight,coverageOfDisclosed:totalDisclosed?usableWeight/totalDisclosed*100:0,deviation:null,confidence:"low" as const,validation:"无法验证"};
 
-  // Use the disclosed portfolio weights as actual NAV contribution.
-  // The undisclosed remainder is intentionally neutral (0%) rather than
-  // renormalizing the top holdings to 100%, which avoids amplifying the move.
   const weightedContribution = usable.reduce((s,h)=>s+h.weight*(h.pct as number),0)/100;
   const estimate = nav*(1+weightedContribution/100);
   const coverage = Math.min(100,usableWeight);
@@ -118,9 +116,12 @@ export const getCalculatedFund = createServerFn({method:"POST"})
       const {gz,ordered,latest}=await getBase(code);
       const nav=n(gz?.dwjz)??latest?.nav??null;
       const navDate=gz?.jzrq?String(gz.jzrq):latest?.date??null;
+      const fundName=String(gz?.name||code);
+      const fundType=String(gz?.fundtype||"基金");
+      const policy=policyForFund(fundType,fundName);
       const externalPct=n(gz?.gszzl??gz?.vgszzl??gz?.zsgzzl);
-      const holdings=await getStockQuotes(await getHoldings(code));
-      const result=buildEstimate(nav,holdings,externalPct);
+      const holdings=policy.allowAshareLookThrough ? await getStockQuotes(await getHoldings(code)) : [];
+      const result=policy.allowAshareLookThrough ? buildEstimate(nav,holdings,externalPct) : { estimate:null,pct:null,disclosedWeight:0,usableWeight:0,coverage:0,coverageOfDisclosed:0,deviation:null,confidence:"low" as const,validation:"该类型不适用A股穿透估值" };
       const history=ordered.map(x=>x.nav);
       const weekBase=ordered[Math.max(0,ordered.length-6)];
       const monthBase=ordered[Math.max(0,ordered.length-22)];
@@ -130,13 +131,27 @@ export const getCalculatedFund = createServerFn({method:"POST"})
       const officialToday=navDate===today();
       const officialDayPct = officialToday ? (n(gz?.jzzzl??gz?.rzzl)??latest?.changePct??null) : null;
       const quote:FundQuote & ValuationAudit & {liveHoldings?:LiveHolding[];coverageOfDisclosed?:number}={
-        code,name:String(gz?.name||code),type:String(gz?.fundtype||"基金"),nav,navDate,
-        estimate:result.estimate,estimatePct:result.pct,estimateTime:new Date().toISOString(),
+        code,name:fundName,type:fundType,nav,navDate,
+        estimate:result.estimate,estimatePct:result.pct,estimateTime:result.estimate!=null?new Date().toISOString():null,
         dayPct:officialToday?officialDayPct:result.pct,
         weekPct,monthPct,history,historyPoints:ordered,metrics,
-        source:result.estimate!=null?`自有穿透估值 · 前十大重仓 × 实时行情 · ${result.validation}${externalPct!=null?` · 参考源差 ${result.deviation?.toFixed(2)}个百分点`:""}`:`自有估值暂不可用 · 未满足可靠持仓覆盖条件`,
-        officialNavPublished:officialToday,valuationStatus:officialToday?"official_nav":result.estimate!=null?"estimate":nav!=null?"waiting_official_nav":"unavailable",estimateConfidence:result.confidence,
-        liveHoldings:holdings,estimateMethod:"已披露重仓权重 × 实时资产涨跌；未披露部分按0贡献处理",estimateCoverage:result.coverage,disclosedWeight:result.disclosedWeight,usableWeight:result.usableWeight,coverageOfDisclosed:result.coverageOfDisclosed,externalEstimatePct:externalPct,estimateDeviation:result.deviation,estimateValidation:result.validation
+        source:result.estimate!=null
+          ?`自有穿透估值 · 前十大重仓 × 实时行情 · ${result.validation}${externalPct!=null?` · 参考源差 ${result.deviation?.toFixed(2)}个百分点`:""}`
+          :policy.allowLiveEstimate
+            ?`自有估值暂不可用 · ${result.validation}`
+            :`按基金类型采用官方净值模式 · ${policy.reason}`,
+        officialNavPublished:officialToday,
+        valuationStatus:officialToday?"official_nav":result.estimate!=null?"estimate":nav!=null?"waiting_official_nav":"unavailable",
+        estimateConfidence:result.confidence,
+        liveHoldings:holdings,
+        estimateMethod:policy.allowAshareLookThrough?"已披露重仓权重 × 实时资产涨跌；未披露部分按0贡献处理":policy.reason,
+        estimateCoverage:result.coverage,
+        disclosedWeight:result.disclosedWeight,
+        usableWeight:result.usableWeight,
+        coverageOfDisclosed:result.coverageOfDisclosed,
+        externalEstimatePct:externalPct,
+        estimateDeviation:result.deviation,
+        estimateValidation:result.validation
       };
       CACHE.set(code,{ts:Date.now(),quote});
       return quote;
