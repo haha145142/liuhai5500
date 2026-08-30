@@ -4,6 +4,7 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppShell } from "@/components/layout/AppShell";
 import appCss from "../styles.css?url";
+import uiPerformanceCss from "../ui-performance.css?url";
 
 const APP_NAME = "Fund AI Pro";
 
@@ -21,6 +22,7 @@ export const Route = createRootRoute({
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "stylesheet", href: appCss },
+      { rel: "stylesheet", href: uiPerformanceCss },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
