@@ -59,28 +59,36 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (pathname.startsWith("/news") || pathname === "/") void refreshNews();
   };
 
+  const header = (
+    <header className="app-header">
+      <div className="app-header-card">
+        <div>
+          <h1 className="app-header-title">Fund AI Pro</h1>
+          <p className="app-header-meta">
+            {sessionLabel()}
+            {snapshot ? ` · 数据截至 ${clockStr(new Date(snapshot.fetchedAt))}` : " · 正在接入行情"}
+          </p>
+        </div>
+        <button type="button" onClick={onRefresh} aria-label="刷新" className="app-refresh-button">
+          <RefreshCw className={cn("size-7", loading && "animate-spin")} />
+        </button>
+      </div>
+    </header>
+  );
+
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-card">
-          <div>
-            <h1 className="app-header-title">Fund AI Pro</h1>
-            <p className="app-header-meta">
-              {sessionLabel()}
-              {snapshot ? ` · 数据截至 ${clockStr(new Date(snapshot.fetchedAt))}` : " · 正在接入行情"}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onRefresh}
-            aria-label="刷新"
-            className="app-refresh-button"
-          >
-            <RefreshCw className={cn("size-7", loading && "animate-spin")} />
-          </button>
-        </div>
-      </header>
-      <main className="app-main">{children}</main>
+      {pathname === "/" ? (
+        <main className="app-main home-top-main">
+          {header}
+          {children}
+        </main>
+      ) : (
+        <>
+          {header}
+          <main className="app-main">{children}</main>
+        </>
+      )}
       <TabBar />
     </div>
   );
