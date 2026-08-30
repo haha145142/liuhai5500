@@ -18,6 +18,8 @@ import {
   type AppSettings,
 } from "./storage";
 import { getFund, getNews, getSnapshot } from "./data/server";
+import { isWeekend } from "./market-hours";
+import { tradingDateLabel } from "./data/trading-day";
 
 type AppState = {
   ready: boolean;
@@ -60,9 +62,10 @@ export const useApp = create<AppState>((set, get) => ({
 
   hydrate: () => {
     if (get().ready) return;
+    const cachedSnapshot = loadCachedSnapshot();
     set({
       ready: true,
-      snapshot: loadCachedSnapshot(),
+      snapshot: cachedSnapshot,
       news: loadCachedNews(),
       funds: loadCachedFunds(),
       portfolio: loadPortfolio(),
@@ -74,13 +77,47 @@ export const useApp = create<AppState>((set, get) => ({
 
   refreshSnapshot: async () => {
     if (get().loading) return;
+
+    // Saturday/Sunday: do not overwrite Friday's validated market snapshot with
+    // empty/currently-closed responses. Resume live refresh automatically Monday.
+    if (isWeekend()) {
+      const cached = get().snapshot || loadCachedSnapshot();
+      if (cached) {
+        const weekendSnapshot: Snapshot = {
+          ...cached,
+          marketDate: cached.marketDate || tradingDateLabel(),
+          validation: "cached_latest_trading_day",
+        };
+        set({ snapshot: weekendSnapshot, loading: false, lastError: null });
+        return;
+      }
+    }
+
     set({ loading: true, lastError: null });
     try {
       const snapshot = await getSnapshot();
-      saveCachedSnapshot(snapshot);
-      set({ snapshot, loading: false });
+      const normalized: Snapshot = {
+        ...snapshot,
+        marketDate: snapshot.marketDate || (isWeekend() ? tradingDateLabel() : null),
+        validation: snapshot.validation || "single_source",
+      };
+      saveCachedSnapshot(normalized);
+      set({ snapshot: normalized, loading: false });
     } catch (e) {
-      set({ loading: false, lastError: e instanceof Error ? e.message : "行情暂时不可用" });
+      const cached = get().snapshot || loadCachedSnapshot();
+      if (cached) {
+        set({
+          snapshot: {
+            ...cached,
+            validation: "cached_latest_trading_day",
+            marketDate: cached.marketDate || tradingDateLabel(),
+          },
+          loading: false,
+          lastError: "实时数据源暂不可用 · 已保留最近交易日数据",
+        });
+      } else {
+        set({ loading: false, lastError: e instanceof Error ? e.message : "行情暂时不可用" });
+      }
     }
   },
 
@@ -100,6 +137,14 @@ export const useApp = create<AppState>((set, get) => ({
     if (get().fundsLoading) return;
     const list = get().portfolio;
     if (!list.length) return;
+
+    // Market-derived fund estimates should not churn on weekends. Keep Friday's
+    // estimate/NAV visible until the next trading session refreshes them.
+    if (isWeekend()) {
+      const cached = get().funds;
+      if (Object.keys(cached).length) return;
+    }
+
     set({ fundsLoading: true });
     try {
       const codes = [...new Set(list.map((h) => h.code))];
@@ -108,9 +153,15 @@ export const useApp = create<AppState>((set, get) => ({
       );
       const funds = { ...get().funds };
       for (const result of entries) {
-        if (result.status === "fulfilled") funds[result.value[0]] = result.value[1];
+        if (result.status === "fulfilled") {
+          const quote = result.value[1];
+          // Never replace a usable cached quote with an all-null response from a
+          // temporarily unavailable provider.
+          const hasUsableValue = quote.nav != null || quote.estimate != null || quote.history.length > 0;
+          if (hasUsableValue) funds[result.value[0]] = quote;
+        }
       }
-      saveCachedFunds(funds);
+      if (Object.keys(funds).length) saveCachedFunds(funds);
       set({ funds });
     } finally {
       set({ fundsLoading: false });
