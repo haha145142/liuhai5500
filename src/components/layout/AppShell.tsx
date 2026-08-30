@@ -8,6 +8,7 @@ import { clockStr } from "@/lib/format";
 import { isTradeTime, isWeekend, sessionLabel } from "@/lib/market-hours";
 import { tradingDateLabel } from "@/lib/data/trading-day";
 import { cn } from "@/lib/cn";
+import { QuickAddFund } from "@/components/portfolio/QuickAddFund";
 
 const NEWS_REFRESH_MS = 3 * 60_000;
 const BOOT_DELAY_MS = 80;
@@ -78,9 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="app-header-card">
         <div>
           <h1 className="app-header-title">Fund AI Pro</h1>
-          <p className="app-header-meta">
-            {sessionLabel()} · {statusText}
-          </p>
+          <p className="app-header-meta">{sessionLabel()} · {statusText}</p>
         </div>
         <button type="button" onClick={onRefresh} aria-label="刷新" className="app-refresh-button">
           <RefreshCw className={cn("size-7", loading && "animate-spin")} />
@@ -89,17 +88,19 @@ export function AppShell({ children }: { children: ReactNode }) {
     </header>
   );
 
+  const mainContent = pathname === "/portfolio" ? <><QuickAddFund />{children}</> : children;
+
   return (
     <div className="app-shell">
       {pathname === "/" ? (
         <section className="home-panel">
           {header}
-          <main className="app-main home-main">{children}</main>
+          <main className="app-main home-main">{mainContent}</main>
         </section>
       ) : (
         <>
           {header}
-          <main className="app-main">{children}</main>
+          <main className="app-main">{mainContent}</main>
         </>
       )}
       <TabBar />
