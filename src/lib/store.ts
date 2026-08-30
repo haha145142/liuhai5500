@@ -20,6 +20,7 @@ import {
 import { getFund, getNews, getSnapshot } from "./data/server";
 import { crossCheckIndices } from "./data/cross-check";
 import { validateFundQuote } from "./data/validation";
+import { getLatestTradingMarketData } from "./data/market-fallback";
 import { isWeekend } from "./market-hours";
 import { tradingDateLabel } from "./data/trading-day";
 
@@ -64,10 +65,9 @@ export const useApp = create<AppState>((set, get) => ({
 
   hydrate: () => {
     if (get().ready) return;
-    const cachedSnapshot = loadCachedSnapshot();
     set({
       ready: true,
-      snapshot: cachedSnapshot,
+      snapshot: loadCachedSnapshot(),
       news: loadCachedNews(),
       funds: loadCachedFunds(),
       portfolio: loadPortfolio(),
@@ -79,13 +79,42 @@ export const useApp = create<AppState>((set, get) => ({
 
   refreshSnapshot: async () => {
     if (get().loading) return;
+
     if (isWeekend()) {
       const cached = get().snapshot || loadCachedSnapshot();
       if (cached) {
-        set({ snapshot: { ...cached, marketDate: cached.marketDate || tradingDateLabel(), validation: "cached_latest_trading_day" }, loading: false, lastError: null });
+        set({
+          snapshot: { ...cached, marketDate: cached.marketDate || tradingDateLabel(), validation: "cached_latest_trading_day" },
+          loading: false,
+          lastError: null,
+        });
         return;
       }
+
+      set({ loading: true, lastError: null });
+      try {
+        const fallback = await getLatestTradingMarketData();
+        const base = loadCachedSnapshot();
+        const snapshot: Snapshot = {
+          ...(base || { indices: [], sectors: [], boards: [], flow: null, global: [], sources: [], fetchedAt: Date.now() }),
+          indices: fallback.indices,
+          sectors: fallback.sectors,
+          marketDate: fallback.marketDate || tradingDateLabel(),
+          validation: "cached_latest_trading_day",
+          fetchedAt: Date.now(),
+          sources: [
+            ...(base?.sources || []),
+            { name: "最近交易日历史行情", status: fallback.marketDate ? "ok" : "warn", note: fallback.note },
+          ],
+        };
+        saveCachedSnapshot(snapshot);
+        set({ snapshot, loading: false, lastError: null });
+      } catch {
+        set({ loading: false, lastError: "暂无最近交易日行情数据" });
+      }
+      return;
     }
+
     set({ loading: true, lastError: null });
     try {
       const snapshot = await getSnapshot();
@@ -95,7 +124,7 @@ export const useApp = create<AppState>((set, get) => ({
       const normalized: Snapshot = {
         ...snapshot,
         indices,
-        marketDate: snapshot.marketDate || (isWeekend() ? tradingDateLabel() : null),
+        marketDate: snapshot.marketDate || null,
         validation: checked.checked ? "cross_checked" : "single_source",
         sources: checked.checked
           ? snapshot.sources.map((s) => s.name === "指数" ? { ...s, note: `${s.note} · ${checked.note}` } : s)
@@ -106,7 +135,11 @@ export const useApp = create<AppState>((set, get) => ({
     } catch (e) {
       const cached = get().snapshot || loadCachedSnapshot();
       if (cached) {
-        set({ snapshot: { ...cached, validation: "cached_latest_trading_day", marketDate: cached.marketDate || tradingDateLabel() }, loading: false, lastError: "实时数据源暂不可用 · 已保留最近交易日数据" });
+        set({
+          snapshot: { ...cached, validation: "cached_latest_trading_day", marketDate: cached.marketDate || tradingDateLabel() },
+          loading: false,
+          lastError: "实时数据源暂不可用 · 已保留最近交易日数据",
+        });
       } else {
         set({ loading: false, lastError: e instanceof Error ? e.message : "行情暂时不可用" });
       }
@@ -130,10 +163,8 @@ export const useApp = create<AppState>((set, get) => ({
     if (get().fundsLoading) return;
     const list = get().portfolio;
     if (!list.length) return;
-    if (isWeekend()) {
-      const cached = get().funds;
-      if (Object.keys(cached).length) return;
-    }
+    if (isWeekend() && Object.keys(get().funds).length) return;
+
     set({ fundsLoading: true });
     try {
       const codes = [...new Set(list.map((h) => h.code))];
