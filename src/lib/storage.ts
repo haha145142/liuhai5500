@@ -1,6 +1,6 @@
 import type { Holding } from "./types";
 import type { FundQuote, NewsFeed, Snapshot } from "./types";
-import { DEFAULT_SECTOR_IDS } from "./data/sectors";
+import { DEFAULT_FUND_SECTOR_IDS } from "./data/fund-sectors";
 
 const PORT_KEYS = ["fund_ai_pro_portfolio_v3", "fund_ai_pro_portfolio_v2", "fund_ai_pro_portfolio"];
 const DS_KEY = "fund_ai_pro_deepseek_key";
@@ -12,168 +12,41 @@ const SNAPSHOT_CACHE_KEY = "fund_ai_pro_snapshot_cache_v1";
 const NEWS_CACHE_KEY = "fund_ai_pro_news_cache_v1";
 const FUNDS_CACHE_KEY = "fund_ai_pro_funds_cache_v1";
 
-export type AppSettings = {
-  autoRefreshMs: number;
-  newsRefreshMs: number;
-};
-
+export type AppSettings = { autoRefreshMs: number; newsRefreshMs: number };
 type CacheEnvelope<T> = { savedAt: number; data: T };
+const DEFAULT_SETTINGS: AppSettings = { autoRefreshMs: 30_000, newsRefreshMs: 3 * 60_000 };
 
-const DEFAULT_SETTINGS: AppSettings = {
-  // Market data: keep the personal app responsive while still refreshing often enough.
-  autoRefreshMs: 30_000,
-  // News is intentionally slower; published timestamps come from the source itself.
-  newsRefreshMs: 3 * 60_000,
-};
+function readJson<T>(key: string, fallback: T): T { if (typeof window === "undefined") return fallback; try { const raw = localStorage.getItem(key); if (!raw) return fallback; return JSON.parse(raw) as T; } catch { return fallback; } }
+function saveJson(key: string, value: unknown) { if (typeof window === "undefined") return; try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
+function loadCache<T>(key: string, maxAge: number): T | null { if (typeof window === "undefined") return null; try { const item = JSON.parse(localStorage.getItem(key) || "null") as CacheEnvelope<T> | null; if (!item || typeof item.savedAt !== "number" || Date.now() - item.savedAt > maxAge) return null; return item.data ?? null; } catch { return null; } }
+function saveCache<T>(key: string, data: T) { saveJson(key, { savedAt: Date.now(), data } satisfies CacheEnvelope<T>); }
 
-function readJson<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
+export function loadCachedSnapshot(maxAge = 24 * 60 * 60_000): Snapshot | null { return loadCache<Snapshot>(SNAPSHOT_CACHE_KEY, maxAge); }
+export function saveCachedSnapshot(data: Snapshot) { saveCache(SNAPSHOT_CACHE_KEY, data); }
+export function loadCachedNews(maxAge = 48 * 60 * 60_000): NewsFeed | null { return loadCache<NewsFeed>(NEWS_CACHE_KEY, maxAge); }
+export function saveCachedNews(data: NewsFeed) { saveCache(NEWS_CACHE_KEY, data); }
+export function loadCachedFunds(maxAge = 48 * 60 * 60_000): Record<string, FundQuote> { return loadCache<Record<string, FundQuote>>(FUNDS_CACHE_KEY, maxAge) || {}; }
+export function saveCachedFunds(data: Record<string, FundQuote>) { saveCache(FUNDS_CACHE_KEY, data); }
 
-function saveJson(key: string, value: unknown) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* quota / private mode */
-  }
-}
+export function loadPortfolio(): Holding[] { if (typeof window === "undefined") return []; for (const key of PORT_KEYS) { try { const arr = JSON.parse(localStorage.getItem(key) || "null"); if (Array.isArray(arr) && arr.length) { const cleaned = arr.filter((x: Holding) => x && /^\d{6}$/.test(x.code) && Number(x.shares) > 0 && Number(x.cost) > 0) as Holding[]; if (cleaned.length) { if (key !== PORT_KEYS[0]) savePortfolio(cleaned); return cleaned; } } } catch {} } return []; }
+export function savePortfolio(list: Holding[]) { try { localStorage.setItem(PORT_KEYS[0], JSON.stringify(list)); } catch {} }
 
-function loadCache<T>(key: string, maxAge: number): T | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const item = JSON.parse(raw) as CacheEnvelope<T>;
-    if (!item || typeof item.savedAt !== "number" || Date.now() - item.savedAt > maxAge) return null;
-    return item.data ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function saveCache<T>(key: string, data: T) {
-  saveJson(key, { savedAt: Date.now(), data } satisfies CacheEnvelope<T>);
-}
-
-export function loadCachedSnapshot(maxAge = 24 * 60 * 60_000): Snapshot | null {
-  return loadCache<Snapshot>(SNAPSHOT_CACHE_KEY, maxAge);
-}
-
-export function saveCachedSnapshot(data: Snapshot) {
-  saveCache(SNAPSHOT_CACHE_KEY, data);
-}
-
-export function loadCachedNews(maxAge = 48 * 60 * 60_000): NewsFeed | null {
-  return loadCache<NewsFeed>(NEWS_CACHE_KEY, maxAge);
-}
-
-export function saveCachedNews(data: NewsFeed) {
-  saveCache(NEWS_CACHE_KEY, data);
-}
-
-export function loadCachedFunds(maxAge = 48 * 60 * 60_000): Record<string, FundQuote> {
-  return loadCache<Record<string, FundQuote>>(FUNDS_CACHE_KEY, maxAge) || {};
-}
-
-export function saveCachedFunds(data: Record<string, FundQuote>) {
-  saveCache(FUNDS_CACHE_KEY, data);
-}
-
-export function loadPortfolio(): Holding[] {
-  if (typeof window === "undefined") return [];
-  for (const key of PORT_KEYS) {
-    try {
-      const arr = JSON.parse(localStorage.getItem(key) || "null");
-      if (Array.isArray(arr) && arr.length) {
-        const cleaned = arr.filter(
-          (x: Holding) => x && /^\d{6}$/.test(x.code) && Number(x.shares) > 0 && Number(x.cost) > 0,
-        ) as Holding[];
-        if (cleaned.length) {
-          if (key !== PORT_KEYS[0]) savePortfolio(cleaned);
-          return cleaned;
-        }
-      }
-    } catch {
-      /* migrate next key */
-    }
-  }
-  return [];
-}
-
-export function savePortfolio(list: Holding[]) {
-  try {
-    localStorage.setItem(PORT_KEYS[0], JSON.stringify(list));
-  } catch {
-    /* quota */
-  }
-}
-
-export function getDSKey(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem(DS_KEY) || "";
-}
-
-export function setDSKey(key: string) {
-  if (!key) localStorage.removeItem(DS_KEY);
-  else localStorage.setItem(DS_KEY, key);
-}
-
-export function getDSModel(): string {
-  if (typeof window === "undefined") return "deepseek-chat";
-  return localStorage.getItem(DS_MODEL) || "deepseek-chat";
-}
-
-export function setDSModel(model: string) {
-  localStorage.setItem(DS_MODEL, model || "deepseek-chat");
-}
+export function getDSKey(): string { if (typeof window === "undefined") return ""; return localStorage.getItem(DS_KEY) || ""; }
+export function setDSKey(key: string) { if (!key) localStorage.removeItem(DS_KEY); else localStorage.setItem(DS_KEY, key); }
+export function getDSModel(): string { if (typeof window === "undefined") return "deepseek-chat"; return localStorage.getItem(DS_MODEL) || "deepseek-chat"; }
+export function setDSModel(model: string) { localStorage.setItem(DS_MODEL, model || "deepseek-chat"); }
 
 export function loadSelectedSectors(): string[] {
-  const ids = readJson<string[]>(SECTOR_KEY, DEFAULT_SECTOR_IDS);
-  return ids.length ? ids : DEFAULT_SECTOR_IDS;
+  const saved = readJson<string[]>(SECTOR_KEY, DEFAULT_FUND_SECTOR_IDS);
+  const validIds = new Set(DEFAULT_FUND_SECTOR_IDS);
+  // Migrate the old stock-sector defaults to the new fund-theme defaults on first load.
+  const hasFundTheme = saved.some((id) => validIds.has(id));
+  if (!hasFundTheme) { saveSelectedSectors(DEFAULT_FUND_SECTOR_IDS); return [...DEFAULT_FUND_SECTOR_IDS]; }
+  return saved;
 }
+export function saveSelectedSectors(ids: string[]) { try { localStorage.setItem(SECTOR_KEY, JSON.stringify(ids)); } catch {} }
 
-export function saveSelectedSectors(ids: string[]) {
-  try {
-    localStorage.setItem(SECTOR_KEY, JSON.stringify(ids));
-  } catch {
-    /* quota */
-  }
-}
-
-export function loadWatchlist(): string[] {
-  return readJson<string[]>(WATCH_KEY, []);
-}
-
-export function saveWatchlist(codes: string[]) {
-  try {
-    localStorage.setItem(WATCH_KEY, JSON.stringify(codes));
-  } catch {
-    /* quota */
-  }
-}
-
-export function loadSettings(): AppSettings {
-  const saved = readJson<Partial<AppSettings>>(SETTINGS_KEY, {});
-  return {
-    ...DEFAULT_SETTINGS,
-    ...saved,
-    autoRefreshMs: Number.isFinite(Number(saved.autoRefreshMs)) ? Math.max(30_000, Number(saved.autoRefreshMs)) : DEFAULT_SETTINGS.autoRefreshMs,
-    newsRefreshMs: Number.isFinite(Number(saved.newsRefreshMs)) ? Math.max(60_000, Number(saved.newsRefreshMs)) : DEFAULT_SETTINGS.newsRefreshMs,
-  };
-}
-
-export function saveSettings(s: AppSettings) {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-  } catch {
-    /* quota */
-  }
-}
+export function loadWatchlist(): string[] { return readJson<string[]>(WATCH_KEY, []); }
+export function saveWatchlist(codes: string[]) { try { localStorage.setItem(WATCH_KEY, JSON.stringify(codes)); } catch {} }
+export function loadSettings(): AppSettings { const saved = readJson<Partial<AppSettings>>(SETTINGS_KEY, {}); return { ...DEFAULT_SETTINGS, ...saved, autoRefreshMs: Number.isFinite(Number(saved.autoRefreshMs)) ? Math.max(30_000, Number(saved.autoRefreshMs)) : DEFAULT_SETTINGS.autoRefreshMs, newsRefreshMs: Number.isFinite(Number(saved.newsRefreshMs)) ? Math.max(60_000, Number(saved.newsRefreshMs)) : DEFAULT_SETTINGS.newsRefreshMs }; }
+export function saveSettings(s: AppSettings) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch {} }
