@@ -9,15 +9,15 @@ export type HoldingEntryResolverResult = ReturnType<typeof calculateHoldingEntry
 
 /**
  * Resolves an entry preview from already-loaded local fund data.
- * It never invents a quote when the local fund store has no reliable number.
+ * Critical rule: during trading hours, an old NAV is never used as today's intraday price.
  */
 export function resolveHoldingEntryPreview(input: HoldingEntryInput, funds: Record<string, FundQuote>, trading: boolean): HoldingEntryResolverResult {
   const fund = funds[input.code];
   const market: HoldingEntryMarket = trading
     ? {
-        price: fund?.estimate ?? fund?.nav ?? null,
-        pct: fund?.estimatePct ?? fund?.dayPct ?? null,
-        source: fund?.estimate != null ? "live_estimate" : fund?.nav != null ? "latest_official" : "none",
+        price: fund?.estimate ?? null,
+        pct: fund?.estimate != null ? (fund.estimatePct ?? fund.dayPct ?? null) : null,
+        source: fund?.estimate != null ? "live_estimate" : "none",
       }
     : {
         price: fund?.nav ?? null,
