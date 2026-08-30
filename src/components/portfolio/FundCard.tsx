@@ -16,26 +16,14 @@ function periodReturn(fund: FundQuote | undefined, tradingDays: number, current:
 
 function isOfficialNavForToday(fund: FundQuote | undefined) {
   if (!fund?.navDate || fund.nav == null) return false;
-  if (fund.officialNavPublished === true) return true;
   const now = cnTime();
   const [y, m, d] = fund.navDate.split(/[-/]/).map(Number);
-  return y === now.getUTCFullYear() && m === now.getUTCMonth() + 1 && d === now.getUTCDate();
+  const sameChinaDate = y === now.getUTCFullYear() && m === now.getUTCMonth() + 1 && d === now.getUTCDate();
+  return sameChinaDate && (fund.officialNavPublished === true || fund.officialNavPublished == null);
 }
 
-export function FundCard({
-  holding,
-  fund,
-  sector,
-  benchPct,
-  onRemove,
-  onUpdate,
-}: {
-  holding: Holding;
-  fund?: FundQuote;
-  sector?: SectorQuote;
-  benchPct: number | null;
-  onRemove: () => void;
-  onUpdate: (patch: Partial<Holding>) => void;
+export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }: {
+  holding: Holding; fund?: FundQuote; sector?: SectorQuote; benchPct: number | null; onRemove: () => void; onUpdate: (patch: Partial<Holding>) => void;
 }) {
   const [open, setOpen] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -56,72 +44,19 @@ export function FundCard({
   const swing = calcSwingTrade(fund?.metrics ?? null, holding.cost, px);
   const estimateGap = fund?.estimate != null && fund.nav ? ((fund.estimate - fund.nav) / fund.nav) * 100 : null;
   const periods = useMemo(() => [["1周", 5], ["1月", 20], ["3月", 60], ["6月", 120], ["1年", 250]] as const, []);
-
-  const saveEdit = () => {
-    const s = Number(shares); const c = Number(cost);
-    if (s > 0 && c > 0) { onUpdate({ shares: s, cost: c }); setEditing(false); }
-  };
-
+  const saveEdit = () => { const s = Number(shares); const c = Number(cost); if (s > 0 && c > 0) { onUpdate({ shares: s, cost: c }); setEditing(false); } };
   const quoteLabel = officialToday ? "今日官方净值" : useEstimate ? "盘中实时估值" : "最近官方净值";
-  const quoteSourceLabel = officialToday
-    ? "今日官方净值已发布，采用正式净值"
-    : useEstimate
-      ? `官方今日净值尚未发布，使用盘中估值${fund?.estimateConfidence ? `（${fund.estimateConfidence === "high" ? "高" : fund.estimateConfidence === "medium" ? "中" : "低"}置信度）` : ""}`
-      : "非交易时段采用最近官方净值";
-
+  const quoteSourceLabel = officialToday ? "今日官方净值已发布，采用正式净值" : useEstimate ? `官方今日净值尚未发布，使用盘中估值${fund?.estimateConfidence ? `（${fund.estimateConfidence === "high" ? "高" : fund.estimateConfidence === "medium" ? "中" : "低"}置信度）` : ""}` : "非交易时段采用最近官方净值";
   return (
     <article className="glass mb-3 p-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-lg font-semibold text-fg">{name} <span className="text-xs font-normal text-muted">{holding.code}</span></div>
-          <div className="mt-1 text-xs text-muted">{quoteLabel} · {fund?.source || "等待数据"}</div>
-        </div>
-        <div className="text-right">
-          <Tone v={day} className="text-2xl font-semibold">{fmtPctShort(day)}</Tone>
-          <div className="text-[10px] text-muted">{officialToday ? "官方净值涨跌" : useEstimate ? "盘中实时估值涨跌" : "最近官方净值涨跌"}</div>
-        </div>
+        <div className="min-w-0"><div className="text-lg font-semibold text-fg">{name} <span className="text-xs font-normal text-muted">{holding.code}</span></div><div className="mt-1 text-xs text-muted">{quoteLabel} · {fund?.source || "等待数据"}</div></div>
+        <div className="text-right"><Tone v={day} className="text-2xl font-semibold">{fmtPctShort(day)}</Tone><div className="text-[10px] text-muted">{officialToday ? "官方净值涨跌" : useEstimate ? "盘中实时估值涨跌" : "最近官方净值涨跌"}</div></div>
       </div>
-
-      <div className="mt-4 rounded-2xl bg-white/60 p-3 ring-1 ring-white/70">
-        <div className="grid grid-cols-2 gap-3">
-          <div><div className="text-xs text-muted">当前价格</div><div className="mt-1 text-xl font-semibold tabular-nums">{fmtPrice(px, 4)}</div></div>
-          <div className="text-right"><div className="text-xs text-muted">持仓市值</div><div className="mt-1 text-xl font-semibold tabular-nums">{fmtMoney(value)}</div></div>
-        </div>
-        <div className="mt-2 text-[11px] text-muted">
-          {fund?.nav != null ? `官方净值 ${fmtPrice(fund.nav, 4)} · ${fund.navDate || "日期未知"}` : "官方净值暂无"}
-          {fund?.estimate != null ? ` · 盘中估值 ${fmtPrice(fund.estimate, 4)}${fund.estimateTime ? ` · ${fund.estimateTime}` : ""}` : ""}
-        </div>
-        <div className="mt-1 text-[11px] font-semibold text-fg">口径：{quoteSourceLabel}</div>
-        {estimateGap != null ? <div className="mt-1 text-[11px] text-muted">估值校验：相对最近官方净值 <Tone v={estimateGap}>{fmtPctShort(estimateGap)}</Tone></div> : null}
-      </div>
-
-      <div className="mt-3 grid grid-cols-4 gap-2 text-[11px] text-muted">
-        <Metric label="持仓金额" value={fmtMoney(value)} />
-        <Metric label="持有收益" value={fmtMoney(pnl)} tone={pnl} />
-        <Metric label="收益率" value={fmtPctShort(pnlPct)} tone={pnlPct} />
-        <Metric label="成本" value={fmtPrice(holding.cost, 4)} />
-      </div>
-
-      <div className="mt-3 rounded-2xl bg-bg-elevated p-3">
-        <div className="flex items-center justify-between"><b className="text-sm">最近收益</b><span className="text-[10px] text-muted">按当前持仓份额回算</span></div>
-        <div className="mt-2 grid grid-cols-5 gap-1.5">
-          {periods.map(([label, days]) => {
-            const r = periodReturn(fund, days, fund?.nav ?? null);
-            return <div key={label} className="rounded-xl bg-white/60 px-1 py-2 text-center"><div className="text-[10px] text-muted">{label}</div><Tone v={r} className="mt-0.5 block text-xs font-semibold">{fmtPctShort(r)}</Tone></div>;
-          })}
-        </div>
-        {fund?.history.length ? <div className="mt-2 text-[11px] text-muted">最近一周 <Tone v={periodReturn(fund, 5, fund.nav)}>{fmtPctShort(periodReturn(fund, 5, fund.nav))}</Tone> · 最近一月 <Tone v={periodReturn(fund, 20, fund.nav)}>{fmtPctShort(periodReturn(fund, 20, fund.nav))}</Tone></div> : null}
-      </div>
-
-      {fund?.metrics ? (
-        <div className="mt-3 rounded-2xl bg-bg-elevated p-3">
-          <div className="flex items-center justify-between"><b className="text-sm">波段信号 · {fund.metrics.band}</b><span className="text-xs font-semibold text-accent">{fund.metrics.bandScore}/100</span></div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-accent" style={{ width: `${fund.metrics.bandScore}%` }} /></div>
-          <div className="mt-2 grid grid-cols-3 gap-2 text-center text-[11px]"><Metric label="趋势" value={`${fund.metrics.trend} ${fund.metrics.trendScore}`} /><Metric label="RSI" value={fund.metrics.rsi.toFixed(1)} /><Metric label="信号强度" value={`${fund.metrics.sigStrength}`} /></div>
-          <div className="mt-2 flex flex-wrap gap-1.5"><Tag>{fund.metrics.band}</Tag><Tag>{fund.metrics.trend}</Tag><Tag>{`RSI ${fund.metrics.rsi.toFixed(0)}`}</Tag><Tag>{`BOLL ${fmtPrice(fund.metrics.lower, 4)} / ${fmtPrice(fund.metrics.upper, 4)}`}</Tag>{swing ? <Tag>{swing.action}</Tag> : null}</div>
-        </div>
-      ) : <p className="mt-3 text-xs text-muted">净值历史不足 35 个交易日，暂不生成可靠波段信号。</p>}
-
+      <div className="mt-4 rounded-2xl bg-white/60 p-3 ring-1 ring-white/70"><div className="grid grid-cols-2 gap-3"><div><div className="text-xs text-muted">当前价格</div><div className="mt-1 text-xl font-semibold tabular-nums">{fmtPrice(px, 4)}</div></div><div className="text-right"><div className="text-xs text-muted">持仓市值</div><div className="mt-1 text-xl font-semibold tabular-nums">{fmtMoney(value)}</div></div></div><div className="mt-2 text-[11px] text-muted">{fund?.nav != null ? `官方净值 ${fmtPrice(fund.nav, 4)} · ${fund.navDate || "日期未知"}` : "官方净值暂无"}{fund?.estimate != null ? ` · 盘中估值 ${fmtPrice(fund.estimate, 4)}${fund.estimateTime ? ` · ${fund.estimateTime}` : ""}` : ""}</div><div className="mt-1 text-[11px] font-semibold text-fg">口径：{quoteSourceLabel}</div>{estimateGap != null ? <div className="mt-1 text-[11px] text-muted">估值校验：相对最近官方净值 <Tone v={estimateGap}>{fmtPctShort(estimateGap)}</Tone></div> : null}</div>
+      <div className="mt-3 grid grid-cols-4 gap-2 text-[11px] text-muted"><Metric label="持仓金额" value={fmtMoney(value)} /><Metric label="持有收益" value={fmtMoney(pnl)} tone={pnl} /><Metric label="收益率" value={fmtPctShort(pnlPct)} tone={pnlPct} /><Metric label="成本" value={fmtPrice(holding.cost, 4)} /></div>
+      <div className="mt-3 rounded-2xl bg-bg-elevated p-3"><div className="flex items-center justify-between"><b className="text-sm">最近收益</b><span className="text-[10px] text-muted">按基金净值历史回算</span></div><div className="mt-2 grid grid-cols-5 gap-1.5">{periods.map(([label, days]) => { const r = periodReturn(fund, days, fund?.nav ?? null); return <div key={label} className="rounded-xl bg-white/60 px-1 py-2 text-center"><div className="text-[10px] text-muted">{label}</div><Tone v={r} className="mt-0.5 block text-xs font-semibold">{fmtPctShort(r)}</Tone></div>; })}</div>{fund?.history.length ? <div className="mt-2 text-[11px] text-muted">最近一周 <Tone v={periodReturn(fund, 5, fund.nav)}>{fmtPctShort(periodReturn(fund, 5, fund.nav))}</Tone> · 最近一月 <Tone v={periodReturn(fund, 20, fund.nav)}>{fmtPctShort(periodReturn(fund, 20, fund.nav))}</Tone></div> : null}</div>
+      {fund?.metrics ? <div className="mt-3 rounded-2xl bg-bg-elevated p-3"><div className="flex items-center justify-between"><b className="text-sm">波段信号 · {fund.metrics.band}</b><span className="text-xs font-semibold text-accent">{fund.metrics.bandScore}/100</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-accent" style={{ width: `${fund.metrics.bandScore}%` }} /></div><div className="mt-2 grid grid-cols-3 gap-2 text-center text-[11px]"><Metric label="趋势" value={`${fund.metrics.trend} ${fund.metrics.trendScore}`} /><Metric label="RSI" value={fund.metrics.rsi.toFixed(1)} /><Metric label="信号强度" value={`${fund.metrics.sigStrength}`} /></div><div className="mt-2 flex flex-wrap gap-1.5"><Tag>{fund.metrics.band}</Tag><Tag>{fund.metrics.trend}</Tag><Tag>{`RSI ${fund.metrics.rsi.toFixed(0)}`}</Tag><Tag>{`BOLL ${fmtPrice(fund.metrics.lower, 4)} / ${fmtPrice(fund.metrics.upper, 4)}`}</Tag>{swing ? <Tag>{swing.action}</Tag> : null}</div></div> : <p className="mt-3 text-xs text-muted">净值历史不足 35 个交易日，暂不生成可靠波段信号。</p>}
       <SwingPlan holding={holding} fund={fund} price={px} officialToday={officialToday} />
       {mapped ? <div className="mt-3 rounded-2xl bg-accent/8 p-3 text-xs text-muted"><b className="text-fg">映射板块：{mapped.name}</b>{sector?.change != null ? <span> · 今日 <Tone v={sector.change}>{fmtPctShort(sector.change)}</Tone></span> : " · 暂无板块行情"}{six ? <div className="mt-1">组合判断：{six.advice} · 置信 {six.confidence}% · {six.basis}</div> : null}</div> : null}
       <button type="button" className="mt-3 w-full rounded-2xl bg-bg-elevated py-2 text-sm font-semibold text-fg" onClick={() => setOpen((v) => !v)}>{open ? "收起原因与指标" : "为什么涨跌 / 波段建议"}</button>
