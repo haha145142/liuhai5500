@@ -24,6 +24,10 @@ export type SectorQuote = {
   streak: number;
   etfCode?: string;
   etfName?: string;
+  /** Secondary direction check from the mapped ETF, when available. */
+  etfChange?: number | null;
+  /** board quote vs ETF direction consistency */
+  validation?: "cross_checked" | "single_source" | "unavailable";
 };
 
 export type BoardQuote = {
@@ -126,11 +130,8 @@ export type FundQuote = {
   historyPoints: FundHistoryPoint[];
   metrics: FundMetrics | null;
   source: string;
-  /** true only when navDate is today's date and the NAV is confirmed official */
   officialNavPublished?: boolean;
-  /** Human-readable state used by the portfolio UI. */
   valuationStatus?: "estimate" | "waiting_official_nav" | "official_nav" | "stale" | "unavailable";
-  /** Confidence in the intraday estimate; never implies a guarantee of accuracy. */
   estimateConfidence?: "high" | "medium" | "low";
 };
 
@@ -158,9 +159,7 @@ export type Snapshot = {
   global: GlobalQuote[];
   sources: DataSource[];
   fetchedAt: number;
-  /** Trading date represented by the market snapshot, e.g. Friday's date on weekends. */
   marketDate?: string | null;
-  /** Whether the displayed market snapshot passed multi-source validation. */
   validation?: "cross_checked" | "single_source" | "cached_latest_trading_day";
 };
 
@@ -173,34 +172,7 @@ export type NewsFeed = {
   latestPublishedAt: number | null;
 };
 
-export type EvidenceStep = {
-  id: string;
-  title: string;
-  body: string;
-  evidence: string;
-};
+export type EvidenceStep = { id: string; title: string; body: string; evidence: string };
+export type EvidenceResult = { steps: EvidenceStep[]; verdict: string; duration: string; confidence: string; summary: string; risk: string; score: number };
 
-export type EvidenceResult = {
-  steps: EvidenceStep[];
-  verdict: string;
-  duration: string;
-  confidence: string;
-  summary: string;
-  risk: string;
-  score: number;
-};
-
-export type SixFactor = {
-  position: number;
-  confidence: number;
-  bullN: number;
-  bearN: number;
-  advice: string;
-  status: string;
-  level: string;
-  trendLabel: string;
-  band: string;
-  ch: number;
-  fl: number;
-  basis: string;
-};
+export type SixFactor = { position: number; confidence: number; bullN: number; bearN: number; advice: string; status: string; level: string; trendLabel: string; band: string; ch: number; fl: number; basis: string };
