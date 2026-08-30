@@ -34,11 +34,11 @@ function navAt(fund: FundQuote | undefined, tradingDaysAgo: number) {
 
 function currentPrice(fund: FundQuote | undefined) {
   if (!fund) return null;
-  return isTradeTime() ? (fund.estimate ?? fund.nav ?? null) : (fund.nav ?? fund.estimate ?? null);
+  return isTradeTime() ? (fund.estimate ?? null) : (fund.nav ?? null);
 }
 
 function periodPct(fund: FundQuote | undefined, days: number) {
-  const now = fund?.nav ?? fund?.estimate ?? null;
+  const now = isTradeTime() ? (fund?.estimate ?? null) : (fund?.nav ?? null);
   const base = navAt(fund, days);
   return now != null && base ? ((now - base) / base) * 100 : null;
 }
@@ -115,7 +115,7 @@ function PortfolioPage() {
       if (px == null) { missing = true; continue; }
       total += px * h.shares;
       pnl += (px - h.cost) * h.shares;
-      if (f) dayPnl += px * h.shares * ((live ? (f.estimatePct ?? f.dayPct) : (f.dayPct ?? f.estimatePct)) || 0) / 100;
+      if (f) dayPnl += px * h.shares * ((live ? (f.estimatePct ?? null) : (f.dayPct ?? null)) || 0) / 100;
     }
     const healthBase = portfolio.filter((h) => (funds[h.code]?.metrics?.bandScore ?? 50) <= 45).length;
     const health = portfolio.length ? Math.max(20, Math.min(95, 88 - healthBase * 12 - (missing ? 8 : 0))) : null;
@@ -131,7 +131,7 @@ function PortfolioPage() {
       let found = false;
       for (const h of portfolio) {
         const f = funds[h.code];
-        const now = f?.nav ?? f?.estimate ?? null;
+        const now = live ? (f?.estimate ?? null) : (f?.nav ?? null);
         const base = navAt(f, Number(days));
         if (now != null && base != null) {
           amount += (now - base) * h.shares;
@@ -141,7 +141,7 @@ function PortfolioPage() {
       }
       return { label: String(label), amount: found ? amount : null, pct: found && baseValue ? (amount / baseValue) * 100 : null };
     });
-  }, [funds, portfolio]);
+  }, [funds, portfolio, live]);
 
   const calendar = useMemo(() => {
     const cells = monthCells(calendarCursor);
@@ -288,17 +288,6 @@ function PortfolioPage() {
             })}
           </div>
         ) : <EmptyNote>暂无提醒。添加一只基金并设置目标收益率即可。</EmptyNote>}
-      </Glass>
-
-      <Glass>
-        <SectionTitle title="添加基金" />
-        <div className="space-y-2">
-          <input value={code} onChange={(e) => void onSearch(e.target.value)} placeholder="6 位基金代码或名称" className="h-11 w-full rounded-2xl bg-bg-elevated px-3 text-sm ring-1 ring-border" />
-          {hits.length ? <div className="overflow-hidden rounded-2xl ring-1 ring-border">{hits.map((h) => <button key={h.code} type="button" className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-bg-elevated" onClick={() => { setCode(h.code); setHits([]); }}><span>{h.name}</span><span className="text-xs text-muted">{h.code}</span></button>)}</div> : null}
-          <div className="grid grid-cols-2 gap-2"><input value={shares} onChange={(e) => setShares(e.target.value)} placeholder="份额" inputMode="decimal" className="h-11 rounded-2xl bg-bg-elevated px-3 text-sm ring-1 ring-border" /><input value={cost} onChange={(e) => setCost(e.target.value)} placeholder="成本价" inputMode="decimal" className="h-11 rounded-2xl bg-bg-elevated px-3 text-sm ring-1 ring-border" /></div>
-          <button type="button" onClick={add} className="h-11 w-full rounded-2xl bg-fg text-sm font-semibold text-bg">保存持仓</button>
-          {hint ? <p className="text-xs text-muted">{hint}</p> : null}
-        </div>
       </Glass>
     </div>
   );
