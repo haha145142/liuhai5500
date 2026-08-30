@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Plus, Sparkles, WifiOff } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
+import { fmtMoney, fmtPctShort } from "@/lib/format";
 import { isTradeTime } from "@/lib/market-hours";
+import "./QuickAddFund.css";
 
 export function QuickAddFund() {
   const addHolding = useApp((s) => s.addHolding);
@@ -24,9 +25,9 @@ export function QuickAddFund() {
 
   const preview = useMemo(() => {
     if (!code && !shares && !cost) return "输入完成后，这里立即计算，不等接口返回";
-    if (localCost == null) return "请输入份额和成本价，即可立即计算持仓成本";
+    if (localCost == null) return "输入份额和成本价，持仓成本马上计算";
     if (cached?.name) return `${cached.name} · 已命中本地缓存数据`;
-    return "当前无缓存行情 · 先按你输入的成本计算，联网后再补最新数据";
+    return "当前无行情缓存 · 先按成本即时计算，联网后再补最新数据";
   }, [cached?.name, code, cost, localCost, shares]);
 
   const save = () => {
@@ -34,12 +35,7 @@ export function QuickAddFund() {
       setMessage("请输入 6 位基金代码、有效份额和成本价");
       return;
     }
-    addHolding({
-      code,
-      name: cached?.name || code,
-      shares: shareValue,
-      cost: costValue,
-    });
+    addHolding({ code, name: cached?.name || code, shares: shareValue, cost: costValue });
     setMessage("已保存到本地持仓 · 网络恢复后自动补齐行情");
     setCode("");
     setShares("");
