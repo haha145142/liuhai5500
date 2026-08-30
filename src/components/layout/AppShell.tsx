@@ -5,7 +5,7 @@ import { TabBar } from "./TabBar";
 import "./BottomNavFix.css";
 import { useApp } from "@/lib/store";
 import { clockStr } from "@/lib/format";
-import { isTradeTime, sessionLabel } from "@/lib/market-hours";
+import { isTradeTime, isWeekend, sessionLabel } from "@/lib/market-hours";
 import { cn } from "@/lib/cn";
 
 const NEWS_REFRESH_MS = 60_000;
@@ -23,8 +23,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
-    // Hydrate synchronously from local storage. Network work is deliberately
-    // deferred so the shell never waits for an external data source to render.
     hydrate();
     const id = window.setTimeout(() => {
       void refreshSnapshot();
@@ -67,7 +65,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   const statusText = snapshot
-    ? `数据截至 ${clockStr(new Date(snapshot.fetchedAt))}`
+    ? isWeekend()
+      ? `周末休市 · 以下行情为最近交易日数据 · 数据刷新 ${clockStr(new Date(snapshot.fetchedAt))}`
+      : `数据刷新 ${clockStr(new Date(snapshot.fetchedAt))}`
     : lastError
       ? "行情暂时不可用 · 已保留本地数据"
       : "正在后台接入行情 · 界面不阻塞";
