@@ -1,28 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Sparkles, WifiOff } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { fmtMoney, fmtPctShort, fmtPrice, cnTime } from "@/lib/format";
-import { isTradeTime } from "@/lib/market-hours";
+import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
 import { getFund } from "@/lib/data/server";
+import { selectFundDisplayQuote } from "@/lib/data/quote-mode";
 import type { FundQuote } from "@/lib/types";
 import "./QuickAddFund.css";
-
-function isOfficialNavToday(fund: FundQuote | undefined) {
-  if (!fund?.navDate || fund.nav == null) return false;
-  const now = cnTime();
-  const [y, m, d] = fund.navDate.split(/[-/]/).map(Number);
-  const sameChinaDate = y === now.getUTCFullYear() && m === now.getUTCMonth() + 1 && d === now.getUTCDate();
-  return sameChinaDate && (fund.officialNavPublished === true || fund.officialNavPublished == null);
-}
-
-function pickCurrentQuote(fund: FundQuote | undefined) {
-  if (!fund) return { price: null as number | null, pct: null as number | null, label: "暂无行情" };
-  const officialToday = isOfficialNavToday(fund);
-  if (officialToday && fund.nav != null) return { price: fund.nav, pct: fund.dayPct, label: "今日官方净值" };
-  if (isTradeTime() && fund.estimate != null) return { price: fund.estimate, pct: fund.estimatePct, label: "盘中实时估值" };
-  if (fund.nav != null) return { price: fund.nav, pct: fund.dayPct, label: fund.navDate ? `最近官方净值 · ${fund.navDate}` : "最近官方净值" };
-  return { price: null, pct: null, label: "暂无可靠行情" };
-}
 
 export function QuickAddFund() {
   const addHolding = useApp((s) => s.addHolding);
@@ -39,7 +22,7 @@ export function QuickAddFund() {
   const shareValue = Number(shares);
   const costValue = Number(cost);
   const localCost = shareValue > 0 && costValue > 0 ? shareValue * costValue : null;
-  const current = pickCurrentQuote(quote);
+  const current = selectFundDisplayQuote(quote);
   const marketPrice = current.price;
   const marketValue = marketPrice != null && shareValue > 0 ? marketPrice * shareValue : null;
   const pnl = localCost != null && marketValue != null ? marketValue - localCost : null;
@@ -113,11 +96,11 @@ export function QuickAddFund() {
         <div className="quick-preview-top"><span><Sparkles size={14} /> 即时计算</span><em>{quote ? current.label : "离线也可算"}</em></div>
         <div className="quick-metrics">
           <Metric label="持仓成本" value={localCost == null ? "—" : fmtMoney(localCost)} />
-          <Metric label={current.label === "盘中实时估值" ? "盘中估值" : "当前市值"} value={marketValue == null ? "待行情" : fmtMoney(marketValue)} />
+          <Metric label={current.mode === "live_estimate" ? "盘中估值" : "当前市值"} value={marketValue == null ? "待行情" : fmtMoney(marketValue)} />
           <Metric label="当前盈亏" value={pnl == null ? "待行情" : fmtMoney(pnl)} tone={pnl} />
           <Metric label="收益率" value={pnlPct == null ? "—" : fmtPctShort(pnlPct)} tone={pnlPct} />
         </div>
-        <div className="quick-quote-row">{marketPrice != null ? `价格 ${fmtPrice(marketPrice, 4)}` : "价格暂无"}{current.pct != null ? ` · 当日 ${fmtPctShort(current.pct)}` : ""}{quote?.navDate ? ` · 数据日 ${quote.navDate}` : ""}</div>
+        <div className="quick-quote-row">{marketPrice != null ? `价格 ${fmtPrice(marketPrice, 4)}` : "价格暂无"}{current.pct != null ? ` · 当日 ${fmtPctShort(current.pct)}` : ""}{current.dataDate ? ` · 数据日 ${current.dataDate}` : ""}</div>
         <div className="quick-preview-note">{preview}</div>
         <div className="quick-preview-note">{auditLine}</div>
       </div>
