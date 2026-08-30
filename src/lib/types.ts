@@ -158,6 +158,10 @@ export type Snapshot = {
   global: GlobalQuote[];
   sources: DataSource[];
   fetchedAt: number;
+  /** Trading date represented by the market snapshot, e.g. Friday's date on weekends. */
+  marketDate?: string | null;
+  /** Whether the displayed market snapshot passed multi-source validation. */
+  validation?: "cross_checked" | "single_source" | "cached_latest_trading_day";
 };
 
 export type NewsFeed = {
