@@ -23,7 +23,9 @@ function Home() {
   let cost = 0;
   for (const h of portfolio) {
     const f = funds[h.code];
-    const px = live ? (f?.estimate ?? f?.nav ?? null) : (f?.nav ?? null);
+    const px = live && f?.valuationStatus === "estimate" && f.estimate != null
+      ? f.estimate
+      : f?.nav ?? null;
     cost += h.cost * h.shares;
     if (px == null) {
       total = null;
@@ -46,6 +48,7 @@ function Home() {
         ? "单源可用"
         : "等待行情";
   const marketDate = snapshot?.marketDate || (isWeekend() ? tradingDateLabel() : "今日");
+  const missingCount = snapshot?.indices.filter((x) => x.pct == null).length ?? 0;
 
   return (
     <div>
@@ -57,7 +60,7 @@ function Home() {
           <Tone v={pnl} className="text-sm font-semibold">
             {portfolio.length ? fmtPctShort(cost && pnl != null ? (pnl / cost) * 100 : null) : "尚未添加持仓"}
           </Tone>
-          {portfolio.length ? <div className="mt-1 text-[10px] text-subtle">口径：{live ? "盘中实时估值" : "最近官方净值"}</div> : null}
+          {portfolio.length ? <div className="mt-1 text-[10px] text-subtle">口径：{live ? "已验证盘中估值" : "最近官方净值"}</div> : null}
         </div>
         <Link to="/portfolio" className="text-xs font-semibold text-accent">
           查看持仓
@@ -72,15 +75,20 @@ function Home() {
             <span>{isWeekend() ? "周末休市" : "市场数据"} · 数据日 {marketDate}</span>
             <span className="rounded-full bg-bg-elevated px-2 py-0.5 font-semibold text-accent">{marketMode}</span>
           </div>
-          <p className="mt-1 text-[10px] text-subtle">通过多源校验后显示；无法确认的异常值不会覆盖上一次可靠数据。</p>
+          <p className="mt-1 text-[10px] text-subtle">
+            {isWeekend()
+              ? `周末沿用最近完成交易日数据；下一个交易日恢复更新。${missingCount ? ` 当前 ${missingCount} 项指数缺少可验证涨跌幅。` : ""}`
+              : `多源校验后显示；${missingCount ? `${missingCount} 项指数暂缺可靠值。` : "当前指数数据完整。`}`
+            }
+          </p>
         </Glass>
       ) : null}
 
-      {snapshot ? <IndexGrid indices={snapshot.indices} /> : <EmptyNote>正在后台接入指数…</EmptyNote>}
+      {snapshot ? <IndexGrid indices={snapshot.indices} /> : <EmptyNote>行情正在后台刷新，界面不阻塞。</EmptyNote>}
       {snapshot ? (
         <Cockpit snap={snapshot} news={news?.items || []} />
       ) : (
-        <EmptyNote>正在后台生成今日判断…</EmptyNote>
+        <EmptyNote>市场判断正在后台生成，不影响页面使用。</EmptyNote>
       )}
     </div>
   );
