@@ -86,15 +86,19 @@ async function getStockQuotes(holdings: LiveHolding[]) {
 }
 
 function buildEstimate(nav:number|null,holdings:LiveHolding[],externalPct:number|null) {
-  const totalDisclosed = holdings.reduce((s,h)=>s+h.weight,0);
+  const totalDisclosed = holdings.reduce((s,h)=>s+Math.max(0,h.weight),0);
   const usable = holdings.filter(h=>h.weight>0&&h.pct!=null);
   const usableWeight = usable.reduce((s,h)=>s+h.weight,0);
   if (nav==null || usableWeight<=0 || totalDisclosed<=0) return {estimate:null,pct:null,disclosedWeight:totalDisclosed,usableWeight,coverage:usableWeight,coverageOfDisclosed:totalDisclosed?usableWeight/totalDisclosed*100:0,deviation:null,confidence:"low" as const,validation:"无法验证"};
-  const weighted = usable.reduce((s,h)=>s+h.weight*(h.pct as number),0)/usableWeight;
-  const estimate = nav*(1+weighted/100);
-  const coverage = usableWeight;
-  const coverageOfDisclosed = usableWeight/totalDisclosed*100;
-  const deviation = externalPct==null?null:Math.abs(weighted-externalPct);
+
+  // Use the disclosed portfolio weights as actual NAV contribution.
+  // The undisclosed remainder is intentionally neutral (0%) rather than
+  // renormalizing the top holdings to 100%, which avoids amplifying the move.
+  const weightedContribution = usable.reduce((s,h)=>s+h.weight*(h.pct as number),0)/100;
+  const estimate = nav*(1+weightedContribution/100);
+  const coverage = Math.min(100,usableWeight);
+  const coverageOfDisclosed = totalDisclosed?usableWeight/totalDisclosed*100:0;
+  const deviation = externalPct==null?null:Math.abs(weightedContribution-externalPct);
   let confidence:"high"|"medium"|"low" = coverage>=60&&coverageOfDisclosed>=70?"high":coverage>=35&&coverageOfDisclosed>=50?"medium":"low";
   let validation = "无法验证";
   if (deviation!=null) {
@@ -102,7 +106,7 @@ function buildEstimate(nav:number|null,holdings:LiveHolding[],externalPct:number
     else if (deviation<=0.9) validation="轻微偏差";
     else { validation="明显偏差"; confidence="low"; }
   }
-  return {estimate,pct:weighted,disclosedWeight:totalDisclosed,usableWeight,coverage,coverageOfDisclosed,deviation,confidence,validation};
+  return {estimate,pct:weightedContribution,disclosedWeight:totalDisclosed,usableWeight,coverage,coverageOfDisclosed,deviation,confidence,validation};
 }
 
 export const getCalculatedFund = createServerFn({method:"POST"})
@@ -132,7 +136,7 @@ export const getCalculatedFund = createServerFn({method:"POST"})
         weekPct,monthPct,history,historyPoints:ordered,metrics,
         source:result.estimate!=null?`自有穿透估值 · 前十大重仓 × 实时行情 · ${result.validation}${externalPct!=null?` · 参考源差 ${result.deviation?.toFixed(2)}个百分点`:""}`:`自有估值暂不可用 · 未满足可靠持仓覆盖条件`,
         officialNavPublished:officialToday,valuationStatus:officialToday?"official_nav":result.estimate!=null?"estimate":nav!=null?"waiting_official_nav":"unavailable",estimateConfidence:result.confidence,
-        liveHoldings:holdings,estimateMethod:"前十大重仓归一化加权 + 实时个股/ETF涨跌幅",estimateCoverage:result.coverage,disclosedWeight:result.disclosedWeight,usableWeight:result.usableWeight,coverageOfDisclosed:result.coverageOfDisclosed,externalEstimatePct:externalPct,estimateDeviation:result.deviation,estimateValidation:result.validation
+        liveHoldings:holdings,estimateMethod:"已披露重仓权重 × 实时资产涨跌；未披露部分按0贡献处理",estimateCoverage:result.coverage,disclosedWeight:result.disclosedWeight,usableWeight:result.usableWeight,coverageOfDisclosed:result.coverageOfDisclosed,externalEstimatePct:externalPct,estimateDeviation:result.deviation,estimateValidation:result.validation
       };
       CACHE.set(code,{ts:Date.now(),quote});
       return quote;
