@@ -3,7 +3,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { FundCard } from "@/components/portfolio/FundCard";
 import { EmptyNote, Glass, SectionTitle, Tone } from "@/components/ui/Glass";
 import { matchFundSector } from "@/lib/data/sectors";
-import { searchFund } from "@/lib/data/server";
 import { fmtMoney, fmtPctShort } from "@/lib/format";
 import { useApp } from "@/lib/store";
 import { isTradeTime } from "@/lib/market-hours";
@@ -37,19 +36,8 @@ function currentPrice(fund: FundQuote | undefined) {
   return isTradeTime() ? (fund.estimate ?? null) : (fund.nav ?? null);
 }
 
-function periodPct(fund: FundQuote | undefined, days: number) {
-  const now = isTradeTime() ? (fund?.estimate ?? null) : (fund?.nav ?? null);
-  const base = navAt(fund, days);
-  return now != null && base ? ((now - base) / base) * 100 : null;
-}
-
 function monthKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function parseDate(s: string) {
-  const [y, m, d] = s.split(/[-/]/).map(Number);
-  return y && m && d ? new Date(y, m - 1, d) : null;
 }
 
 function monthCells(cursor: Date) {
@@ -80,14 +68,8 @@ function PortfolioPage() {
   const portfolio = useApp((s) => s.portfolio);
   const funds = useApp((s) => s.funds);
   const snapshot = useApp((s) => s.snapshot);
-  const addHolding = useApp((s) => s.addHolding);
   const updateHolding = useApp((s) => s.updateHolding);
   const removeHolding = useApp((s) => s.removeHolding);
-  const [code, setCode] = useState("");
-  const [shares, setShares] = useState("");
-  const [cost, setCost] = useState("");
-  const [hint, setHint] = useState("");
-  const [hits, setHits] = useState<{ code: string; name: string; type: string }[]>([]);
   const [alerts, setAlerts] = useState<AlertRule[]>([]);
   const [alertCode, setAlertCode] = useState("");
   const [alertKind, setAlertKind] = useState<AlertRule["kind"]>("止盈");
@@ -151,23 +133,6 @@ function PortfolioPage() {
       return { date, key, inMonth: monthKey(date) === activeMonth, pnl: dailyPortfolioPnl(key, portfolio, funds) };
     });
   }, [calendarCursor, funds, portfolio]);
-
-  const onSearch = async (q: string) => {
-    setCode(q);
-    if (q.trim().length < 2) { setHits([]); return; }
-    setHits(await searchFund({ data: { q } }));
-  };
-
-  const add = () => {
-    if (!/^\d{6}$/.test(code) || Number(shares) <= 0 || Number(cost) <= 0) {
-      setHint("请输入 6 位基金代码、份额和成本价");
-      return;
-    }
-    const name = hits.find((h) => h.code === code)?.name || code;
-    addHolding({ code, name, shares: Number(shares), cost: Number(cost) });
-    setCode(""); setShares(""); setCost(""); setHits([]);
-    setHint("已保存，正在读取官方净值与盘中估值…");
-  };
 
   const addAlert = () => {
     const pct = Number(alertPct);
@@ -243,9 +208,7 @@ function PortfolioPage() {
       }) : (
         <Glass>
           <EmptyNote>还没有持仓。添加基金后会自动拉取官方净值、盘中估值和历史指标。</EmptyNote>
-          <button type="button" onClick={() => addHolding({ code: "110022", name: "易方达消费行业", shares: 1000, cost: 3.2 })} className="w-full rounded-2xl bg-accent py-2.5 text-sm font-semibold text-accent-fg">
-            载入 1 只示例持仓
-          </button>
+          <div className="text-xs text-muted">上方“添加基金”入口可直接录入。</div>
         </Glass>
       )}
 
