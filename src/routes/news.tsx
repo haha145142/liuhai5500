@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { EmptyNote, Glass, SectionTitle, Tone } from "@/components/ui/Glass";
 import { ageLabel, clockStr, formatPublishedAt } from "@/lib/format";
 import { analyzeNews } from "@/lib/data/server";
+import { assessNewsEvidence } from "@/lib/calc/news-evidence";
 import { useApp } from "@/lib/store";
 import type { NewsItem } from "@/lib/types";
 
@@ -178,7 +179,7 @@ function NewsPage() {
           {items.map((n) => {
             const matchedFunds = matchFundThemes(n, fundList);
             const touched = matchedFunds.length > 0 || newsTouchesHoldings(n, names);
-            return <NewsCard key={n.id + n.source} item={n} holdings={names} matchedFunds={matchedFunds} touched={touched} />;
+            return <NewsCard key={n.id + n.source} item={n} holdings={names} matchedFunds={matchedFunds} touched={touched} snapshot={snapshot} />;
           })}
         </>
       ) : (
@@ -190,11 +191,32 @@ function NewsPage() {
   );
 }
 
-function NewsCard({ item, holdings, matchedFunds, touched }: { item: NewsItem; holdings: string[]; matchedFunds: string[]; touched: boolean }) {
+function NewsCard({ item, holdings, matchedFunds, touched, snapshot }: { item: NewsItem; holdings: string[]; matchedFunds: string[]; touched: boolean; snapshot: ReturnType<typeof useApp.getState>["snapshot"] }) {
   const hitHold = holdings.filter((n) => n && (item.title.includes(n.slice(0, 4)) || item.relatedSectors.some((s) => n.includes(s))));
   const hasSourceUrl = /^https?:\/\//i.test(item.url);
   const timeReliable = item.publishedAt != null;
   const signalLabel = item.sentiment === "bull" ? "偏利好" : item.sentiment === "bear" ? "偏利空" : "中性";
+  const normalized = item.relatedSectors.map(normalizeTopic).filter(Boolean);
+  const sector = snapshot?.sectors.find((s) => normalized.some((t) => t.length >= 2 && (normalizeTopic(s.name).includes(t) || t.includes(normalizeTopic(s.name).slice(0, 4)))));
+  const evidence = assessNewsEvidence({
+    publishedAt: item.publishedAt,
+    sourceUrl: item.url,
+    relatedSector: item.relatedSectors.length > 0,
+    sectorPct: sector?.change ?? null,
+    sectorValidation: sector?.validation,
+    indexPct: snapshot?.indices.find((x) => x.pct != null)?.pct ?? null,
+    moneyFlow: sector?.flow ?? snapshot?.flow?.main ?? null,
+    hasFundQuote: matchedFunds.length > 0,
+  });
+  const evidenceReasons = [
+    !evidence.checks.publishTime ? "缺可靠发布时间" : null,
+    !evidence.checks.source ? "缺原文来源" : null,
+    !evidence.checks.theme ? "未识别明确基金主题" : null,
+    !evidence.checks.market ? "缺板块行情验证" : null,
+    !evidence.checks.flow ? "缺资金验证" : null,
+    !evidence.checks.fund ? "缺具体基金行情" : null,
+  ].filter(Boolean) as string[];
+  const tone = evidence.level === "verified" ? "bg-up/10 text-up" : evidence.level === "corroborated" ? "bg-accent/10 text-accent" : evidence.level === "event_only" ? "bg-warn/10 text-warn" : "bg-bg-elevated text-muted";
   return (
     <article className={`glass-tight mb-2 p-3 ${touched ? "ring-1 ring-accent/10" : ""}`}>
       <div className="flex items-center gap-2 text-[11px] text-muted"><span>{item.source}</span><span>·</span><span>{formatPublishedAt(item.publishedAt)}</span><span className="ml-auto">{ageLabel(item.publishedAt)}</span></div>
@@ -202,6 +224,7 @@ function NewsCard({ item, holdings, matchedFunds, touched }: { item: NewsItem; h
       {item.summary ? <p className="mt-1 text-xs leading-relaxed text-muted">{item.summary}</p> : null}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <Tone v={item.sentiment === "bull" ? 1 : item.sentiment === "bear" ? -1 : 0} className="rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-semibold">{signalLabel}</Tone>
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tone}`}>{evidence.label}</span>
         {item.relatedSectors.slice(0, 3).map((s) => <span key={s} className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">{s}</span>)}
         {timeReliable ? <span className="rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-semibold text-muted">时间可信</span> : <span className="rounded-full bg-warn/10 px-2 py-0.5 text-[10px] font-semibold text-warn">时间未知</span>}
         {matchedFunds.length ? <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">关联基金 {matchedFunds.length} 只</span> : null}
@@ -209,6 +232,10 @@ function NewsCard({ item, holdings, matchedFunds, touched }: { item: NewsItem; h
       </div>
       {matchedFunds.length ? <p className="mt-2 rounded-xl bg-accent/8 px-2 py-1 text-[10.5px] leading-relaxed text-accent">相关基金：{matchedFunds.slice(0, 4).join("、")}</p> : null}
       {hitHold.length ? <p className="mt-2 rounded-xl bg-warn/10 px-2 py-1 text-[11px] font-semibold text-warn">可能关联持仓：{hitHold.join("、")}</p> : null}
+      <div className="mt-2 rounded-xl bg-bg-elevated/65 px-2.5 py-2 text-[9.5px] leading-relaxed text-subtle">
+        <div className="flex items-center justify-between gap-2"><span>{evidence.statement}</span><span className="shrink-0">{evidence.checks.market ? evidenceTone(evidence.checks.market ? sector?.validation : undefined) : "待验证"}</span></div>
+        {evidenceReasons.length ? <div className="mt-1">尚缺：{evidenceReasons.join(" · ")}</div> : null}
+      </div>
       <p className="mt-2 text-[9.5px] text-subtle">新闻情绪只表示文本倾向；是否真正影响行情，需要指数、基金涨跌和资金数据进一步验证。</p>
     </article>
   );
