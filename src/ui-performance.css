@@ -1,0 +1,55 @@
+/* Fund AI Pro: lightweight Liquid Glass overrides.
+ * Keep blur small and localized; avoid large-area filters on scrolling content.
+ */
+.glass,
+.glass-tight,
+.app-header-card,
+.launcher-card,
+.tabbar {
+  contain: paint;
+}
+
+.glass {
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
+  box-shadow: 0 10px 26px rgb(20 60 110 / 0.065), inset 0 1px 0 rgb(255 255 255 / 0.82);
+}
+
+.glass-tight {
+  backdrop-filter: blur(9px) saturate(135%);
+  -webkit-backdrop-filter: blur(9px) saturate(135%);
+  box-shadow: 0 5px 16px rgb(20 60 110 / 0.045), inset 0 1px 0 rgb(255 255 255 / 0.72);
+}
+
+.app-header-card {
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: 0 12px 30px rgb(29 78 121 / 0.07), inset 0 1px 0 rgb(255 255 255 / 0.88);
+}
+
+.launcher-card {
+  backdrop-filter: blur(13px) saturate(150%);
+  -webkit-backdrop-filter: blur(13px) saturate(150%);
+  box-shadow: 0 9px 22px rgb(29 78 121 / 0.055), inset 0 1px 0 rgb(255 255 255 / 0.82);
+}
+
+.tabbar {
+  backdrop-filter: blur(18px) saturate(165%) brightness(1.02);
+  -webkit-backdrop-filter: blur(18px) saturate(165%) brightness(1.02);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 0.075), inset 0 1px 0 rgb(255 255 255 / 0.66);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-refresh-button,
+  .launcher-card,
+  .tabbar > a {
+    transition: none !important;
+  }
+}
+
+@media (max-width: 430px) and (hover: none) {
+  .launcher-card:hover,
+  .tabbar > a:hover {
+    transform: none;
+  }
+}
