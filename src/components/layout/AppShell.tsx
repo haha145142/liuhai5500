@@ -8,7 +8,7 @@ import { clockStr } from "@/lib/format";
 import { isTradeTime, isWeekend, sessionLabel } from "@/lib/market-hours";
 import { cn } from "@/lib/cn";
 
-const NEWS_REFRESH_MS = 60_000;
+const NEWS_REFRESH_MS = 3 * 60_000;
 const BOOT_DELAY_MS = 80;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     const id = window.setInterval(() => {
       if (document.hidden) return;
       void refreshSnapshot();
-      void refreshFunds();
+      if (isTradeTime()) void refreshFunds();
     }, Math.max(30_000, settings.autoRefreshMs));
     return () => window.clearInterval(id);
   }, [refreshSnapshot, refreshFunds, settings.autoRefreshMs]);
@@ -50,24 +50,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.clearInterval(id);
   }, [pathname, refreshNews, settings.newsRefreshMs]);
 
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      if (document.hidden) return;
-      if (isTradeTime()) void refreshFunds();
-    }, 30_000);
-    return () => window.clearInterval(id);
-  }, [refreshFunds]);
-
   const onRefresh = () => {
     void refreshSnapshot();
-    void refreshFunds();
+    if (isTradeTime()) void refreshFunds();
     if (pathname.startsWith("/news") || pathname === "/") void refreshNews();
   };
 
+  const failedSources = snapshot?.sources.filter((s) => s.status === "err").map((s) => s.name) || [];
   const statusText = snapshot
     ? isWeekend()
-      ? `周末休市 · 以下行情为最近交易日数据 · 数据刷新 ${clockStr(new Date(snapshot.fetchedAt))}`
-      : `数据刷新 ${clockStr(new Date(snapshot.fetchedAt))}`
+      ? `周末休市 · 最近交易日数据 · ${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`
+      : `${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`
     : lastError
       ? "行情暂时不可用 · 已保留本地数据"
       : "正在后台接入行情 · 界面不阻塞";
