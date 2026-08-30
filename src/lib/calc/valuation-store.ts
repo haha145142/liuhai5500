@@ -1,11 +1,15 @@
-import type { ValuationObservation } from "./valuation-observation";
+import type { ValuationObservation } from "./valuation-calibration";
 
 const KEY = "fund-ai-pro:valuation-observations:v1";
 const MAX = 2000;
 
-export type StoredObservation = ValuationObservation & {
+type StoredObservation = ValuationObservation & {
   id: string;
-  settled?: boolean;
+  fundCode: string;
+  estimateTime: string;
+  officialDate?: string;
+  createdAt: string;
+  settled: boolean;
   settledAt?: number;
 };
 
@@ -26,68 +30,70 @@ function readAll(): StoredObservation[] {
 
 function writeAll(items: StoredObservation[]) {
   if (!canUseStorage()) return;
-  try {
-    window.localStorage.setItem(KEY, JSON.stringify(items.slice(-MAX)));
-  } catch {
-    // Storage can fail in private mode or when quota is exhausted.
-  }
+  try { window.localStorage.setItem(KEY, JSON.stringify(items.slice(-MAX))); } catch {}
 }
 
-function makeId(o: ValuationObservation) {
-  return [o.code, o.valuationDate, o.observedAt].join(":");
+function idFor(fundCode: string, estimateTime: string) {
+  return `${fundCode}:${estimateTime}`;
 }
 
-export function recordValuationObservation(observation: ValuationObservation): StoredObservation | null {
-  if (!observation.code || !observation.valuationDate || !Number.isFinite(observation.estimatedPct)) return null;
+export function recordPendingValuation(input: {
+  fundCode: string;
+  fundType?: string;
+  estimatePct: number | null | undefined;
+  coveragePct?: number;
+  sourceAgreementPct?: number;
+  estimateTime?: string | null;
+}) {
+  if (!input.fundCode || !Number.isFinite(input.estimatePct)) return null;
+  const estimateTime = input.estimateTime || new Date().toISOString();
   const current = readAll();
-  const id = makeId(observation);
+  const id = idFor(input.fundCode, estimateTime);
   const existing = current.find((x) => x.id === id);
   if (existing) return existing;
-  const next: StoredObservation = { ...observation, id, settled: false };
+  const next: StoredObservation = {
+    fundCode: input.fundCode,
+    fundType: input.fundType,
+    estimatePct: input.estimatePct as number,
+    coveragePct: input.coveragePct,
+    sourceAgreementPct: input.sourceAgreementPct,
+    estimateTime,
+    createdAt: new Date().toISOString(),
+    id,
+    settled: false,
+  };
   current.push(next);
   writeAll(current);
   return next;
 }
 
-export function settleOfficialNav(
-  code: string,
-  valuationDate: string,
-  officialPct: number,
-  settledAt = Date.now(),
-): StoredObservation[] {
-  if (!Number.isFinite(officialPct)) return [];
+export function settleOfficialNav(code: string, officialDate: string, officialPct: number, settledAt = Date.now()) {
+  if (!code || !officialDate || !Number.isFinite(officialPct)) return [];
   const current = readAll();
-  const settled: StoredObservation[] = [];
+  const settled: Array<StoredObservation & { officialPct: number }> = [];
   let changed = false;
   for (let i = 0; i < current.length; i++) {
     const item = current[i];
-    if (item.code !== code || item.valuationDate !== valuationDate || item.settled || !Number.isFinite(item.estimatedPct)) continue;
-    const errorPct = item.estimatedPct - officialPct;
-    current[i] = { ...item, officialPct, errorPct, settled: true, settledAt };
-    settled.push(current[i]);
+    if (item.fundCode !== code || item.settled || !Number.isFinite(item.estimatePct)) continue;
+    if (item.estimateTime.slice(0, 10) !== officialDate) continue;
+    const next = { ...item, officialPct, officialDate, settled: true, settledAt } as StoredObservation & { officialPct: number };
+    current[i] = next;
+    settled.push(next);
     changed = true;
   }
   if (changed) writeAll(current);
   return settled;
 }
 
-export function getSettledObservations(code?: string): StoredObservation[] {
-  return readAll().filter((x) => x.settled && (!code || x.code === code));
-}
-
-export function getCalibrationSamples(code?: string) {
-  return getSettledObservations(code)
-    .filter((x) => Number.isFinite(x.estimatedPct) && Number.isFinite(x.officialPct) && Number.isFinite(x.errorPct))
+export function getSettledObservations(code?: string): ValuationObservation[] {
+  return readAll()
+    .filter((x) => x.settled && (!code || x.fundCode === code) && Number.isFinite((x as any).officialPct))
     .map((x) => ({
-      code: x.code,
       fundType: x.fundType,
-      estimatedPct: x.estimatedPct,
-      officialPct: x.officialPct as number,
-      errorPct: x.errorPct as number,
-      absoluteErrorPct: Math.abs(x.errorPct as number),
-      directionCorrect: Math.sign(x.estimatedPct) === Math.sign(x.officialPct as number),
-      observedAt: x.observedAt,
-      settledAt: x.settledAt,
+      estimatePct: x.estimatePct,
+      officialPct: (x as any).officialPct,
+      coveragePct: x.coveragePct,
+      sourceAgreementPct: x.sourceAgreementPct,
     }));
 }
 
