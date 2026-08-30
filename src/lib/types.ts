@@ -1,178 +1,19 @@
 export type SourceStatus = "ok" | "warn" | "err" | "idle";
-
-export type IndexQuote = {
-  name: string;
-  code: string;
-  secid: string;
-  price: number | null;
-  pct: number | null;
-  change: number | null;
-};
-
-export type SectorQuote = {
-  id: string;
-  name: string;
-  bkCode: string;
-  change: number | null;
-  flow: number | null;
-  super: number | null;
-  large: number | null;
-  mid: number | null;
-  small: number | null;
-  turnover: number | null;
-  available: boolean;
-  streak: number;
-  etfCode?: string;
-  etfName?: string;
-  /** Secondary direction check from the mapped ETF, when available. */
-  etfChange?: number | null;
-  /** board quote vs ETF direction consistency */
-  validation?: "cross_checked" | "single_source" | "unavailable";
-};
-
-export type BoardQuote = {
-  code: string;
-  name: string;
-  type: "industry" | "concept";
-  change: number | null;
-  flow: number | null;
-};
-
-export type MarketOrder = {
-  main: number;
-  super: number;
-  large: number;
-  mid: number;
-  small: number;
-  count: number;
-};
-
-export type GlobalQuote = {
-  name: string;
-  pct: number | null;
-  price: number | null;
-};
-
-export type NewsItem = {
-  id: string;
-  title: string;
-  summary: string;
-  source: string;
-  url: string;
-  publishedAt: number | null;
-  fetchedAt: number;
-  category: "policy" | "market" | "global" | "sector" | "other";
-  sentiment: "bull" | "bear" | "neutral";
-  relatedSectors: string[];
-};
-
-export type Holding = {
-  code: string;
-  name: string;
-  shares: number;
-  cost: number;
-};
-
-export type FundMetrics = {
-  last: number;
-  ma5: number | null;
-  ma10: number | null;
-  ma20: number | null;
-  ma60: number | null;
-  rsi: number;
-  bias: number;
-  upper: number;
-  lower: number;
-  macd: number;
-  dif: number;
-  dea: number;
-  band: string;
-  bandTone: "low" | "high" | "neutral";
-  trend: string;
-  bandScore: number;
-  trendScore: number;
-  combo: string;
-  conf: "高" | "中" | "低";
-  sigStrength: number;
-  sigConds: string[];
-};
-
-export type SwingAdvice = {
-  env: number;
-  envLevel: string;
-  envText: string;
-  allowT: boolean;
-  buyGrid: number | null;
-  sellGrid: number | null;
-  action: string;
-  reason: string;
-};
-
-export type FundHistoryPoint = {
-  date: string;
-  nav: number;
-  changePct: number | null;
-};
-
-export type FundQuote = {
-  code: string;
-  name: string;
-  type: string;
-  nav: number | null;
-  navDate: string | null;
-  estimate: number | null;
-  estimatePct: number | null;
-  estimateTime: string | null;
-  dayPct: number | null;
-  weekPct: number | null;
-  monthPct: number | null;
-  history: number[];
-  historyPoints: FundHistoryPoint[];
-  metrics: FundMetrics | null;
-  source: string;
-  officialNavPublished?: boolean;
-  valuationStatus?: "estimate" | "waiting_official_nav" | "official_nav" | "stale" | "unavailable";
-  estimateConfidence?: "high" | "medium" | "low";
-};
-
-export type RankRow = {
-  code: string;
-  name: string;
-  nav: number | null;
-  day: number | null;
-  week: number | null;
-  month: number | null;
-  ytd: number | null;
-};
-
-export type DataSource = {
-  name: string;
-  status: SourceStatus;
-  note: string;
-};
-
-export type Snapshot = {
-  indices: IndexQuote[];
-  sectors: SectorQuote[];
-  boards: BoardQuote[];
-  flow: MarketOrder | null;
-  global: GlobalQuote[];
-  sources: DataSource[];
-  fetchedAt: number;
-  marketDate?: string | null;
-  validation?: "cross_checked" | "single_source" | "cached_latest_trading_day";
-};
-
-export type NewsFeed = {
-  items: NewsItem[];
-  deep: NewsItem[];
-  sentiment: NewsItem[];
-  sources: DataSource[];
-  fetchedAt: number;
-  latestPublishedAt: number | null;
-};
-
-export type EvidenceStep = { id: string; title: string; body: string; evidence: string };
-export type EvidenceResult = { steps: EvidenceStep[]; verdict: string; duration: string; confidence: string; summary: string; risk: string; score: number };
-
-export type SixFactor = { position: number; confidence: number; bullN: number; bearN: number; advice: string; status: string; level: string; trendLabel: string; band: string; ch: number; fl: number; basis: string };
+export type IndexQuote = { name:string; code:string; secid:string; price:number|null; pct:number|null; change:number|null };
+export type SectorQuote = { id:string; name:string; bkCode:string; change:number|null; flow:number|null; super:number|null; large:number|null; mid:number|null; small:number|null; turnover:number|null; available:boolean; streak:number; etfCode?:string; etfName?:string; etfChange?:number|null; validation?:"cross_checked"|"single_source"|"unavailable" };
+export type BoardQuote = { code:string; name:string; type:"industry"|"concept"; change:number|null; flow:number|null };
+export type MarketOrder = { main:number; super:number; large:number; mid:number; small:number; count:number };
+export type GlobalQuote = { name:string; pct:number|null; price:number|null };
+export type NewsItem = { id:string; title:string; summary:string; source:string; url:string; publishedAt:number|null; fetchedAt:number; category:"policy"|"market"|"global"|"sector"|"other"; sentiment:"bull"|"bear"|"neutral"; relatedSectors:string[] };
+export type Holding = { code:string; name:string; shares:number; cost:number };
+export type FundMetrics = { last:number; ma5:number|null; ma10:number|null; ma20:number|null; ma60:number|null; rsi:number; bias:number; upper:number; lower:number; macd:number; dif:number; dea:number; band:string; bandTone:"low"|"high"|"neutral"; trend:string; bandScore:number; trendScore:number; combo:string; conf:"高"|"中"|"低"; sigStrength:number; sigConds:string[] };
+export type SwingAdvice = { env:number; envLevel:string; envText:string; allowT:boolean; buyGrid:number|null; sellGrid:number|null; action:string; reason:string };
+export type FundHistoryPoint = { date:string; nav:number; changePct:number|null };
+export type FundQuote = { code:string; name:string; type:string; nav:number|null; navDate:string|null; estimate:number|null; estimatePct:number|null; estimateTime:string|null; dayPct:number|null; weekPct:number|null; monthPct:number|null; history:number[]; historyPoints:FundHistoryPoint[]; metrics:FundMetrics|null; source:string; officialNavPublished?:boolean; valuationStatus?:"estimate"|"waiting_official_nav"|"official_nav"|"stale"|"unavailable"; estimateConfidence?:"high"|"medium"|"low" };
+export type RankRow = { code:string; name:string; nav:number|null; day:number|null; week:number|null; month:number|null; ytd:number|null };
+export type DataSource = { name:string; status:SourceStatus; note:string };
+export type Snapshot = { indices:IndexQuote[]; sectors:SectorQuote[]; boards:BoardQuote[]; flow:MarketOrder|null; global:GlobalQuote[]; sources:DataSource[]; fetchedAt:number; marketDate?:string|null; validation?:"cross_checked"|"single_source"|"cached_latest_trading_day" };
+export type NewsFeed = { items:NewsItem[]; deep:NewsItem[]; sentiment:NewsItem[]; sources:DataSource[]; fetchedAt:number; latestPublishedAt:number|null };
+export type EvidenceStep = { id:string; title:string; body:string; evidence:string };
+export type EvidenceResult = { steps:EvidenceStep[]; verdict:string; duration:string; confidence:string; summary:string; risk:string; score:number };
+export type SixFactor = { position:number; confidence:number; bullN:number; bearN:number; advice:string; status:string; level:string; trendLabel:string; band:string; ch:number; fl:number; basis:string };
