@@ -48,7 +48,9 @@ export const useApp = create<AppState>((set, get) => ({
     if (isWeekend()) {
       const cached = get().snapshot || loadCachedSnapshot();
       if (cached) {
-        set({ snapshot: { ...cached, marketDate: cached.marketDate || tradingDateLabel(), validation: "cached_latest_trading_day" }, loading: false, lastError: null });
+        const snapshot = { ...cached, marketDate: tradingDateLabel(), validation: "cached_latest_trading_day" as const };
+        saveCachedSnapshot(snapshot);
+        set({ snapshot, loading: false, lastError: null });
         return;
       }
       set({ loading: true, lastError: null });
@@ -121,15 +123,28 @@ export const useApp = create<AppState>((set, get) => ({
     const list = get().portfolio;
     if (!list.length) return;
     const currentFunds = get().funds;
+    const weekend = isWeekend();
     const codes = [...new Set(list.map((h) => h.code))];
-    const codesToFetch = isWeekend() ? codes.filter((code) => !currentFunds[code]) : codes;
+    const codesToFetch = weekend ? codes.filter((code) => !currentFunds[code]) : codes;
     if (!codesToFetch.length) return;
     set({ fundsLoading: true });
     try {
       const entries = await Promise.allSettled(codesToFetch.map(async (code) => {
         const raw = await getFund({ data: { code } });
-        try { const validated = await validateFundQuote({ data: { quote: raw } }); return [code, validated.quote] as const; }
-        catch { return [code, raw] as const; }
+        try {
+          const validated = await validateFundQuote({ data: { quote: raw } });
+          const quote = weekend ? {
+            ...validated.quote,
+            estimate: null,
+            estimatePct: null,
+            estimateTime: null,
+            valuationStatus: validated.quote.nav != null ? "official_nav" as const : "stale" as const,
+            estimateConfidence: "low" as const,
+          } : validated.quote;
+          return [code, quote] as const;
+        } catch {
+          return [code, raw] as const;
+        }
       }));
       const funds = { ...get().funds };
       for (const result of entries) {
