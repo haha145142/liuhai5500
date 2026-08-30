@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Launcher } from "@/components/home/Launcher";
 import { Cockpit } from "@/components/market/Cockpit";
 import { IndexGrid } from "@/components/market/IndexGrid";
 import { Glass, EmptyNote, Tone } from "@/components/ui/Glass";
@@ -36,7 +35,6 @@ function Home() {
 
   return (
     <div>
-      <Launcher />
       <Glass tight className="flex items-end justify-between">
         <div>
           <div className="text-xs text-muted">组合资产</div>
