@@ -1,8 +1,3 @@
-.bottom-nav {
-  display: none !important;
-}
-
+.bottom-nav { display: none !important; }
 .bottom-nav button,
-.bottom-nav button.active {
-  display: none !important;
-}
+.bottom-nav button.active { display: none !important; }
