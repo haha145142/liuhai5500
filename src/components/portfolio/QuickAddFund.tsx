@@ -4,6 +4,7 @@ import { useApp } from "@/lib/store";
 import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
 import { getFund } from "@/lib/data/server";
 import { selectFundDisplayQuote } from "@/lib/data/quote-mode";
+import { previewHoldingEntry, quoteFromFundState } from "@/lib/calc/holding-entry";
 import type { FundQuote } from "@/lib/types";
 import "./QuickAddFund.css";
 
@@ -21,12 +22,21 @@ export function QuickAddFund() {
   const quote = remoteQuote?.code === code ? remoteQuote : cached;
   const shareValue = Number(shares);
   const costValue = Number(cost);
-  const localCost = shareValue > 0 && costValue > 0 ? shareValue * costValue : null;
   const current = selectFundDisplayQuote(quote);
-  const marketPrice = current.price;
-  const marketValue = marketPrice != null && shareValue > 0 ? marketPrice * shareValue : null;
-  const pnl = localCost != null && marketValue != null ? marketValue - localCost : null;
-  const pnlPct = pnl != null && localCost ? (pnl / localCost) * 100 : null;
+  const entryQuote = quoteFromFundState({
+    estimate: quote?.estimate,
+    estimatePct: quote?.estimatePct,
+    nav: quote?.nav,
+    dayPct: quote?.dayPct,
+    navDate: quote?.navDate,
+    estimateTime: quote?.estimateTime,
+    tradeTime: current.mode === "live_estimate",
+  });
+  const previewResult = previewHoldingEntry(shares, cost, entryQuote);
+  const marketPrice = previewResult.price;
+  const marketValue = previewResult.marketValue;
+  const pnl = previewResult.pnl;
+  const pnlPct = previewResult.pnlPct;
   const canSave = /^\d{6}$/.test(code) && shareValue > 0 && costValue > 0;
   const ownEstimate = quote?.estimateMethod?.startsWith("前十大重仓") || quote?.source?.startsWith("自有穿透估值");
   const auditLine = quote
@@ -63,10 +73,10 @@ export function QuickAddFund() {
 
   const preview = useMemo(() => {
     if (!code && !shares && !cost) return "输入完成后，这里立即计算；行情异步更新，不阻塞录入";
-    if (localCost == null) return "输入份额和成本价，持仓成本马上计算";
-    if (quote?.name) return `${quote.name} · ${current.label}${quoteLoading ? " · 正在校验" : ""}`;
+    if (previewResult.costValue == null) return "输入份额和成本价，持仓成本马上计算";
+    if (quote?.name) return `${quote.name} · ${previewResult.quoteLabel}${quoteLoading ? " · 正在校验" : ""}`;
     return quoteLoading ? "正在读取最新行情 · 本地成本计算已立即生效" : "暂无可靠行情 · 先按成本即时计算，联网后自动补齐";
-  }, [code, cost, current.label, localCost, quote?.name, quoteLoading, shares]);
+  }, [code, cost, previewResult.costValue, previewResult.quoteLabel, quote?.name, quoteLoading, shares]);
 
   const save = () => {
     if (!canSave) {
@@ -74,7 +84,7 @@ export function QuickAddFund() {
       return;
     }
     addHolding({ code, name: quote?.name || code, shares: shareValue, cost: costValue });
-    setMessage(`已保存 · ${current.label}会自动随交易时段切换`);
+    setMessage(`已保存 · ${previewResult.quoteLabel}会自动随交易时段切换`);
     setCode(""); setShares(""); setCost(""); setRemoteQuote(undefined);
   };
 
@@ -93,14 +103,14 @@ export function QuickAddFund() {
         <div className="quick-field"><label>成本价</label><input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" placeholder="如 1.2500" /></div>
       </div>
       <div className="quick-add-preview">
-        <div className="quick-preview-top"><span><Sparkles size={14} /> 即时计算</span><em>{quote ? current.label : "离线也可算"}</em></div>
+        <div className="quick-preview-top"><span><Sparkles size={14} /> 即时计算</span><em>{current.label}</em></div>
         <div className="quick-metrics">
-          <Metric label="持仓成本" value={localCost == null ? "—" : fmtMoney(localCost)} />
-          <Metric label={current.mode === "live_estimate" ? "盘中估值" : "当前市值"} value={marketValue == null ? "待行情" : fmtMoney(marketValue)} />
+          <Metric label="持仓成本" value={previewResult.costValue == null ? "—" : fmtMoney(previewResult.costValue)} />
+          <Metric label={previewResult.quoteMode === "live_estimate" ? "盘中估值" : "当前市值"} value={marketValue == null ? "待行情" : fmtMoney(marketValue)} />
           <Metric label="当前盈亏" value={pnl == null ? "待行情" : fmtMoney(pnl)} tone={pnl} />
           <Metric label="收益率" value={pnlPct == null ? "—" : fmtPctShort(pnlPct)} tone={pnlPct} />
         </div>
-        <div className="quick-quote-row">{marketPrice != null ? `价格 ${fmtPrice(marketPrice, 4)}` : "价格暂无"}{current.pct != null ? ` · 当日 ${fmtPctShort(current.pct)}` : ""}{current.dataDate ? ` · 数据日 ${current.dataDate}` : ""}</div>
+        <div className="quick-quote-row">{marketPrice != null ? `价格 ${fmtPrice(marketPrice, 4)}` : "价格暂无"}{entryQuote.pct != null ? ` · 当日 ${fmtPctShort(entryQuote.pct)}` : ""}{quote?.navDate ? ` · 数据日 ${quote.navDate}` : ""}</div>
         <div className="quick-preview-note">{preview}</div>
         <div className="quick-preview-note">{auditLine}</div>
       </div>
