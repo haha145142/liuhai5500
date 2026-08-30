@@ -1,38 +1,8 @@
-.bottom-nav{
-  position:fixed;
-  left:16px;
-  right:16px;
-  bottom:18px;
-  display:flex;
-  justify-content:space-around;
-  align-items:center;
-  padding:12px 14px;
-
-  background:rgba(255,255,255,.26);
-  backdrop-filter:blur(24px) saturate(180%);
-  -webkit-backdrop-filter:blur(24px) saturate(180%);
-
-  border:1px solid rgba(255,255,255,.42);
-  border-radius:28px;
-
-  box-shadow:
-    0 12px 40px rgba(15,23,42,.12),
-    inset 0 1px 0 rgba(255,255,255,.45);
-
-  z-index:9999;
+.bottom-nav {
+  display: none !important;
 }
 
-.bottom-nav button{
-  background:none;
-  border:none;
-  color:#667085;
-  font-size:14px;
-  padding:10px 12px;
-  border-radius:18px;
-}
-
-.bottom-nav button.active{
-  color:#4FA3FF;
-  font-weight:600;
-  background:rgba(79,163,255,.12);
+.bottom-nav button,
+.bottom-nav button.active {
+  display: none !important;
 }
