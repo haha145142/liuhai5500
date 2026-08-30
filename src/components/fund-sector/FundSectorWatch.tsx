@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, GripVertical, Pin, Plus, Search, X } from "lucide-react";
 import { getFundSectorQuotes, type FundSectorQuote } from "@/lib/data/server";
 import { FUND_SECTORS, DEFAULT_FUND_SECTOR_IDS } from "@/lib/data/fund-sectors";
+import { enrichFundSectorMembers, quoteForEnrichedHolding } from "@/lib/data/fund-sector-membership";
 import { fmtPctShort } from "@/lib/format";
 import type { FundQuote, Holding } from "@/lib/types";
 
@@ -19,11 +20,8 @@ function readPrefs(): StoredPrefs {
       const pinned = Array.isArray(rawV2?.pinned) ? rawV2.pinned.filter((x): x is string => typeof x === "string" && ids.includes(x)) : [];
       return { ids, pinned };
     }
-
     const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || "null");
-    if (Array.isArray(legacy) && legacy.every((x) => typeof x === "string")) {
-      return { ids: legacy, pinned: [] };
-    }
+    if (Array.isArray(legacy) && legacy.every((x) => typeof x === "string")) return { ids: legacy, pinned: [] };
     return { ids: DEFAULT_FUND_SECTOR_IDS, pinned: [] };
   } catch {
     return { ids: DEFAULT_FUND_SECTOR_IDS, pinned: [] };
@@ -140,9 +138,23 @@ export function FundSectorWatch({ portfolio = [], funds = {} }: { portfolio?: Ho
         {loading && !rows.length ? <div className="rounded-2xl bg-bg-elevated px-3 py-4 text-center text-[10px] text-subtle">正在读取基金板块…</div> : null}
         {orderedRows.map((row) => {
           const open = openId === row.id;
+          const sectorDef = FUND_SECTORS.find((s) => s.id === row.id);
           const heldFunds = row.funds.filter((fund) => heldCodes.has(fund.code));
-          const otherFunds = row.funds.filter((fund) => !heldCodes.has(fund.code));
-          const orderedFunds = [...heldFunds, ...otherFunds];
+          const dynamicMembers = sectorDef ? enrichFundSectorMembers(sectorDef, row.funds, portfolio) : [];
+          const dynamicHeld = dynamicMembers.map((m) => {
+            const holding = portfolio.find((h) => h.code === m.code);
+            if (!holding) return null;
+            const quote = quoteForEnrichedHolding(holding, funds);
+            return {
+              ...quote,
+              validation: quote.pct != null ? "single_source" as const : "unavailable" as const,
+              source: quote.pct != null ? "持仓基金本地行情" : "暂无可靠行情",
+            };
+          }).filter((v): v is NonNullable<typeof v> => v !== null);
+          const mergedFunds = [...row.funds, ...dynamicHeld.filter((fund) => !row.funds.some((x) => x.code === fund.code))];
+          const heldMerged = mergedFunds.filter((fund) => heldCodes.has(fund.code));
+          const otherFunds = mergedFunds.filter((fund) => !heldCodes.has(fund.code));
+          const orderedFunds = [...heldMerged, ...otherFunds];
           const isPinned = pinned.includes(row.id);
           return (
             <div key={row.id} className="overflow-hidden rounded-2xl bg-bg-elevated/75 ring-1 ring-white/70">
@@ -154,7 +166,7 @@ export function FundSectorWatch({ portfolio = [], funds = {} }: { portfolio?: Ho
                     <span className="truncate text-xs font-semibold text-fg">{row.name}</span>
                     {isPinned ? <Pin size={11} className="shrink-0 text-accent" fill="currentColor" /> : null}
                   </span>
-                  <span className="mt-0.5 block text-[9px] text-subtle">{row.validCount}/{row.totalCount} 只基金有可靠行情 · {row.up} 涨 {row.down} 跌{heldFunds.length ? ` · 你持有 ${heldFunds.length} 只` : ""}</span>
+                  <span className="mt-0.5 block text-[9px] text-subtle">{row.validCount}/{row.totalCount} 只基金有可靠行情 · {row.up} 涨 {row.down} 跌{heldMerged.length ? ` · 你持有 ${heldMerged.length} 只` : ""}</span>
                 </span>
                 <span className={`text-sm font-bold tabular-nums ${toneClass(row.pct)}`}>{row.pct == null ? "—" : fmtPctShort(row.pct)}</span>
                 <ChevronDown size={15} className={`text-subtle transition-transform ${open ? "rotate-180" : ""}`} />
@@ -164,11 +176,12 @@ export function FundSectorWatch({ portfolio = [], funds = {} }: { portfolio?: Ho
                 <div className="border-t border-white/60 px-3 pb-3 pt-2">
                   <div className="mb-2 flex items-center justify-between text-[9px] text-subtle">
                     <span>板块内基金 · 持仓优先</span>
-                    <span>{row.validation === "cross_checked" ? "双源核验" : row.validation === "single_source" ? "部分可用" : "暂无可靠数据"}</span>
+                    <span>{dynamicHeld.length ? `自动识别 ${dynamicHeld.length} 只` : ""} {row.validation === "cross_checked" ? "· 双源核验" : row.validation === "single_source" ? "· 部分可用" : "· 暂无可靠数据"}</span>
                   </div>
                   <div className="space-y-1">
                     {orderedFunds.map((fund) => {
                       const held = heldCodes.has(fund.code);
+                      const auto = dynamicHeld.some((x) => x.code === fund.code);
                       const appFund = funds[fund.code];
                       return (
                         <div key={fund.code} className={`flex items-center gap-2 rounded-xl px-2.5 py-2 ${held ? "bg-accent/10 ring-1 ring-accent/15" : "bg-white/45"}`}>
@@ -176,6 +189,7 @@ export function FundSectorWatch({ portfolio = [], funds = {} }: { portfolio?: Ho
                             <div className="flex items-center gap-1.5">
                               <div className="truncate text-[10px] font-medium text-fg">{fund.name}</div>
                               {held ? <span className="shrink-0 rounded-full bg-accent/12 px-1.5 py-0.5 text-[8px] font-semibold text-accent">持仓</span> : null}
+                              {auto ? <span className="shrink-0 rounded-full bg-black/5 px-1.5 py-0.5 text-[8px] text-subtle">自动识别</span> : null}
                             </div>
                             <div className="text-[9px] text-subtle">{fund.code}{appFund?.nav != null ? ` · 净值 ${appFund.nav.toFixed(4)}` : ""}</div>
                           </div>
