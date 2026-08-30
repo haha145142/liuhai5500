@@ -49,6 +49,9 @@ function Home() {
         : "等待行情";
   const marketDate = snapshot?.marketDate || (isWeekend() ? tradingDateLabel() : "今日");
   const missingCount = snapshot?.indices.filter((x) => x.pct == null).length ?? 0;
+  const statusText = isWeekend()
+    ? `周末沿用最近完成交易日数据；下一个交易日恢复更新。${missingCount ? ` 当前 ${missingCount} 项指数缺少可验证涨跌幅。` : ""}`
+    : (missingCount ? `${missingCount} 项指数暂缺可靠值。` : "当前指数数据完整。");
 
   return (
     <div>
@@ -75,12 +78,7 @@ function Home() {
             <span>{isWeekend() ? "周末休市" : "市场数据"} · 数据日 {marketDate}</span>
             <span className="rounded-full bg-bg-elevated px-2 py-0.5 font-semibold text-accent">{marketMode}</span>
           </div>
-          <p className="mt-1 text-[10px] text-subtle">
-            {isWeekend()
-              ? `周末沿用最近完成交易日数据；下一个交易日恢复更新。${missingCount ? ` 当前 ${missingCount} 项指数缺少可验证涨跌幅。` : ""}`
-              : `多源校验后显示；${missingCount ? `${missingCount} 项指数暂缺可靠值。` : "当前指数数据完整。`}`
-            }
-          </p>
+          <p className="mt-1 text-[10px] text-subtle">{statusText}</p>
         </Glass>
       ) : null}
 
