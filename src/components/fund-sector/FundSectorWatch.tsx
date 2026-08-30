@@ -6,16 +6,25 @@ import { fmtPctShort } from "@/lib/format";
 import type { FundQuote, Holding } from "@/lib/types";
 
 const KEY = "fund_ai_pro_fund_sector_watch_v2";
+const LEGACY_KEY = "fund_ai_pro_fund_sector_watch_v1";
 
 type StoredPrefs = { ids: string[]; pinned: string[] };
 
 function readPrefs(): StoredPrefs {
   if (typeof window === "undefined") return { ids: DEFAULT_FUND_SECTOR_IDS, pinned: [] };
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || "null") as Partial<StoredPrefs> | null;
-    const ids = Array.isArray(raw?.ids) && raw.ids.every((x) => typeof x === "string") ? raw!.ids! : DEFAULT_FUND_SECTOR_IDS;
-    const pinned = Array.isArray(raw?.pinned) && raw.pinned.every((x) => typeof x === "string") ? raw!.pinned! : [];
-    return { ids, pinned: pinned.filter((id) => ids.includes(id)) };
+    const rawV2 = JSON.parse(localStorage.getItem(KEY) || "null") as Partial<StoredPrefs> | null;
+    if (Array.isArray(rawV2?.ids)) {
+      const ids = rawV2.ids.filter((x): x is string => typeof x === "string");
+      const pinned = Array.isArray(rawV2?.pinned) ? rawV2.pinned.filter((x): x is string => typeof x === "string" && ids.includes(x)) : [];
+      return { ids, pinned };
+    }
+
+    const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || "null");
+    if (Array.isArray(legacy) && legacy.every((x) => typeof x === "string")) {
+      return { ids: legacy, pinned: [] };
+    }
+    return { ids: DEFAULT_FUND_SECTOR_IDS, pinned: [] };
   } catch {
     return { ids: DEFAULT_FUND_SECTOR_IDS, pinned: [] };
   }
