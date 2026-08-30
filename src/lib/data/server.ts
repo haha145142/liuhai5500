@@ -1,1 +1,1 @@
-export { getSnapshot, getNews, getFund, getRankings, calcIndicators } from "./server-stable";
+export { getSnapshot, getNews, getFund, searchFund, getFundRank, analyzeMarket, analyzeNews, calcIndicators } from "./server-stable";
