@@ -115,7 +115,6 @@ export function FundSectorWatch({ portfolio = [], funds = {} }: { portfolio?: Ho
                   <div className="space-y-1">
                     {orderedFunds.map((fund) => {
                       const held = heldCodes.has(fund.code);
-                      const held = heldCodes.has(fund.code);
                       const appFund = funds[fund.code];
                       return (
                         <div key={fund.code} className={`flex items-center gap-2 rounded-xl px-2.5 py-2 ${held ? "bg-accent/10 ring-1 ring-accent/15" : "bg-white/45"}`}>
