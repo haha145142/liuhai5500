@@ -13,6 +13,32 @@ import {
 } from "./storage";
 import { getFund, getNews, getSnapshot } from "./data/server";
 
+const SNAPSHOT_CACHE_KEY = "fund_ai_pro_snapshot_cache_v1";
+const NEWS_CACHE_KEY = "fund_ai_pro_news_cache_v1";
+const FUNDS_CACHE_KEY = "fund_ai_pro_funds_cache_v1";
+
+type Cached<T> = { savedAt: number; value: T };
+
+function readCache<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return (JSON.parse(raw) as Cached<T>).value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache<T>(key: string, value: T) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), value } satisfies Cached<T>));
+  } catch {
+    /* cache is optional; never block the UI */
+  }
+}
+
 type AppState = {
   ready: boolean;
   loading: boolean;
@@ -54,8 +80,14 @@ export const useApp = create<AppState>((set, get) => ({
 
   hydrate: () => {
     if (get().ready) return;
+    const cachedSnapshot = readCache<Snapshot>(SNAPSHOT_CACHE_KEY);
+    const cachedNews = readCache<NewsFeed>(NEWS_CACHE_KEY);
+    const cachedFunds = readCache<Record<string, FundQuote>>(FUNDS_CACHE_KEY);
     set({
       ready: true,
+      snapshot: cachedSnapshot,
+      news: cachedNews,
+      funds: cachedFunds ?? {},
       portfolio: loadPortfolio(),
       selectedSectors: loadSelectedSectors(),
       watchlist: loadWatchlist(),
@@ -68,6 +100,7 @@ export const useApp = create<AppState>((set, get) => ({
     set({ loading: true, lastError: null });
     try {
       const snapshot = await getSnapshot();
+      writeCache(SNAPSHOT_CACHE_KEY, snapshot);
       set({ snapshot, loading: false });
     } catch (e) {
       set({ loading: false, lastError: e instanceof Error ? e.message : "刷新失败" });
@@ -79,6 +112,7 @@ export const useApp = create<AppState>((set, get) => ({
     set({ newsLoading: true });
     try {
       const news = await getNews();
+      writeCache(NEWS_CACHE_KEY, news);
       set({ news, newsLoading: false });
     } catch {
       set({ newsLoading: false });
@@ -104,6 +138,7 @@ export const useApp = create<AppState>((set, get) => ({
       );
       const funds = { ...get().funds };
       for (const e of entries) if (e) funds[e[0]] = e[1];
+      writeCache(FUNDS_CACHE_KEY, funds);
       set({ funds });
     } finally {
       set({ fundsLoading: false });
