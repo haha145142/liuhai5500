@@ -5,8 +5,9 @@ import { IndexGrid } from "@/components/market/IndexGrid";
 import { PortfolioInsight } from "@/components/portfolio/PortfolioInsight";
 import { Glass, EmptyNote, Tone } from "@/components/ui/Glass";
 import { useApp } from "@/lib/store";
+import { calcPortfolioAnalysis } from "@/lib/calc/portfolio";
 import { fmtMoney, fmtPctShort } from "@/lib/format";
-import { isTradeTime, isWeekend } from "@/lib/market-hours";
+import { isWeekend } from "@/lib/market-hours";
 import { tradingDateLabel } from "@/lib/data/trading-day";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -16,29 +17,7 @@ function Home() {
   const news = useApp((s) => s.news);
   const portfolio = useApp((s) => s.portfolio);
   const funds = useApp((s) => s.funds);
-  const live = isTradeTime();
-
-  let total: number | null = 0;
-  let pnl: number | null = 0;
-  let cost = 0;
-  for (const h of portfolio) {
-    const f = funds[h.code];
-    const px = live && f?.valuationStatus === "estimate" && f.estimate != null
-      ? f.estimate
-      : f?.nav ?? null;
-    cost += h.cost * h.shares;
-    if (px == null) {
-      total = null;
-      pnl = null;
-      continue;
-    }
-    total = (total || 0) + px * h.shares;
-    pnl = (pnl || 0) + (px - h.cost) * h.shares;
-  }
-  if (!portfolio.length) {
-    total = 0;
-    pnl = 0;
-  }
+  const analysis = portfolio.length ? calcPortfolioAnalysis(portfolio, Object.values(funds), snapshot?.sectors || []) : null;
 
   const marketMode = snapshot?.validation === "cross_checked"
     ? "双源核验"
@@ -56,19 +35,33 @@ function Home() {
   return (
     <div>
       <Launcher />
-      <Glass tight className="flex items-end justify-between">
-        <div>
-          <div className="text-xs text-muted">组合资产</div>
-          <div className="mt-1 text-2xl font-semibold tabular-nums">{fmtMoney(total)}</div>
-          <Tone v={pnl} className="text-sm font-semibold">
-            {portfolio.length ? fmtPctShort(cost && pnl != null ? (pnl / cost) * 100 : null) : "尚未添加持仓"}
-          </Tone>
-          {portfolio.length ? <div className="mt-1 text-[10px] text-subtle">口径：{live ? "已验证盘中估值" : "最近官方净值"}</div> : null}
-        </div>
-        <Link to="/portfolio" className="text-xs font-semibold text-accent">
-          查看持仓
-        </Link>
-      </Glass>
+      {analysis ? (
+        <Glass tight className="mb-2">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-xs text-muted">组合资产</div>
+              <div className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{fmtMoney(analysis.marketValue)}</div>
+              <div className="mt-1 flex items-center gap-2">
+                <Tone v={analysis.dayPnl} className="text-sm font-bold">{analysis.dayPnl == null ? "今日盈亏暂无可靠数据" : `今日 ${fmtMoney(analysis.dayPnl)}`}</Tone>
+                <span className="text-[10px] text-subtle">{analysis.dayPct == null ? "" : fmtPctShort(analysis.dayPct)}</span>
+              </div>
+              <div className="mt-2 text-[10px] text-subtle">累计收益 {analysis.pnlPct == null ? "暂无可靠数据" : fmtPctShort(analysis.pnlPct)} · 数据覆盖 {analysis.holdingsCovered}/{analysis.holdingsTotal}</div>
+            </div>
+            <Link to="/portfolio" className="rounded-full bg-bg-elevated px-3 py-1.5 text-xs font-semibold text-accent">查看持仓</Link>
+          </div>
+          {(analysis.topContributor || analysis.topDrag) ? (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <MiniImpact label="主要贡献" row={analysis.topContributor} />
+              <MiniImpact label="主要拖累" row={analysis.topDrag} />
+            </div>
+          ) : null}
+        </Glass>
+      ) : (
+        <Glass tight className="mb-2 flex items-end justify-between">
+          <div><div className="text-xs text-muted">组合资产</div><div className="mt-1 text-2xl font-semibold tabular-nums">—</div><div className="mt-1 text-xs text-subtle">尚未添加持仓</div></div>
+          <Link to="/portfolio" className="text-xs font-semibold text-accent">添加基金</Link>
+        </Glass>
+      )}
 
       <PortfolioInsight holdings={portfolio} funds={Object.values(funds)} sectors={snapshot?.sectors || []} />
 
@@ -83,11 +76,12 @@ function Home() {
       ) : null}
 
       {snapshot ? <IndexGrid indices={snapshot.indices} /> : <EmptyNote>行情正在后台刷新，界面不阻塞。</EmptyNote>}
-      {snapshot ? (
-        <Cockpit snap={snapshot} news={news?.items || []} />
-      ) : (
-        <EmptyNote>市场判断正在后台生成，不影响页面使用。</EmptyNote>
-      )}
+      {snapshot ? <Cockpit snap={snapshot} news={news?.items || []} /> : <EmptyNote>市场判断正在后台生成，不影响页面使用。</EmptyNote>}
     </div>
   );
+}
+
+function MiniImpact({ label, row }: { label: string; row: ReturnType<typeof calcPortfolioAnalysis>["topContributor"] }) {
+  if (!row) return <div className="rounded-2xl bg-bg-elevated px-3 py-2.5 text-[10px] text-subtle">{label} · 暂无可靠数据</div>;
+  return <div className="rounded-2xl bg-bg-elevated px-3 py-2.5"><div className="text-[10px] text-subtle">{label}</div><div className="mt-1 truncate text-xs font-semibold">{row.name}</div><Tone v={row.dayPnl} className="mt-0.5 block text-sm font-bold tabular-nums">{fmtMoney(row.dayPnl)}</Tone></div>;
 }
