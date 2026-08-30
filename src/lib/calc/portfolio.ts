@@ -19,7 +19,8 @@ export type PortfolioAnalysis = {
 export function calcPortfolioAnalysis(holdings: Holding[], funds: FundQuote[], sectors: SectorQuote[]): PortfolioAnalysis {
   const rows = holdings.map((h) => {
     const f = funds.find((x) => x.code === h.code);
-    const price = f?.valuationStatus === "estimate" && f.estimate != null ? f.estimate : f?.nav ?? null;
+    const useEstimate = f?.estimate != null && f.valuationStatus !== "official_nav" && f.valuationStatus !== "unavailable";
+    const price = useEstimate ? f!.estimate! : f?.nav ?? null;
     const value = price != null && Number.isFinite(price) && price > 0 ? price * h.shares : null;
     const pnl = value != null ? value - h.cost * h.shares : null;
     return { h, f, value, pnl };
