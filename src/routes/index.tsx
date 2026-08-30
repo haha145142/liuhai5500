@@ -78,7 +78,7 @@ function Home() {
       </div>
       <PortfolioInsight holdings={portfolio} funds={Object.values(funds)} sectors={snapshot?.sectors || []} />
 
-      <FundSectorWatch />
+      <FundSectorWatch portfolio={portfolio} funds={funds} />
 
       {snapshot ? (
         <Glass tight className="home-market-strip mb-3">
