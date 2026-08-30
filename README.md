@@ -17,6 +17,11 @@ npm run lint
 npm test
 ```
 
+## Deployment
+
+- Direct commits are made to `main`.
+- Vercel automatically deploys new commits pushed to `main`.
+
 ## Notes
 
 - Secrets and environment-specific values must stay outside Git.
