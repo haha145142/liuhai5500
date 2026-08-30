@@ -26,3 +26,4 @@ npm test
 
 - Secrets and environment-specific values must stay outside Git.
 - Historical reference implementations are kept under `attachments/` for later feature comparison and consolidation.
+- Fund intraday valuation is calculated by Fund AI Pro from disclosed holdings and live underlying quotes; third-party estimates are used only for validation.
