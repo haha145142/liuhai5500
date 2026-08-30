@@ -45,6 +45,12 @@ export function QuickAddFund() {
   const pnl = localCost != null && marketValue != null ? marketValue - localCost : null;
   const pnlPct = pnl != null && localCost ? (pnl / localCost) * 100 : null;
   const canSave = /^\d{6}$/.test(code) && shareValue > 0 && costValue > 0;
+  const ownEstimate = quote?.estimateMethod?.startsWith("前十大重仓") || quote?.source?.startsWith("自有穿透估值");
+  const auditLine = quote
+    ? ownEstimate
+      ? `自有穿透估值 · 覆盖 ${quote.estimateCoverage?.toFixed(1) ?? "—"}% · 参考源差 ${quote.estimateDeviation?.toFixed(2) ?? "—"} 个百分点 · ${quote.estimateValidation || "待验证"}`
+      : "估值引擎正在等待可靠持仓数据"
+    : "输入基金代码后自动启动穿透估值";
 
   useEffect(() => {
     if (!/^\d{6}$/.test(code)) {
@@ -113,6 +119,7 @@ export function QuickAddFund() {
         </div>
         <div className="quick-quote-row">{marketPrice != null ? `价格 ${fmtPrice(marketPrice, 4)}` : "价格暂无"}{current.pct != null ? ` · 当日 ${fmtPctShort(current.pct)}` : ""}{quote?.navDate ? ` · 数据日 ${quote.navDate}` : ""}</div>
         <div className="quick-preview-note">{preview}</div>
+        <div className="quick-preview-note">{auditLine}</div>
       </div>
       <button type="button" className="quick-save" disabled={!canSave} onClick={save}>保存持仓</button>
       <div className={`quick-message ${message.startsWith("已保存") ? "ok" : message ? "warn" : ""}`}>{message || "不用手填当天净值 · 交易时段自动取盘中估值 · 官方净值发布后自动切换"}</div>
