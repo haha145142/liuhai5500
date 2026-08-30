@@ -1,9 +1,9 @@
-import React, { type ErrorInfo, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 
 type Props = { children: ReactNode };
 type State = { hasError: boolean };
 
-export class AppErrorBoundary extends React.Component<Props, State> {
+export class AppErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false };
 
   static getDerivedStateFromError(): State {
@@ -11,8 +11,7 @@ export class AppErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(_error: Error, _info: ErrorInfo) {
-    // Intentionally keep the production fallback quiet. A runtime error must
-    // never leave the user with a blank screen or a permanently spinning UI.
+    // Keep production fallback quiet. A runtime error must never become a blank screen.
   }
 
   render() {
