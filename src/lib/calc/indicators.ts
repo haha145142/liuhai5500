@@ -128,18 +128,24 @@ export function calcSwingTrade(
   price: number,
 ): SwingAdvice | null {
   if (!metrics) return null;
-  const p = price || metrics.last || 0;
-  const rsi = metrics.rsi || 50;
-  const bias = metrics.bias || 0;
-  const band = metrics.bandScore || 50;
-  const trend = metrics.trendScore || 50;
-  const upper = metrics.upper || 0;
-  const lower = metrics.lower || 0;
-  const ma20 = metrics.ma20 || 0;
 
-  const amplitude = upper && lower && ma20 ? ((upper - lower) / ma20) * 100 : Math.abs(bias) + 3;
+  // Never manufacture a price. Grid levels are only meaningful when the
+  // caller supplied a finite, positive, already-validated valuation.
+  const p = Number(price);
+  if (!Number.isFinite(p) || p <= 0) return null;
+  if (!Number.isFinite(cost) || cost <= 0) return null;
+
+  const rsi = metrics.rsi;
+  const bias = metrics.bias;
+  const band = metrics.bandScore;
+  const trend = metrics.trendScore;
+  const upper = metrics.upper;
+  const lower = metrics.lower;
+  const ma20 = metrics.ma20;
+
+  const amplitude = upper > 0 && lower > 0 && ma20 > 0 ? ((upper - lower) / ma20) * 100 : Math.abs(bias) + 3;
   const step = Math.max(1.5, Math.min(6, amplitude * 0.6));
-  const gainPct = cost > 0 && p ? ((p - cost) / cost) * 100 : null;
+  const gainPct = ((p - cost) / cost) * 100;
 
   const trendFactor = 1 - Math.abs(trend - 50) / 50;
   const bandFactor = 1 - Math.abs(band - 50) / 50;
@@ -172,13 +178,13 @@ export function calcSwingTrade(
   if (!allowT) {
     action = "持有观察";
     reason = envText;
-  } else if (rsi < 32 || (lower && p <= lower) || bias < -6) {
+  } else if (rsi < 32 || (lower > 0 && p <= lower) || bias < -6) {
     action = "低吸观察";
     reason = "超卖/触及下轨，等待收盘确认后再考虑加仓";
-  } else if (rsi > 68 || (upper && p >= upper) || bias > 6) {
+  } else if (rsi > 68 || (upper > 0 && p >= upper) || bias > 6) {
     action = "减仓提示";
     reason = "超买/触及上轨，震荡市可高抛一部分";
-  } else if (gainPct != null && gainPct > step * 1.2) {
+  } else if (gainPct > step * 1.2) {
     action = "卖出提示";
     reason = `相对成本已有 ${gainPct.toFixed(1)}% 浮盈，可按网格落袋一部分`;
   } else {
