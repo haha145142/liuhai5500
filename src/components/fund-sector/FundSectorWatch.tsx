@@ -3,6 +3,7 @@ import { ChevronDown, Plus, X } from "lucide-react";
 import { getFundSectorQuotes, type FundSectorQuote } from "@/lib/data/server";
 import { FUND_SECTORS, DEFAULT_FUND_SECTOR_IDS } from "@/lib/data/fund-sectors";
 import { fmtPctShort } from "@/lib/format";
+import type { FundQuote, Holding } from "@/lib/types";
 
 const KEY = "fund_ai_pro_fund_sector_watch_v1";
 
@@ -21,7 +22,7 @@ function toneClass(pct: number | null) {
   return pct > 0 ? "text-up" : pct < 0 ? "text-down" : "text-muted";
 }
 
-export function FundSectorWatch() {
+export function FundSectorWatch({ portfolio = [], funds = {} }: { portfolio?: Holding[]; funds?: Record<string, FundQuote> }) {
   const [ids, setIds] = useState<string[]>(readIds);
   const [rows, setRows] = useState<FundSectorQuote[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export function FundSectorWatch() {
   const [message, setMessage] = useState("");
 
   const available = useMemo(() => FUND_SECTORS.filter((s) => !ids.includes(s.id)), [ids]);
+  const heldCodes = useMemo(() => new Set(portfolio.map((h) => h.code)), [portfolio]);
 
   useEffect(() => {
     try { localStorage.setItem(KEY, JSON.stringify(ids)); } catch { /* local only */ }
@@ -89,13 +91,16 @@ export function FundSectorWatch() {
         {loading && !rows.length ? <div className="rounded-2xl bg-bg-elevated px-3 py-4 text-center text-[10px] text-subtle">正在读取基金板块…</div> : null}
         {rows.map((row) => {
           const open = openId === row.id;
+          const heldFunds = row.funds.filter((fund) => heldCodes.has(fund.code));
+          const otherFunds = row.funds.filter((fund) => !heldCodes.has(fund.code));
+          const orderedFunds = [...heldFunds, ...otherFunds];
           return (
             <div key={row.id} className="overflow-hidden rounded-2xl bg-bg-elevated/75 ring-1 ring-white/70">
               <button type="button" onClick={() => setOpenId((cur) => cur === row.id ? null : row.id)} className="flex w-full items-center gap-2 px-3 py-2.5 text-left">
                 <span className="text-base">{row.icon}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs font-semibold text-fg">{row.name}</span>
-                  <span className="mt-0.5 block text-[9px] text-subtle">{row.validCount}/{row.totalCount} 只基金有可靠行情 · {row.up} 涨 {row.down} 跌</span>
+                  <span className="mt-0.5 block text-[9px] text-subtle">{row.validCount}/{row.totalCount} 只基金有可靠行情 · {row.up} 涨 {row.down} 跌{heldFunds.length ? ` · 你持有 ${heldFunds.length} 只` : ""}</span>
                 </span>
                 <span className={`text-sm font-bold tabular-nums ${toneClass(row.pct)}`}>{row.pct == null ? "—" : fmtPctShort(row.pct)}</span>
                 <ChevronDown size={15} className={`text-subtle transition-transform ${open ? "rotate-180" : ""}`} />
@@ -104,19 +109,30 @@ export function FundSectorWatch() {
               {open ? (
                 <div className="border-t border-white/60 px-3 pb-3 pt-2">
                   <div className="mb-2 flex items-center justify-between text-[9px] text-subtle">
-                    <span>板块内基金</span>
+                    <span>板块内基金 · 持仓优先</span>
                     <span>{row.validation === "cross_checked" ? "双源核验" : row.validation === "single_source" ? "部分可用" : "暂无可靠数据"}</span>
                   </div>
                   <div className="space-y-1">
-                    {row.funds.map((fund) => (
-                      <div key={fund.code} className="flex items-center gap-2 rounded-xl bg-white/45 px-2.5 py-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-[10px] font-medium text-fg">{fund.name}</div>
-                          <div className="text-[9px] text-subtle">{fund.code}</div>
+                    {orderedFunds.map((fund) => {
+                      const held = heldCodes.has(fund.code);
+                      const held = heldCodes.has(fund.code);
+                      const appFund = funds[fund.code];
+                      return (
+                        <div key={fund.code} className={`flex items-center gap-2 rounded-xl px-2.5 py-2 ${held ? "bg-accent/10 ring-1 ring-accent/15" : "bg-white/45"}`}>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <div className="truncate text-[10px] font-medium text-fg">{fund.name}</div>
+                              {held ? <span className="shrink-0 rounded-full bg-accent/12 px-1.5 py-0.5 text-[8px] font-semibold text-accent">持仓</span> : null}
+                            </div>
+                            <div className="text-[9px] text-subtle">{fund.code}{appFund?.nav != null ? ` · 净值 ${appFund.nav.toFixed(4)}` : ""}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-[11px] font-semibold tabular-nums ${toneClass(fund.pct)}`}>{fund.pct == null ? "—" : fmtPctShort(fund.pct)}</div>
+                            {held ? <div className="text-[8px] text-accent">重点关注</div> : null}
+                          </div>
                         </div>
-                        <div className={`text-[11px] font-semibold tabular-nums ${toneClass(fund.pct)}`}>{fund.pct == null ? "—" : fmtPctShort(fund.pct)}</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span className="text-[9px] text-subtle">数据日 {row.marketDate || "暂无"}</span>
