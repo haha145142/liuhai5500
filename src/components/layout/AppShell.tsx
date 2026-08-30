@@ -58,10 +58,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   const failedSources = snapshot?.sources.filter((s) => s.status === "err").map((s) => s.name) || [];
+  const validationLabel = snapshot?.validation === "cross_checked"
+    ? "双源核验"
+    : snapshot?.validation === "cached_latest_trading_day"
+      ? "最近交易日缓存"
+      : snapshot?.validation === "single_source"
+        ? "单源可用"
+        : "数据状态待确认";
   const statusText = snapshot
     ? isWeekend()
-      ? `周末休市 · 最近交易日 ${tradingDateLabel()} · ${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`
-      : `${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`
+      ? `周末休市 · 数据日 ${snapshot.marketDate || tradingDateLabel()} · ${validationLabel} · ${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`
+      : `数据日 ${snapshot.marketDate || "今日"} · ${validationLabel} · ${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`
     : lastError
       ? "行情暂时不可用 · 已保留本地数据"
       : "正在后台接入行情 · 界面不阻塞";
