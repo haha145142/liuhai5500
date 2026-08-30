@@ -8,11 +8,11 @@ import type { FundQuote } from "@/lib/types";
 import "./QuickAddFund.css";
 
 function isOfficialNavToday(fund: FundQuote | undefined) {
-  if (!fund?.navDate) return false;
-  if (fund.officialNavPublished === true) return fund.nav != null;
+  if (!fund?.navDate || fund.nav == null) return false;
   const now = cnTime();
   const [y, m, d] = fund.navDate.split(/[-/]/).map(Number);
-  return fund.nav != null && y === now.getUTCFullYear() && m === now.getUTCMonth() + 1 && d === now.getUTCDate();
+  const sameChinaDate = y === now.getUTCFullYear() && m === now.getUTCMonth() + 1 && d === now.getUTCDate();
+  return sameChinaDate && (fund.officialNavPublished === true || fund.officialNavPublished == null);
 }
 
 function pickCurrentQuote(fund: FundQuote | undefined) {
