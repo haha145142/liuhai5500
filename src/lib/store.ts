@@ -5,6 +5,12 @@ import {
   loadSelectedSectors,
   loadSettings,
   loadWatchlist,
+  loadCachedSnapshot,
+  loadCachedNews,
+  loadCachedFunds,
+  saveCachedSnapshot,
+  saveCachedNews,
+  saveCachedFunds,
   savePortfolio,
   saveSelectedSectors,
   saveSettings,
@@ -56,6 +62,9 @@ export const useApp = create<AppState>((set, get) => ({
     if (get().ready) return;
     set({
       ready: true,
+      snapshot: loadCachedSnapshot(),
+      news: loadCachedNews(),
+      funds: loadCachedFunds(),
       portfolio: loadPortfolio(),
       selectedSectors: loadSelectedSectors(),
       watchlist: loadWatchlist(),
@@ -68,9 +77,10 @@ export const useApp = create<AppState>((set, get) => ({
     set({ loading: true, lastError: null });
     try {
       const snapshot = await getSnapshot();
+      saveCachedSnapshot(snapshot);
       set({ snapshot, loading: false });
     } catch (e) {
-      set({ loading: false, lastError: e instanceof Error ? e.message : "刷新失败" });
+      set({ loading: false, lastError: e instanceof Error ? e.message : "行情暂时不可用" });
     }
   },
 
@@ -79,6 +89,7 @@ export const useApp = create<AppState>((set, get) => ({
     set({ newsLoading: true });
     try {
       const news = await getNews();
+      saveCachedNews(news);
       set({ news, newsLoading: false });
     } catch {
       set({ newsLoading: false });
@@ -92,18 +103,14 @@ export const useApp = create<AppState>((set, get) => ({
     set({ fundsLoading: true });
     try {
       const codes = [...new Set(list.map((h) => h.code))];
-      const entries = await Promise.all(
-        codes.map(async (code) => {
-          try {
-            const q = await getFund({ data: { code } });
-            return [code, q] as const;
-          } catch {
-            return null;
-          }
-        }),
+      const entries = await Promise.allSettled(
+        codes.map(async (code) => [code, await getFund({ data: { code } })] as const),
       );
       const funds = { ...get().funds };
-      for (const e of entries) if (e) funds[e[0]] = e[1];
+      for (const result of entries) {
+        if (result.status === "fulfilled") funds[result.value[0]] = result.value[1];
+      }
+      saveCachedFunds(funds);
       set({ funds });
     } finally {
       set({ fundsLoading: false });
