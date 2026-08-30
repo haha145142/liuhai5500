@@ -20,8 +20,10 @@ export type AppSettings = {
 type CacheEnvelope<T> = { savedAt: number; data: T };
 
 const DEFAULT_SETTINGS: AppSettings = {
-  autoRefreshMs: 120_000,
-  newsRefreshMs: 15 * 60_000,
+  // Market data: keep the personal app responsive while still refreshing often enough.
+  autoRefreshMs: 30_000,
+  // News is intentionally slower; published timestamps come from the source itself.
+  newsRefreshMs: 3 * 60_000,
 };
 
 function readJson<T>(key: string, fallback: T): T {
@@ -159,7 +161,13 @@ export function saveWatchlist(codes: string[]) {
 }
 
 export function loadSettings(): AppSettings {
-  return { ...DEFAULT_SETTINGS, ...readJson<Partial<AppSettings>>(SETTINGS_KEY, {}) };
+  const saved = readJson<Partial<AppSettings>>(SETTINGS_KEY, {});
+  return {
+    ...DEFAULT_SETTINGS,
+    ...saved,
+    autoRefreshMs: Number.isFinite(Number(saved.autoRefreshMs)) ? Math.max(30_000, Number(saved.autoRefreshMs)) : DEFAULT_SETTINGS.autoRefreshMs,
+    newsRefreshMs: Number.isFinite(Number(saved.newsRefreshMs)) ? Math.max(60_000, Number(saved.newsRefreshMs)) : DEFAULT_SETTINGS.newsRefreshMs,
+  };
 }
 
 export function saveSettings(s: AppSettings) {
