@@ -16,15 +16,13 @@ export type PortfolioAnalysis = {
   notes: string[];
 };
 
-export function calcPortfolioAnalysis(
-  holdings: Holding[],
-  funds: FundQuote[],
-  sectors: SectorQuote[],
-): PortfolioAnalysis {
+export function calcPortfolioAnalysis(holdings: Holding[], funds: FundQuote[], sectors: SectorQuote[]): PortfolioAnalysis {
   const rows = holdings.map((h) => {
     const f = funds.find((x) => x.code === h.code);
-    const price = f?.nav ?? f?.estimate ?? null;
-    const value = price != null && Number.isFinite(price) ? price * h.shares : null;
+    const price = f?.valuationStatus === "estimate" && f.estimate != null
+      ? f.estimate
+      : f?.nav ?? null;
+    const value = price != null && Number.isFinite(price) && price > 0 ? price * h.shares : null;
     const pnl = value != null ? value - h.cost * h.shares : null;
     return { h, f, value, pnl };
   });
@@ -36,9 +34,7 @@ export function calcPortfolioAnalysis(
   const pnlPct = pnl != null && totalCost > 0 ? (pnl / totalCost) * 100 : null;
   const covered = rows.filter((r) => r.value != null).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
   const concentrationTop1Pct = marketValue > 0 && covered[0]?.value != null ? ((covered[0].value as number) / marketValue) * 100 : 0;
-  const concentrationTop3Pct = marketValue > 0
-    ? (covered.slice(0, 3).reduce((s, r) => s + (r.value ?? 0), 0) / marketValue) * 100
-    : 0;
+  const concentrationTop3Pct = marketValue > 0 ? (covered.slice(0, 3).reduce((s, r) => s + (r.value ?? 0), 0) / marketValue) * 100 : 0;
   const dayKnown = rows.filter((r) => r.f?.dayPct != null);
   const avgDayPct = dayKnown.length ? dayKnown.reduce((s, r) => s + (r.f?.dayPct ?? 0), 0) / dayKnown.length : null;
 
@@ -66,38 +62,15 @@ export function calcPortfolioAnalysis(
     else risk = "低";
   }
 
-  const trend: PortfolioAnalysis["trend"] = avgDayPct == null
-    ? "数据不足"
-    : avgDayPct > 0.3 ? "偏强" : avgDayPct < -0.3 ? "偏弱" : "震荡";
+  const trend: PortfolioAnalysis["trend"] = avgDayPct == null ? "数据不足" : avgDayPct > 0.3 ? "偏强" : avgDayPct < -0.3 ? "偏弱" : "震荡";
 
-  return {
-    totalCost,
-    marketValue,
-    pnl,
-    pnlPct,
-    holdingsCovered: covered.length,
-    holdingsTotal: holdings.length,
-    concentrationTop1Pct,
-    concentrationTop3Pct,
-    avgDayPct,
-    risk,
-    trend,
-    sectorExposures,
-    notes,
-  };
+  return { totalCost, marketValue, pnl, pnlPct, holdingsCovered: covered.length, holdingsTotal: holdings.length, concentrationTop1Pct, concentrationTop3Pct, avgDayPct, risk, trend, sectorExposures, notes };
 }
 
 function inferFundSectorName(fund: FundQuote, sectors: SectorQuote[]): string {
   const text = `${fund.name} ${fund.type}`;
   const rules: Array<[RegExp, string]> = [
-    [/半导体|芯片|集成电路/, "半导体"],
-    [/新能源|光伏|储能|电池|锂电/, "新能源"],
-    [/医药|医疗|创新药|生物/, "医药"],
-    [/消费|食品|白酒|家电/, "消费"],
-    [/金融|银行|证券|保险/, "金融"],
-    [/军工|国防/, "军工"],
-    [/通信|5G/, "通信"],
-    [/人工智能|AI|算力|机器人/, "AI/科技"],
+    [/半导体|芯片|集成电路/, "半导体"], [/新能源|光伏|储能|电池|锂电/, "新能源"], [/医药|医疗|创新药|生物/, "医药"], [/消费|食品|白酒|家电/, "消费"], [/金融|银行|证券|保险/, "金融"], [/军工|国防/, "军工"], [/通信|5G/, "通信"], [/人工智能|AI|算力|机器人/, "AI/科技"],
   ];
   const hit = rules.find(([re]) => re.test(text));
   if (hit) return hit[1];
