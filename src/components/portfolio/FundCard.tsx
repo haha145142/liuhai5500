@@ -17,17 +17,10 @@ function periodReturn(fund: FundQuote | undefined, tradingDays: number, current:
 
 function isOfficialNavForToday(fund: FundQuote | undefined) {
   if (!fund?.navDate) return false;
+  if (fund.officialNavPublished === true) return true;
   const now = cnTime();
   const [y, m, d] = fund.navDate.split(/[-/]/).map(Number);
   return y === now.getUTCFullYear() && m === now.getUTCMonth() + 1 && d === now.getUTCDate();
-}
-
-function isAfterClose(d = new Date()) {
-  const t = cnTime(d);
-  const day = t.getUTCDay();
-  if (day === 0 || day === 6) return false;
-  const mins = t.getUTCHours() * 60 + t.getUTCMinutes();
-  return mins > 15 * 60;
 }
 
 export function FundCard({
@@ -52,9 +45,11 @@ export function FundCard({
   const name = fund?.name || holding.name || holding.code;
   const live = isTradeTime();
   const officialToday = isOfficialNavForToday(fund);
-  const useEstimate = !officialToday && (live || isAfterClose());
-  const px = useEstimate ? (fund?.estimate ?? fund?.nav ?? null) : (fund?.nav ?? fund?.estimate ?? null);
-  const day = useEstimate ? (fund?.estimatePct ?? fund?.dayPct ?? null) : (fund?.dayPct ?? fund?.estimatePct ?? null);
+  // Only use intraday estimate while A-shares are actively trading.
+  // Before open, after close, and weekends use the latest official NAV.
+  const useEstimate = !officialToday && live && fund?.estimate != null;
+  const px = useEstimate ? fund.estimate : (fund?.nav ?? null);
+  const day = useEstimate ? (fund?.estimatePct ?? null) : (fund?.dayPct ?? null);
   const value = px != null ? px * holding.shares : null;
   const costVal = holding.cost * holding.shares;
   const pnl = value != null ? value - costVal : null;
@@ -64,13 +59,7 @@ export function FundCard({
   const swing = calcSwingTrade(fund?.metrics ?? null, holding.cost, px || 0);
   const estimateGap = fund?.estimate != null && fund.nav ? ((fund.estimate - fund.nav) / fund.nav) * 100 : null;
   const periods = useMemo(
-    () => [
-      ["1周", 5],
-      ["1月", 20],
-      ["3月", 60],
-      ["6月", 120],
-      ["1年", 250],
-    ] as const,
+    () => [["1周", 5], ["1月", 20], ["3月", 60], ["6月", 120], ["1年", 250]] as const,
     [],
   );
 
@@ -83,8 +72,12 @@ export function FundCard({
     }
   };
 
-  const quoteLabel = officialToday ? "今日官方净值" : useEstimate ? "盘中估值 / 收盘估值" : "最近官方净值";
-  const quoteSourceLabel = officialToday ? "官方净值已发布，优先采用" : useEstimate ? "官方今日净值尚未发布，继续采用估值" : "等待今日净值或盘中估值";
+  const quoteLabel = officialToday ? "今日官方净值" : useEstimate ? "盘中实时估值" : "最近官方净值";
+  const quoteSourceLabel = officialToday
+    ? "官方净值已发布，优先采用"
+    : useEstimate
+      ? `官方今日净值尚未发布，使用盘中估值${fund?.estimateConfidence ? `（${fund.estimateConfidence === "high" ? "高" : fund.estimateConfidence === "medium" ? "中" : "低"}置信度）` : ""}`
+      : "非交易时段不使用盘中估值，采用最近官方净值";
 
   return (
     <article className="glass mb-3 p-4">
@@ -93,15 +86,13 @@ export function FundCard({
           <div className="text-lg font-semibold text-fg">
             {name} <span className="text-xs font-normal text-muted">{holding.code}</span>
           </div>
-          <div className="mt-1 text-xs text-muted">
-            {quoteLabel} · {fund?.source || "等待数据"}
-          </div>
+          <div className="mt-1 text-xs text-muted">{quoteLabel} · {fund?.source || "等待数据"}</div>
         </div>
         <div className="text-right">
-          <Tone v={day} className="text-2xl font-semibold">
-            {fmtPctShort(day)}
-          </Tone>
-          <div className="text-[10px] text-muted">{officialToday ? "官方净值涨跌" : useEstimate ? "盘中/收盘估值涨跌" : "最近交易日涨跌"}</div>
+          <Tone v={day} className="text-2xl font-semibold">{fmtPctShort(day)}</Tone>
+          <div className="text-[10px] text-muted">
+            {officialToday ? "官方净值涨跌" : useEstimate ? "盘中实时估值涨跌" : "最近官方净值涨跌"}
+          </div>
         </div>
       </div>
 
@@ -121,11 +112,7 @@ export function FundCard({
           {fund?.estimate != null ? ` · 盘中估值 ${fmtPrice(fund.estimate, 4)}${fund.estimateTime ? ` · ${fund.estimateTime}` : ""}` : ""}
         </div>
         <div className="mt-1 text-[11px] font-semibold text-fg">口径：{quoteSourceLabel}</div>
-        {estimateGap != null ? (
-          <div className="mt-1 text-[11px] text-muted">
-            估值校验：相对最近官方净值 <Tone v={estimateGap}>{fmtPctShort(estimateGap)}</Tone>
-          </div>
-        ) : null}
+        {estimateGap != null ? <div className="mt-1 text-[11px] text-muted">估值校验：相对最近官方净值 <Tone v={estimateGap}>{fmtPctShort(estimateGap)}</Tone></div> : null}
       </div>
 
       <div className="mt-3 grid grid-cols-4 gap-2 text-[11px] text-muted">
@@ -136,109 +123,36 @@ export function FundCard({
       </div>
 
       <div className="mt-3 rounded-2xl bg-bg-elevated p-3">
-        <div className="flex items-center justify-between">
-          <b className="text-sm">最近收益</b>
-          <span className="text-[10px] text-muted">按当前持仓份额回算</span>
-        </div>
+        <div className="flex items-center justify-between"><b className="text-sm">最近收益</b><span className="text-[10px] text-muted">按当前持仓份额回算</span></div>
         <div className="mt-2 grid grid-cols-5 gap-1.5">
           {periods.map(([label, days]) => {
-            const r = periodReturn(fund, days, fund?.nav ?? fund?.estimate ?? null);
-            return (
-              <div key={label} className="rounded-xl bg-white/60 px-1 py-2 text-center">
-                <div className="text-[10px] text-muted">{label}</div>
-                <Tone v={r} className="mt-0.5 block text-xs font-semibold">{fmtPctShort(r)}</Tone>
-              </div>
-            );
+            const r = periodReturn(fund, days, fund?.nav ?? null);
+            return <div key={label} className="rounded-xl bg-white/60 px-1 py-2 text-center"><div className="text-[10px] text-muted">{label}</div><Tone v={r} className="mt-0.5 block text-xs font-semibold">{fmtPctShort(r)}</Tone></div>;
           })}
         </div>
-        {fund?.history.length ? (
-          <div className="mt-2 text-[11px] text-muted">
-            最近一周 <Tone v={periodReturn(fund, 5, fund.nav ?? fund.estimate)}>{fmtPctShort(periodReturn(fund, 5, fund.nav ?? fund.estimate))}</Tone>
-            · 最近一月 <Tone v={periodReturn(fund, 20, fund.nav ?? fund.estimate)}>{fmtPctShort(periodReturn(fund, 20, fund.nav ?? fund.estimate))}</Tone>
-          </div>
-        ) : null}
+        {fund?.history.length ? <div className="mt-2 text-[11px] text-muted">最近一周 <Tone v={periodReturn(fund, 5, fund.nav)}>{fmtPctShort(periodReturn(fund, 5, fund.nav))}</Tone> · 最近一月 <Tone v={periodReturn(fund, 20, fund.nav)}>{fmtPctShort(periodReturn(fund, 20, fund.nav))}</Tone></div> : null}
       </div>
 
       {fund?.metrics ? (
         <div className="mt-3 rounded-2xl bg-bg-elevated p-3">
-          <div className="flex items-center justify-between">
-            <b className="text-sm">波段信号 · {fund.metrics.band}</b>
-            <span className="text-xs font-semibold text-accent">{fund.metrics.bandScore}/100</span>
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
-            <div className="h-full rounded-full bg-accent" style={{ width: `${fund.metrics.bandScore}%` }} />
-          </div>
-          <div className="mt-2 grid grid-cols-3 gap-2 text-center text-[11px]">
-            <Metric label="趋势" value={`${fund.metrics.trend} ${fund.metrics.trendScore}`} />
-            <Metric label="RSI" value={fund.metrics.rsi.toFixed(1)} />
-            <Metric label="信号强度" value={`${fund.metrics.sigStrength}`} />
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <Tag>{fund.metrics.band}</Tag>
-            <Tag>{fund.metrics.trend}</Tag>
-            <Tag>{`RSI ${fund.metrics.rsi.toFixed(0)}`}</Tag>
-            <Tag>{`BOLL ${fmtPrice(fund.metrics.lower, 4)} / ${fmtPrice(fund.metrics.upper, 4)}`}</Tag>
-            {swing ? <Tag>{swing.action}</Tag> : null}
-          </div>
+          <div className="flex items-center justify-between"><b className="text-sm">波段信号 · {fund.metrics.band}</b><span className="text-xs font-semibold text-accent">{fund.metrics.bandScore}/100</span></div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-accent" style={{ width: `${fund.metrics.bandScore}%` }} /></div>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-center text-[11px]"><Metric label="趋势" value={`${fund.metrics.trend} ${fund.metrics.trendScore}`} /><Metric label="RSI" value={fund.metrics.rsi.toFixed(1)} /><Metric label="信号强度" value={`${fund.metrics.sigStrength}`} /></div>
+          <div className="mt-2 flex flex-wrap gap-1.5"><Tag>{fund.metrics.band}</Tag><Tag>{fund.metrics.trend}</Tag><Tag>{`RSI ${fund.metrics.rsi.toFixed(0)}`}</Tag><Tag>{`BOLL ${fmtPrice(fund.metrics.lower, 4)} / ${fmtPrice(fund.metrics.upper, 4)}`}</Tag>{swing ? <Tag>{swing.action}</Tag> : null}</div>
         </div>
-      ) : (
-        <p className="mt-3 text-xs text-muted">净值历史不足 35 个交易日，暂不生成可靠波段信号。</p>
-      )}
+      ) : <p className="mt-3 text-xs text-muted">净值历史不足 35 个交易日，暂不生成可靠波段信号。</p>}
 
       <SwingPlan holding={holding} fund={fund} price={px} officialToday={officialToday} />
 
-      {mapped ? (
-        <div className="mt-3 rounded-2xl bg-accent/8 p-3 text-xs text-muted">
-          <b className="text-fg">映射板块：{mapped.name}</b>
-          {sector?.change != null ? <span> · 今日 <Tone v={sector.change}>{fmtPctShort(sector.change)}</Tone></span> : " · 暂无板块行情"}
-          {six ? <div className="mt-1">组合判断：{six.advice} · 置信 {six.confidence}% · {six.basis}</div> : null}
-        </div>
-      ) : null}
+      {mapped ? <div className="mt-3 rounded-2xl bg-accent/8 p-3 text-xs text-muted"><b className="text-fg">映射板块：{mapped.name}</b>{sector?.change != null ? <span> · 今日 <Tone v={sector.change}>{fmtPctShort(sector.change)}</Tone></span> : " · 暂无板块行情"}{six ? <div className="mt-1">组合判断：{six.advice} · 置信 {six.confidence}% · {six.basis}</div> : null}</div> : null}
 
-      <button
-        type="button"
-        className="mt-3 w-full rounded-2xl bg-bg-elevated py-2 text-sm font-semibold text-fg"
-        onClick={() => setOpen((v) => !v)}
-      >
-        {open ? "收起原因与指标" : "为什么涨跌 / 波段建议"}
-      </button>
-      {open ? (
-        <div className="mt-3 space-y-2 rounded-2xl bg-white/55 p-3 text-xs leading-relaxed text-muted">
-          <p><b className="text-fg">综合判断：</b>{fund?.metrics?.combo || "暂无可靠波段结论"}</p>
-          {swing ? <p><b className="text-fg">波段建议：</b>{swing.reason} · 环境 {swing.envLevel}</p> : null}
-          {fund?.metrics ? (
-            <p>MACD {fund.metrics.macd.toFixed(4)} · BIAS {fund.metrics.bias.toFixed(2)}% · DIF {fund.metrics.dif.toFixed(4)} · DEA {fund.metrics.dea.toFixed(4)}</p>
-          ) : null}
-          {fund?.metrics?.sigConds.length ? <p>触发条件：{fund.metrics.sigConds.join(" · ")}</p> : null}
-        </div>
-      ) : null}
+      <button type="button" className="mt-3 w-full rounded-2xl bg-bg-elevated py-2 text-sm font-semibold text-fg" onClick={() => setOpen((v) => !v)}>{open ? "收起原因与指标" : "为什么涨跌 / 波段建议"}</button>
+      {open ? <div className="mt-3 space-y-2 rounded-2xl bg-white/55 p-3 text-xs leading-relaxed text-muted"><p><b className="text-fg">综合判断：</b>{fund?.metrics?.combo || "暂无可靠波段结论"}</p>{swing ? <p><b className="text-fg">波段建议：</b>{swing.reason} · 环境 {swing.envLevel}</p> : null}{fund?.metrics ? <p>MACD {fund.metrics.macd.toFixed(4)} · BIAS {fund.metrics.bias.toFixed(2)}% · DIF {fund.metrics.dif.toFixed(4)} · DEA {fund.metrics.dea.toFixed(4)}</p> : null}{fund?.metrics?.sigConds.length ? <p>触发条件：{fund.metrics.sigConds.join(" · ")}</p> : null}</div> : null}
 
-      {editing ? (
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <input value={shares} onChange={(e) => setShares(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-bg-elevated px-3 text-sm ring-1 ring-border" placeholder="份额" />
-          <input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-bg-elevated px-3 text-sm ring-1 ring-border" placeholder="成本价" />
-          <button type="button" onClick={saveEdit} className="rounded-xl bg-accent py-2 text-sm font-semibold text-accent-fg">保存修改</button>
-          <button type="button" onClick={() => setEditing(false)} className="rounded-xl bg-bg-elevated py-2 text-sm font-semibold">取消</button>
-        </div>
-      ) : (
-        <div className="mt-3 flex gap-2">
-          <button type="button" onClick={() => setEditing(true)} className="flex-1 rounded-xl bg-bg-elevated py-2 text-sm">编辑</button>
-          <button type="button" onClick={onRemove} className="flex-1 rounded-xl bg-bg-elevated py-2 text-sm text-up">删除</button>
-        </div>
-      )}
+      {editing ? <div className="mt-3 grid grid-cols-2 gap-2"><input value={shares} onChange={(e) => setShares(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-bg-elevated px-3 text-sm ring-1 ring-border" placeholder="份额" /><input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-bg-elevated px-3 text-sm ring-1 ring-border" placeholder="成本价" /><button type="button" onClick={saveEdit} className="rounded-xl bg-accent py-2 text-sm font-semibold text-accent-fg">保存修改</button><button type="button" onClick={() => setEditing(false)} className="rounded-xl bg-bg-elevated py-2 text-sm font-semibold">取消</button></div> : <div className="mt-3 flex gap-2"><button type="button" onClick={() => setEditing(true)} className="flex-1 rounded-xl bg-bg-elevated py-2 text-sm">编辑</button><button type="button" onClick={onRemove} className="flex-1 rounded-xl bg-bg-elevated py-2 text-sm text-up">删除</button></div>}
     </article>
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone?: number | null }) {
-  return (
-    <div className="rounded-xl bg-white/55 px-1.5 py-2 text-center">
-      <div className="text-[10px] text-subtle">{label}</div>
-      {tone === undefined ? <div className="mt-0.5 text-xs font-semibold text-fg tabular-nums">{value}</div> : <Tone v={tone} className="mt-0.5 block text-xs font-semibold">{value}</Tone>}
-    </div>
-  );
-}
-
-function Tag({ children }: { children: string }) {
-  return <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-fg ring-1 ring-white/70">{children}</span>;
-}
+function Metric({ label, value, tone }: { label: string; value: string; tone?: number | null }) { return <div className="rounded-xl bg-white/55 px-1.5 py-2 text-center"><div className="text-[10px] text-subtle">{label}</div>{tone === undefined ? <div className="mt-0.5 text-xs font-semibold text-fg tabular-nums">{value}</div> : <Tone v={tone} className="mt-0.5 block text-xs font-semibold">{value}</Tone>}</div>; }
+function Tag({ children }: { children: string }) { return <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-fg ring-1 ring-white/70">{children}</span>; }
