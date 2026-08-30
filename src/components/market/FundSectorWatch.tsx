@@ -4,6 +4,7 @@ import { FUND_SECTORS } from "@/lib/data/fund-sectors";
 import { isWeekend, isTradeTime, sessionLabel } from "@/lib/market-hours";
 import { tradingDateLabel } from "@/lib/data/trading-day";
 import { useApp } from "@/lib/store";
+import { FundDetailSheet } from "@/components/funds/FundDetailSheet";
 import "./FundSectorWatch.css";
 
 const CACHE_KEY = "fund_ai_pro_fund_sector_watch_v3";
@@ -22,14 +23,18 @@ export function FundSectorWatch() {
   const selected = useApp((s) => s.selectedSectors);
   const setSectors = useApp((s) => s.setSectors);
   const portfolio = useApp((s) => s.portfolio);
+  const funds = useApp((s) => s.funds);
   const [rows, setRows] = useState<FundSectorQuote[]>([]);
   const [loading, setLoading] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [detailCode, setDetailCode] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
   const validSelected = useMemo(() => { const known = new Set(FUND_SECTORS.map((s) => s.id)); const clean = selected.filter((id) => known.has(id)); return clean.length ? clean : FUND_SECTORS.slice(0, 8).map((s) => s.id); }, [selected]);
   const holdingMap = useMemo(() => new Map(portfolio.map((h) => [h.code, h])), [portfolio]);
+  const detailFund = detailCode ? funds[detailCode] || rows.flatMap((r) => r.funds).find((f) => f.code === detailCode) : null;
+  const detailHolding = detailCode ? portfolio.find((h) => h.code === detailCode) : undefined;
   const refresh = async (force = false) => {
     if (loading) return; const weekend = isWeekend(); const cached = readCache();
     if (!force && cached?.rows?.length && weekend) { setRows(cached.rows.filter((r) => validSelected.includes(r.id))); setStale(true); return; }
@@ -58,9 +63,10 @@ export function FundSectorWatch() {
         <div className="fsw-foot"><span>{row.leader?`领涨 · ${row.leader.name} ${pctText(row.leader.pct)}`:leaders[0]?`领涨 · ${leaders[0].name} ${pctText(leaders[0].pct)}`:"暂无可靠领涨数据"}</span><span>{open?"⌃ 收起":"⌄ 展开查看基金"}</span></div>
         <div className="fsw-trust-row"><span>{heldFunds.length ? `持仓 ${heldFunds.length} 只 · 暴露 ${money(heldValue)}` : "未持有该板块基金"}</span>{heldFunds.length ? <b>{Number.isFinite(impact) ? `今日影响≈ ${money(impact)}` : "影响待数据"}</b> : <b>{sectorTrust(row)}</b>}</div>
       </button>
-      {open?<div className="fsw-funds"><div className="fsw-fund-head"><span>包含基金</span><span>价格</span><span>涨跌</span></div>{displayFunds.map((fund)=>{const q=displayQuote(fund);return <div className="fsw-fund-row" key={fund.code}><div className="fsw-fund-info"><div className="fsw-fund-name">{fund.name}{holdingMap.has(fund.code)?<span className="held">持有</span>:null}</div><div className="fsw-fund-meta">{fund.code} · {fund.validation==="cross_checked"?"双源":fund.validation==="single_source"?"单源":"暂无"}{fund.time?` · ${fund.time}`:""}{fund.date?` · ${fund.date}`:""}</div></div><div className="fsw-fund-value">{q.value==null?"—":q.value.toFixed(4)}<small>{q.label}</small></div><div className={`fsw-fund-pct ${tone(fund.pct)}`}>{pctText(fund.pct)}</div></div>})}<div className="fsw-expanded-note">板块涨跌 = 有效成分基金涨跌幅等权平均；没有可靠数据的基金不参与计算，也不会被当成 0。持仓影响 = 板块内实际持仓基金逐只按“当前市值 × 该基金涨跌幅”累加得到的近似影响，不等同于组合最终结算收益。</div></div>:null}
+      {open?<div className="fsw-funds"><div className="fsw-fund-head"><span>包含基金</span><span>价格</span><span>涨跌</span></div>{displayFunds.map((fund)=>{const q=displayQuote(fund);const h=holdingMap.get(fund.code);return <button type="button" className="fsw-fund-row fsw-fund-row-button" key={fund.code} onClick={()=>setDetailCode(fund.code)}><div className="fsw-fund-info"><div className="fsw-fund-name">{fund.name}{h?<span className="held">持有</span>:null}</div><div className="fsw-fund-meta">{fund.code} · {fund.validation==="cross_checked"?"双源":fund.validation==="single_source"?"单源":"暂无"}{fund.time?` · ${fund.time}`:""}{fund.date?` · ${fund.date}`:""}</div></div><div className="fsw-fund-value">{q.value==null?"—":q.value.toFixed(4)}<small>{q.label}</small></div><div className={`fsw-fund-pct ${tone(fund.pct)}`}>{pctText(fund.pct)}</div></button>})}<div className="fsw-expanded-note">板块涨跌 = 有效成分基金涨跌幅等权平均；没有可靠数据的基金不参与计算，也不会被当成 0。点基金可查看完整详情。</div></div>:null}
     </article>}) : <div className="fsw-placeholder-list">{validSelected.slice(0,8).map((id)=>{const meta=FUND_SECTORS.find((s)=>s.id===id)!;return <article key={id} className="fsw-card fsw-placeholder-card"><div className="fsw-main"><div className="fsw-main-head"><div className="fsw-name-block"><span className="fsw-icon">{meta.icon}</span><div><div className="fsw-name">{meta.name}<span className="fsw-fund-count">{meta.funds.length} 只基金</span></div><div className="fsw-mini-source">{loading?"正在获取基金数据…":"等待可靠数据"}</div></div></div><div className="fsw-skeleton-value">—</div></div><div className="fsw-placeholder-line"/><div className="fsw-placeholder-line short"/></div></article>})}</div>}
     </div>
     {managerOpen?<div className="fsw-mask" onMouseDown={(e)=>{if(e.target===e.currentTarget)setManagerOpen(false)}}><div className="fsw-sheet"><div className="fsw-sheet-handle"/><div className="fsw-sheet-title"><div><h3>管理基金板块</h3><p>选中后，这个主题会出现在大盘页</p></div><button type="button" onClick={()=>setManagerOpen(false)}>完成</button></div><input autoFocus value={query} onChange={(e)=>setQuery(e.target.value)} className="fsw-search" placeholder="搜索 半导体 / CPO / AI / 医药 / 白酒 / 黄金…"/><div className="fsw-sheet-count">已关注 {validSelected.length} 个 · 可选 {FUND_SECTORS.length} 个主题 · 只管理基金主题，不管理股票板块</div><div className="fsw-manager-list">{manager.map((s)=><button key={s.id} type="button" className={`fsw-manager-row ${selectedSet.has(s.id)?"selected":""}`} onClick={()=>toggleSector(s.id)}><span className="mi">{s.icon}</span><span className="mn"><b>{s.name}</b><small>{s.funds.length} 只关联基金</small></span><span className="check">{selectedSet.has(s.id)?"✓":"+"}</span></button>)}</div></div></div>:null}
+    {detailFund?<FundDetailSheet fund={detailFund} shares={detailHolding?.shares} cost={detailHolding?.cost} onClose={()=>setDetailCode(null)} />:null}
   </section>;
 }
