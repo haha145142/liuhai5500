@@ -61,11 +61,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-shell">
-      <header className="sticky top-0 z-30 px-4 pb-2 pt-[max(14px,env(safe-area-inset-top))]">
-        <div className="glass flex items-center justify-between px-4 py-3">
+      <header className="app-header">
+        <div className="app-header-card">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-fg">Fund AI Pro</h1>
-            <p className="text-xs text-muted">
+            <h1 className="app-header-title">Fund AI Pro</h1>
+            <p className="app-header-meta">
               {sessionLabel()}
               {snapshot ? ` · 数据截至 ${clockStr(new Date(snapshot.fetchedAt))}` : " · 正在接入行情"}
             </p>
@@ -74,13 +74,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             type="button"
             onClick={onRefresh}
             aria-label="刷新"
-            className="flex size-10 items-center justify-center rounded-full bg-white/80 text-fg shadow-sm ring-1 ring-border transition-transform active:scale-95"
+            className="app-refresh-button"
           >
-            <RefreshCw className={cn("size-4", loading && "animate-spin")} />
+            <RefreshCw className={cn("size-7", loading && "animate-spin")} />
           </button>
         </div>
       </header>
-      <main className="px-3 pt-1">{children}</main>
+      <main className="app-main">{children}</main>
       <TabBar />
     </div>
   );
