@@ -1,4 +1,5 @@
 import type { Holding } from "./types";
+import type { FundQuote, NewsFeed, Snapshot } from "./types";
 import { DEFAULT_SECTOR_IDS } from "./data/sectors";
 
 const PORT_KEYS = ["fund_ai_pro_portfolio_v3", "fund_ai_pro_portfolio_v2", "fund_ai_pro_portfolio"];
@@ -7,11 +8,16 @@ const DS_MODEL = "fund_ai_pro_deepseek_model";
 const SECTOR_KEY = "fund_ai_pro_selected_sectors_v1";
 const WATCH_KEY = "fund_ai_pro_watchlist_v1";
 const SETTINGS_KEY = "fund_ai_pro_settings_v1";
+const SNAPSHOT_CACHE_KEY = "fund_ai_pro_snapshot_cache_v1";
+const NEWS_CACHE_KEY = "fund_ai_pro_news_cache_v1";
+const FUNDS_CACHE_KEY = "fund_ai_pro_funds_cache_v1";
 
 export type AppSettings = {
   autoRefreshMs: number;
   newsRefreshMs: number;
 };
+
+type CacheEnvelope<T> = { savedAt: number; data: T };
 
 const DEFAULT_SETTINGS: AppSettings = {
   autoRefreshMs: 120_000,
@@ -27,6 +33,56 @@ function readJson<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function saveJson(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function loadCache<T>(key: string, maxAge: number): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const item = JSON.parse(raw) as CacheEnvelope<T>;
+    if (!item || typeof item.savedAt !== "number" || Date.now() - item.savedAt > maxAge) return null;
+    return item.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function saveCache<T>(key: string, data: T) {
+  saveJson(key, { savedAt: Date.now(), data } satisfies CacheEnvelope<T>);
+}
+
+export function loadCachedSnapshot(maxAge = 24 * 60 * 60_000): Snapshot | null {
+  return loadCache<Snapshot>(SNAPSHOT_CACHE_KEY, maxAge);
+}
+
+export function saveCachedSnapshot(data: Snapshot) {
+  saveCache(SNAPSHOT_CACHE_KEY, data);
+}
+
+export function loadCachedNews(maxAge = 48 * 60 * 60_000): NewsFeed | null {
+  return loadCache<NewsFeed>(NEWS_CACHE_KEY, maxAge);
+}
+
+export function saveCachedNews(data: NewsFeed) {
+  saveCache(NEWS_CACHE_KEY, data);
+}
+
+export function loadCachedFunds(maxAge = 48 * 60 * 60_000): Record<string, FundQuote> {
+  return loadCache<Record<string, FundQuote>>(FUNDS_CACHE_KEY, maxAge) || {};
+}
+
+export function saveCachedFunds(data: Record<string, FundQuote>) {
+  saveCache(FUNDS_CACHE_KEY, data);
 }
 
 export function loadPortfolio(): Holding[] {
