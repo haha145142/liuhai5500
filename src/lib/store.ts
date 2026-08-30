@@ -19,6 +19,7 @@ import {
 } from "./storage";
 import { getFund, getNews, getSnapshot } from "./data/server";
 import { crossCheckIndices } from "./data/cross-check";
+import { validateFundQuote } from "./data/validation";
 import { isWeekend } from "./market-hours";
 import { tradingDateLabel } from "./data/trading-day";
 
@@ -78,63 +79,34 @@ export const useApp = create<AppState>((set, get) => ({
 
   refreshSnapshot: async () => {
     if (get().loading) return;
-
-    // Weekend policy: freeze market data at the latest locally validated trading-day snapshot.
     if (isWeekend()) {
       const cached = get().snapshot || loadCachedSnapshot();
       if (cached) {
-        set({
-          snapshot: {
-            ...cached,
-            marketDate: cached.marketDate || tradingDateLabel(),
-            validation: "cached_latest_trading_day",
-          },
-          loading: false,
-          lastError: null,
-        });
+        set({ snapshot: { ...cached, marketDate: cached.marketDate || tradingDateLabel(), validation: "cached_latest_trading_day" }, loading: false, lastError: null });
         return;
       }
     }
-
     set({ loading: true, lastError: null });
     try {
       const snapshot = await getSnapshot();
       const checked = await crossCheckIndices({ data: { indices: snapshot.indices } });
       const previous = get().snapshot;
-      const hasInvalidated = checked.validated.some((x) => x.pct == null && x.price == null) &&
-        snapshot.indices.some((x) => x.pct != null || x.price != null);
-
-      // A materially divergent new quote is not trusted. Preserve the last good quote
-      // for that item rather than surfacing an unexplained number or clearing the screen.
-      const indices = checked.validated.map((x) => {
-        if (x.pct != null || x.price != null) return x;
-        return previous?.indices.find((p) => p.code === x.code) || x;
-      });
-
+      const indices = checked.validated.map((x) => x.pct != null || x.price != null ? x : previous?.indices.find((p) => p.code === x.code) || x);
       const normalized: Snapshot = {
         ...snapshot,
         indices,
         marketDate: snapshot.marketDate || (isWeekend() ? tradingDateLabel() : null),
-        validation: checked.checked && !hasInvalidated ? "cross_checked" : "single_source",
+        validation: checked.checked ? "cross_checked" : "single_source",
         sources: checked.checked
           ? snapshot.sources.map((s) => s.name === "指数" ? { ...s, note: `${s.note} · ${checked.note}` } : s)
           : [...snapshot.sources, { name: "交叉验证", status: "warn", note: checked.note }],
       };
-
       saveCachedSnapshot(normalized);
       set({ snapshot: normalized, loading: false });
     } catch (e) {
       const cached = get().snapshot || loadCachedSnapshot();
       if (cached) {
-        set({
-          snapshot: {
-            ...cached,
-            validation: "cached_latest_trading_day",
-            marketDate: cached.marketDate || tradingDateLabel(),
-          },
-          loading: false,
-          lastError: "实时数据源暂不可用 · 已保留最近交易日数据",
-        });
+        set({ snapshot: { ...cached, validation: "cached_latest_trading_day", marketDate: cached.marketDate || tradingDateLabel() }, loading: false, lastError: "实时数据源暂不可用 · 已保留最近交易日数据" });
       } else {
         set({ loading: false, lastError: e instanceof Error ? e.message : "行情暂时不可用" });
       }
@@ -162,20 +134,26 @@ export const useApp = create<AppState>((set, get) => ({
       const cached = get().funds;
       if (Object.keys(cached).length) return;
     }
-
     set({ fundsLoading: true });
     try {
       const codes = [...new Set(list.map((h) => h.code))];
       const entries = await Promise.allSettled(
-        codes.map(async (code) => [code, await getFund({ data: { code } })] as const),
+        codes.map(async (code) => {
+          const raw = await getFund({ data: { code } });
+          try {
+            const validated = await validateFundQuote({ data: { quote: raw } });
+            return [code, validated.quote] as const;
+          } catch {
+            return [code, raw] as const;
+          }
+        }),
       );
       const funds = { ...get().funds };
       for (const result of entries) {
-        if (result.status === "fulfilled") {
-          const quote = result.value[1];
-          const hasUsableValue = quote.nav != null || quote.estimate != null || quote.history.length > 0;
-          if (hasUsableValue) funds[result.value[0]] = quote;
-        }
+        if (result.status !== "fulfilled") continue;
+        const quote = result.value[1];
+        const hasUsableValue = quote.nav != null || quote.estimate != null || quote.history.length > 0;
+        if (hasUsableValue) funds[result.value[0]] = quote;
       }
       if (Object.keys(funds).length) saveCachedFunds(funds);
       set({ funds });
