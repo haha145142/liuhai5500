@@ -21,7 +21,7 @@ export const FUND_SECTORS: FundSector[] = [
   { id:"baijiu",name:"白酒",icon:"🍷",funds:[
     {code:"161725",name:"招商中证白酒指数A"},{code:"012414",name:"鹏华中证酒指数A"},{code:"012415",name:"鹏华中证酒指数C"},{code:"160222",name:"国泰国证食品饮料行业指数"}]},
   { id:"consume",name:"消费",icon:"🛍️",funds:[
-    {code:"000083",name:"汇添富消费行业混合"},{code:"000083",name:"汇添富消费行业混合"},{code:"160222",name:"国泰国证食品饮料行业指数"},{code:"001487",name:"宝盈优势产业混合"}]},
+    {code:"000083",name:"汇添富消费行业混合"},{code:"160222",name:"国泰国证食品饮料行业指数"},{code:"001487",name:"宝盈优势产业混合"}]},
   { id:"food",name:"食品饮料",icon:"🍜",funds:[
     {code:"160222",name:"国泰国证食品饮料行业指数"},{code:"161725",name:"招商中证白酒指数A"},{code:"005635",name:"华夏消费升级混合A"},{code:"000083",name:"汇添富消费行业混合"}]},
   { id:"nev",name:"新能源车",icon:"🚗",funds:[
@@ -35,7 +35,7 @@ export const FUND_SECTORS: FundSector[] = [
   { id:"broker",name:"券商",icon:"🏦",funds:[
     {code:"512000",name:"华宝中证全指证券公司ETF"},{code:"012238",name:"华夏中证全指证券公司ETF联接A"},{code:"012239",name:"华夏中证全指证券公司ETF联接C"},{code:"161720",name:"招商中证证券公司指数A"}]},
   { id:"bank",name:"银行",icon:"🏛️",funds:[
-    {code:"161029",name:"富国中证银行指数A"},{code:"012262",name:"天弘中证银行ETF联接A"},{code:"012263",name:"天弘中证银行ETF联接C"},{code:"160631",name:"鹏华银行分级"}]},
+    {code:"161029",name:"富国中证银行指数A"},{code:"012262",name:"天弘中证银行ETF联接A"},{code:"012263",name:"天弘中证银行ETF联接C"},{code:"160631",name:"鹏华中证银行指数(LOF)A"}]},
   { id:"restate",name:"房地产",icon:"🏠",funds:[
     {code:"160218",name:"国泰国证房地产行业指数"},{code:"004742",name:"南方中证全指房地产ETF联接A"},{code:"004743",name:"南方中证全指房地产ETF联接C"}]},
   { id:"nonfer",name:"有色金属",icon:"⛏️",funds:[
@@ -45,7 +45,7 @@ export const FUND_SECTORS: FundSector[] = [
   { id:"coal",name:"煤炭",icon:"🪨",funds:[
     {code:"161032",name:"富国中证煤炭指数A"},{code:"008279",name:"招商中证煤炭等权指数A"},{code:"008280",name:"招商中证煤炭等权指数C"}]},
   { id:"steel",name:"钢铁",icon:"🏭",funds:[
-    {code:"502023",name:"鹏华钢铁分级"},{code:"168203",name:"中融国证钢铁行业指数"}]},
+    {code:"502023",name:"鹏华国证钢铁行业指数(LOF)A"},{code:"168203",name:"中融国证钢铁行业指数"}]},
   { id:"chem",name:"化工",icon:"⚗️",funds:[
     {code:"004205",name:"南方中证500原材料指数A"},{code:"004206",name:"南方中证500原材料指数C"}]},
   { id:"agri",name:"农业",icon:"🌾",funds:[
