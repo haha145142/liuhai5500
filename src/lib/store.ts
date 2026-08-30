@@ -18,6 +18,7 @@ import {
   type AppSettings,
 } from "./storage";
 import { getFund, getNews, getSnapshot } from "./data/server";
+import { crossCheckIndices } from "./data/cross-check";
 import { isWeekend } from "./market-hours";
 import { tradingDateLabel } from "./data/trading-day";
 
@@ -78,17 +79,19 @@ export const useApp = create<AppState>((set, get) => ({
   refreshSnapshot: async () => {
     if (get().loading) return;
 
-    // Saturday/Sunday: do not overwrite Friday's validated market snapshot with
-    // empty/currently-closed responses. Resume live refresh automatically Monday.
+    // Weekend policy: freeze market data at the latest locally validated trading-day snapshot.
     if (isWeekend()) {
       const cached = get().snapshot || loadCachedSnapshot();
       if (cached) {
-        const weekendSnapshot: Snapshot = {
-          ...cached,
-          marketDate: cached.marketDate || tradingDateLabel(),
-          validation: "cached_latest_trading_day",
-        };
-        set({ snapshot: weekendSnapshot, loading: false, lastError: null });
+        set({
+          snapshot: {
+            ...cached,
+            marketDate: cached.marketDate || tradingDateLabel(),
+            validation: "cached_latest_trading_day",
+          },
+          loading: false,
+          lastError: null,
+        });
         return;
       }
     }
@@ -96,11 +99,28 @@ export const useApp = create<AppState>((set, get) => ({
     set({ loading: true, lastError: null });
     try {
       const snapshot = await getSnapshot();
+      const checked = await crossCheckIndices({ data: { indices: snapshot.indices } });
+      const previous = get().snapshot;
+      const hasInvalidated = checked.validated.some((x) => x.pct == null && x.price == null) &&
+        snapshot.indices.some((x) => x.pct != null || x.price != null);
+
+      // A materially divergent new quote is not trusted. Preserve the last good quote
+      // for that item rather than surfacing an unexplained number or clearing the screen.
+      const indices = checked.validated.map((x) => {
+        if (x.pct != null || x.price != null) return x;
+        return previous?.indices.find((p) => p.code === x.code) || x;
+      });
+
       const normalized: Snapshot = {
         ...snapshot,
+        indices,
         marketDate: snapshot.marketDate || (isWeekend() ? tradingDateLabel() : null),
-        validation: snapshot.validation || "single_source",
+        validation: checked.checked && !hasInvalidated ? "cross_checked" : "single_source",
+        sources: checked.checked
+          ? snapshot.sources.map((s) => s.name === "指数" ? { ...s, note: `${s.note} · ${checked.note}` } : s)
+          : [...snapshot.sources, { name: "交叉验证", status: "warn", note: checked.note }],
       };
+
       saveCachedSnapshot(normalized);
       set({ snapshot: normalized, loading: false });
     } catch (e) {
@@ -129,7 +149,8 @@ export const useApp = create<AppState>((set, get) => ({
       saveCachedNews(news);
       set({ news, newsLoading: false });
     } catch {
-      set({ newsLoading: false });
+      const cached = loadCachedNews();
+      set({ news: get().news || cached, newsLoading: false });
     }
   },
 
@@ -137,9 +158,6 @@ export const useApp = create<AppState>((set, get) => ({
     if (get().fundsLoading) return;
     const list = get().portfolio;
     if (!list.length) return;
-
-    // Market-derived fund estimates should not churn on weekends. Keep Friday's
-    // estimate/NAV visible until the next trading session refreshes them.
     if (isWeekend()) {
       const cached = get().funds;
       if (Object.keys(cached).length) return;
@@ -155,8 +173,6 @@ export const useApp = create<AppState>((set, get) => ({
       for (const result of entries) {
         if (result.status === "fulfilled") {
           const quote = result.value[1];
-          // Never replace a usable cached quote with an all-null response from a
-          // temporarily unavailable provider.
           const hasUsableValue = quote.nav != null || quote.estimate != null || quote.history.length > 0;
           if (hasUsableValue) funds[result.value[0]] = quote;
         }
