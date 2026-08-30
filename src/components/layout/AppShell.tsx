@@ -9,6 +9,7 @@ import { isTradeTime, sessionLabel } from "@/lib/market-hours";
 import { cn } from "@/lib/cn";
 
 const NEWS_REFRESH_MS = 60_000;
+const BOOT_DELAY_MS = 80;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const hydrate = useApp((s) => s.hydrate);
@@ -18,13 +19,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   const loading = useApp((s) => s.loading);
   const snapshot = useApp((s) => s.snapshot);
   const settings = useApp((s) => s.settings);
+  const lastError = useApp((s) => s.lastError);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
+    // Hydrate synchronously from local storage. Network work is deliberately
+    // deferred so the shell never waits for an external data source to render.
     hydrate();
-    void refreshSnapshot();
-    void refreshNews();
-    void refreshFunds();
+    const id = window.setTimeout(() => {
+      void refreshSnapshot();
+      void refreshNews();
+      void refreshFunds();
+    }, BOOT_DELAY_MS);
+    return () => window.clearTimeout(id);
   }, [hydrate, refreshSnapshot, refreshNews, refreshFunds]);
 
   useEffect(() => {
@@ -32,7 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (document.hidden) return;
       void refreshSnapshot();
       void refreshFunds();
-    }, settings.autoRefreshMs);
+    }, Math.max(30_000, settings.autoRefreshMs));
     return () => window.clearInterval(id);
   }, [refreshSnapshot, refreshFunds, settings.autoRefreshMs]);
 
@@ -41,9 +48,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     const id = window.setInterval(() => {
       if (document.hidden) return;
       void refreshNews();
-    }, NEWS_REFRESH_MS);
+    }, Math.max(60_000, settings.newsRefreshMs || NEWS_REFRESH_MS));
     return () => window.clearInterval(id);
-  }, [pathname, refreshNews]);
+  }, [pathname, refreshNews, settings.newsRefreshMs]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -59,14 +66,19 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (pathname.startsWith("/news") || pathname === "/") void refreshNews();
   };
 
+  const statusText = snapshot
+    ? `数据截至 ${clockStr(new Date(snapshot.fetchedAt))}`
+    : lastError
+      ? "行情暂时不可用 · 已保留本地数据"
+      : "正在后台接入行情 · 界面不阻塞";
+
   const header = (
     <header className="app-header">
       <div className="app-header-card">
         <div>
           <h1 className="app-header-title">Fund AI Pro</h1>
           <p className="app-header-meta">
-            {sessionLabel()}
-            {snapshot ? ` · 数据截至 ${clockStr(new Date(snapshot.fetchedAt))}` : " · 正在接入行情"}
+            {sessionLabel()} · {statusText}
           </p>
         </div>
         <button type="button" onClick={onRefresh} aria-label="刷新" className="app-refresh-button">
