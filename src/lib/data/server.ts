@@ -117,7 +117,7 @@ export const getFund = createServerFn({ method: "POST" }).validator((input: { co
   const code = data.code.replace(/\D/g, "").slice(0, 6);
   const empty: FundQuote = { code, name: code, type: "基金", nav: null, navDate: null, estimate: null, estimatePct: null, estimateTime: null, dayPct: null, weekPct: null, monthPct: null, history: [], historyPoints: [], metrics: null, source: "数据源暂不可用" };
   if (!/^\d{6}$/.test(code)) return empty;
-  let name = code, nav: number | null = null, navDate: string | null = null, dayPct: number | null = null, source = "数据源暂不可用";
+  let name = code, nav: number | null = null, navDate: string | null = null, dayPct: number | null = null, estimate: number | null = null, estimatePct: number | null = null, estimateTime: string | null = null, source = "数据源暂不可用";
   const history: number[] = []; const historyPoints: FundHistoryPoint[] = [];
   try {
     const j = (await emJson(`https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=400`, 12000)) as { Data?: { LSJZList?: Record<string, unknown>[] } };
@@ -127,12 +127,16 @@ export const getFund = createServerFn({ method: "POST" }).validator((input: { co
   } catch {}
   try {
     const gz = parseMaybeJsonp(await fetchText(`https://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`, 8000, { Referer: "https://fund.eastmoney.com/" })) as Record<string, unknown> | null;
-    if (gz) { name = String(gz.name || name); if (nav == null) nav = n(gz.dwjz); if (!navDate) navDate = String(gz.jzrq || "") || null; empty.estimate = n(gz.gsz); empty.estimatePct = n(gz.gszzl); empty.estimateTime = String(gz.gztime || "") || null; source = source === "数据源暂不可用" ? "天天基金估值" : source + " + 天天基金估值"; }
+    if (gz) { name = String(gz.name || name); if (nav == null) nav = n(gz.dwjz); if (!navDate) navDate = String(gz.jzrq || "") || null; estimate = n(gz.gsz); estimatePct = n(gz.gszzl); estimateTime = String(gz.gztime || "") || null; source = source === "数据源暂不可用" ? "天天基金估值" : source + " + 天天基金估值"; }
   } catch {}
   if (name === code) { try { const j = (await emJson(`https://fundsuggest.eastmoney.com/FundSearch/api/FundSearchAPI.ashx?m=1&key=${code}`, 6000)) as { Datas?: { CODE?: string; NAME?: string; CATEGORYDESC?: string }[] }; const hit = (j?.Datas || []).find((x) => x.CODE === code) || j?.Datas?.[0]; if (hit?.NAME) name = hit.NAME; if (hit?.CATEGORYDESC) empty.type = hit.CATEGORYDESC; } catch {} }
   const metrics = calcIndicators(history); const latest = history[history.length - 1] ?? null;
   const periodPct = (days: number) => { if (latest == null || history.length <= days) return null; const base = history[history.length - 1 - days]; return base ? ((latest - base) / base) * 100 : null; };
-  return { ...empty, code, name, nav, navDate, dayPct, weekPct: periodPct(5), monthPct: periodPct(20), history, historyPoints, metrics, source };
+  const now = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  const today = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(now.getUTCDate()).padStart(2, "0")}`;
+  const officialNavPublished = !!navDate && navDate === today && nav != null;
+  const valuationStatus: FundQuote["valuationStatus"] = officialNavPublished ? "official_nav" : estimate != null ? "waiting_official_nav" : nav != null ? "stale" : "unavailable";
+  return { ...empty, code, name, nav, navDate, estimate, estimatePct, estimateTime, dayPct, weekPct: periodPct(5), monthPct: periodPct(20), history, historyPoints, metrics, source, officialNavPublished, valuationStatus };
 });
 
 export const searchFund = createServerFn({ method: "POST" }).validator((input: { q: string }) => input).handler(async ({ data }): Promise<{ code: string; name: string; type: string }[]> => {
