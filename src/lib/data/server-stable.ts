@@ -4,6 +4,7 @@ import { GLOBAL_DEFS, INDEX_DEFS, SECTOR_RULES } from "./sectors";
 import { calcIndicators } from "../calc/indicators";
 import type { BoardQuote, DataSource, FundQuote, GlobalQuote, IndexQuote, MarketOrder, NewsFeed, NewsItem, RankRow, SectorQuote, Snapshot } from "../types";
 import { safeText } from "../format";
+import { isWeekend, tradingDateLabel } from "./trading-day";
 
 const EM_UT = "fa5fd1943c7b386f172d6893dbfba10b";
 type Entry<T> = { ts: number; data: T };
@@ -57,7 +58,11 @@ async function fetchFlow(): Promise<{ flow: MarketOrder | null; source: DataSour
     const j = await em(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=400&po=1&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent("m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23")}&fields=f62,f66,f69,f72,f75&ut=${EM_UT}&_=${Date.now()}`, 10000) as any;
     const arr = asArr(j?.data?.diff); if (!arr.length) throw new Error("empty");
     const sum = (k: string) => arr.reduce((s, x) => s + (n(x[k]) || 0), 0);
-    return { flow: { main: sum("f62"), super: sum("f66"), large: sum("f69"), mid: sum("f72"), small: sum("f75"), count: arr.length }, source: source("资金", true, `东方财富全A ${arr.length} 只；主力=超大单+大单口径`) };
+    const main = sum("f62"); const superFlow = sum("f66"); const large = sum("f69"); const mid = sum("f72"); const small = sum("f75");
+    const internalDelta = Math.abs(main - (superFlow + large));
+    const tolerance = Math.max(1, Math.abs(main) * 0.02);
+    const validated = internalDelta <= tolerance;
+    return { flow: { main, super: superFlow, large, mid, small, count: arr.length }, source: source("资金", true, `东方财富全A ${arr.length} 只；主力=超大单+大单${validated ? "，内部一致" : "，内部存在偏差"}`) };
   } catch { return { flow: null, source: source("资金", false, "数据源暂不可用") }; }
 }
 
@@ -70,10 +75,10 @@ async function fetchGlobal(): Promise<{ list: GlobalQuote[]; source: DataSource 
 }
 
 export const getSnapshot = createServerFn({ method: "GET" }).handler(async (): Promise<Snapshot> => {
-  const weekend = [0, 6].includes(new Date().getDay()); const ttl = weekend ? 7 * 86400000 : 20000; const hit = cache<Snapshot>("snap", ttl, null); if (hit) return hit;
+  const weekend = isWeekend(); const ttl = weekend ? 7 * 86400000 : 20000; const hit = cache<Snapshot>("snap", ttl, null); if (hit) return hit;
   const [idx, bk, fl, gl] = await Promise.all([fetchIndices(), fetchBoards(), fetchFlow(), fetchGlobal()]);
   const usable = idx.list.some(x => x.pct != null) || bk.sectors.some(x => x.change != null) || !!fl.flow;
-  return cache("snap", ttl, { indices: idx.list, sectors: bk.sectors, boards: bk.boards.slice(0, 40), flow: fl.flow, global: gl.list, sources: [idx.source, bk.source, fl.source, gl.source], fetchedAt: Date.now(), marketDate: weekend ? new Date(Date.now() - 86400000).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10), validation: weekend ? "cached_latest_trading_day" : (idx.validation || (usable ? "single_source" : "cached_latest_trading_day")) })!;
+  return cache("snap", ttl, { indices: idx.list, sectors: bk.sectors, boards: bk.boards.slice(0, 40), flow: fl.flow, global: gl.list, sources: [idx.source, bk.source, fl.source, gl.source], fetchedAt: Date.now(), marketDate: weekend ? tradingDateLabel() : new Date().toISOString().slice(0, 10), validation: weekend ? "cached_latest_trading_day" : (idx.validation || (usable ? "single_source" : "cached_latest_trading_day")) })!;
 });
 
 function makeId(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return String(h); }
@@ -97,11 +102,18 @@ export const getFund = createServerFn({ method: "POST" }).validator((input: { co
   try {
     const raw = await fetchText(`https://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`, 8000, { Referer: "https://fund.eastmoney.com/" });
     const gz = parseMaybeJsonp(raw) as any;
-    const hist = await fetchText(`https://api.fund.eastmoney.com/f10/lsjz?fundcode=${code}&pageIndex=1&pageSize=300`, 10000, { Referer: "https://fund.eastmoney.com/" });
-    const hj = parseMaybeJsonp(hist) as any;
-    const points = (hj?.Data?.LSJZList || []).map((x: any) => ({ date: String(x.FSRQ || ""), nav: n(x.DWJZ) ?? 0, changePct: n(x.JZZZL) })).filter((x: any) => x.date && x.nav > 0);
-    const history = points.map((x: any) => x.nav).reverse(); const nav = n(gz?.dwjz), estimate = n(gz?.gsz), estimatePct = n(gz?.gszzl);
-    return cache(`fund:${code}`, 20000, { code, name: String(gz?.name || code), type: String(gz?.fundtype || "基金"), nav, navDate: gz?.jzrq ? String(gz.jzrq) : null, estimate, estimatePct, estimateTime: gz?.gztime ? String(gz.gztime) : null, dayPct: estimatePct ?? n(points[0]?.changePct), weekPct: null, monthPct: null, history, historyPoints: points.reverse(), metrics: calcIndicators(history), source: "天天基金估值 + 东方财富历史净值", officialNavPublished: false, valuationStatus: estimate != null ? "estimate" : nav != null ? "official_nav" : "unavailable", estimateConfidence: estimate != null && nav != null ? "medium" : "low" })!;
+    const histRaw = await fetchText(`https://api.fund.eastmoney.com/f10/lsjz?fundcode=${code}&pageIndex=1&pageSize=300`, 10000, { Referer: "https://fund.eastmoney.com/" });
+    const hj = parseMaybeJsonp(histRaw) as any;
+    const ordered = (hj?.Data?.LSJZList || []).map((x: any) => ({ date: String(x.FSRQ || ""), nav: n(x.DWJZ) ?? 0, changePct: n(x.JZZZL) })).filter((x: any) => x.date && x.nav > 0).reverse();
+    const history = ordered.map((x: any) => x.nav);
+    const latest = ordered[ordered.length - 1];
+    const weekBase = ordered[Math.max(0, ordered.length - 6)];
+    const monthBase = ordered[Math.max(0, ordered.length - 22)];
+    const weekPct = latest && weekBase && weekBase.nav > 0 ? ((latest.nav / weekBase.nav) - 1) * 100 : null;
+    const monthPct = latest && monthBase && monthBase.nav > 0 ? ((latest.nav / monthBase.nav) - 1) * 100 : null;
+    const nav = n(gz?.dwjz), estimate = n(gz?.gsz), estimatePct = n(gz?.gszzl);
+    const officialNav = nav != null;
+    return cache(`fund:${code}`, 20000, { code, name: String(gz?.name || code), type: String(gz?.fundtype || "基金"), nav, navDate: gz?.jzrq ? String(gz.jzrq) : latest?.date ?? null, estimate, estimatePct, estimateTime: gz?.gztime ? String(gz.gztime) : null, dayPct: estimatePct ?? latest?.changePct ?? null, weekPct, monthPct, history, historyPoints: ordered, metrics: calcIndicators(history), source: "天天基金估值 + 东方财富历史净值", officialNavPublished: officialNav, valuationStatus: estimate != null ? "estimate" : officialNav ? "official_nav" : "unavailable", estimateConfidence: estimate != null && nav != null ? "medium" : "low" })!;
   } catch {
     return { code, name: code, type: "基金", nav: null, navDate: null, estimate: null, estimatePct: null, estimateTime: null, dayPct: null, weekPct: null, monthPct: null, history: [], historyPoints: [], metrics: null, source: "数据源暂不可用", officialNavPublished: false, valuationStatus: "unavailable", estimateConfidence: "low" };
   }
