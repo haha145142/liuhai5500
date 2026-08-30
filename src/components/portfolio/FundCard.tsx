@@ -4,9 +4,8 @@ import { Tone } from "@/components/ui/Glass";
 import { calcSixFactor } from "@/lib/calc/six-factor";
 import { calcSwingTrade } from "@/lib/calc/indicators";
 import { matchFundSector } from "@/lib/data/sectors";
-import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
+import { fmtMoney, fmtPctShort, fmtPrice, cnTime } from "@/lib/format";
 import { isTradeTime } from "@/lib/market-hours";
-import { cnTime } from "@/lib/format";
 import type { FundQuote, Holding, SectorQuote } from "@/lib/types";
 
 function periodReturn(fund: FundQuote | undefined, tradingDays: number, current: number | null) {
@@ -16,7 +15,7 @@ function periodReturn(fund: FundQuote | undefined, tradingDays: number, current:
 }
 
 function isOfficialNavForToday(fund: FundQuote | undefined) {
-  if (!fund?.navDate) return false;
+  if (!fund?.navDate || fund.nav == null) return false;
   if (fund.officialNavPublished === true) return true;
   const now = cnTime();
   const [y, m, d] = fund.navDate.split(/[-/]/).map(Number);
@@ -45,8 +44,6 @@ export function FundCard({
   const name = fund?.name || holding.name || holding.code;
   const live = isTradeTime();
   const officialToday = isOfficialNavForToday(fund);
-  // Only use intraday estimate while A-shares are actively trading.
-  // Before open, after close, and weekends use the latest official NAV.
   const useEstimate = !officialToday && live && fund?.estimate != null;
   const px = useEstimate ? fund.estimate : (fund?.nav ?? null);
   const day = useEstimate ? (fund?.estimatePct ?? null) : (fund?.dayPct ?? null);
@@ -56,56 +53,39 @@ export function FundCard({
   const pnlPct = value != null && costVal ? (pnl! / costVal) * 100 : null;
   const mapped = matchFundSector(name);
   const six = sector && sector.available ? calcSixFactor(sector, benchPct) : null;
-  const swing = calcSwingTrade(fund?.metrics ?? null, holding.cost, px || 0);
+  const swing = calcSwingTrade(fund?.metrics ?? null, holding.cost, px);
   const estimateGap = fund?.estimate != null && fund.nav ? ((fund.estimate - fund.nav) / fund.nav) * 100 : null;
-  const periods = useMemo(
-    () => [["1周", 5], ["1月", 20], ["3月", 60], ["6月", 120], ["1年", 250]] as const,
-    [],
-  );
+  const periods = useMemo(() => [["1周", 5], ["1月", 20], ["3月", 60], ["6月", 120], ["1年", 250]] as const, []);
 
   const saveEdit = () => {
-    const s = Number(shares);
-    const c = Number(cost);
-    if (s > 0 && c > 0) {
-      onUpdate({ shares: s, cost: c });
-      setEditing(false);
-    }
+    const s = Number(shares); const c = Number(cost);
+    if (s > 0 && c > 0) { onUpdate({ shares: s, cost: c }); setEditing(false); }
   };
 
   const quoteLabel = officialToday ? "今日官方净值" : useEstimate ? "盘中实时估值" : "最近官方净值";
   const quoteSourceLabel = officialToday
-    ? "官方净值已发布，优先采用"
+    ? "今日官方净值已发布，采用正式净值"
     : useEstimate
       ? `官方今日净值尚未发布，使用盘中估值${fund?.estimateConfidence ? `（${fund.estimateConfidence === "high" ? "高" : fund.estimateConfidence === "medium" ? "中" : "低"}置信度）` : ""}`
-      : "非交易时段不使用盘中估值，采用最近官方净值";
+      : "非交易时段采用最近官方净值";
 
   return (
     <article className="glass mb-3 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-lg font-semibold text-fg">
-            {name} <span className="text-xs font-normal text-muted">{holding.code}</span>
-          </div>
+          <div className="text-lg font-semibold text-fg">{name} <span className="text-xs font-normal text-muted">{holding.code}</span></div>
           <div className="mt-1 text-xs text-muted">{quoteLabel} · {fund?.source || "等待数据"}</div>
         </div>
         <div className="text-right">
           <Tone v={day} className="text-2xl font-semibold">{fmtPctShort(day)}</Tone>
-          <div className="text-[10px] text-muted">
-            {officialToday ? "官方净值涨跌" : useEstimate ? "盘中实时估值涨跌" : "最近官方净值涨跌"}
-          </div>
+          <div className="text-[10px] text-muted">{officialToday ? "官方净值涨跌" : useEstimate ? "盘中实时估值涨跌" : "最近官方净值涨跌"}</div>
         </div>
       </div>
 
       <div className="mt-4 rounded-2xl bg-white/60 p-3 ring-1 ring-white/70">
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <div className="text-xs text-muted">当前净值/估值</div>
-            <div className="mt-1 text-xl font-semibold tabular-nums">{fmtPrice(px, 4)}</div>
-          </div>
-          <div className="text-right">
-            <div className="text-xs text-muted">持仓市值</div>
-            <div className="mt-1 text-xl font-semibold tabular-nums">{fmtMoney(value)}</div>
-          </div>
+          <div><div className="text-xs text-muted">当前价格</div><div className="mt-1 text-xl font-semibold tabular-nums">{fmtPrice(px, 4)}</div></div>
+          <div className="text-right"><div className="text-xs text-muted">持仓市值</div><div className="mt-1 text-xl font-semibold tabular-nums">{fmtMoney(value)}</div></div>
         </div>
         <div className="mt-2 text-[11px] text-muted">
           {fund?.nav != null ? `官方净值 ${fmtPrice(fund.nav, 4)} · ${fund.navDate || "日期未知"}` : "官方净值暂无"}
@@ -143,12 +123,9 @@ export function FundCard({
       ) : <p className="mt-3 text-xs text-muted">净值历史不足 35 个交易日，暂不生成可靠波段信号。</p>}
 
       <SwingPlan holding={holding} fund={fund} price={px} officialToday={officialToday} />
-
       {mapped ? <div className="mt-3 rounded-2xl bg-accent/8 p-3 text-xs text-muted"><b className="text-fg">映射板块：{mapped.name}</b>{sector?.change != null ? <span> · 今日 <Tone v={sector.change}>{fmtPctShort(sector.change)}</Tone></span> : " · 暂无板块行情"}{six ? <div className="mt-1">组合判断：{six.advice} · 置信 {six.confidence}% · {six.basis}</div> : null}</div> : null}
-
       <button type="button" className="mt-3 w-full rounded-2xl bg-bg-elevated py-2 text-sm font-semibold text-fg" onClick={() => setOpen((v) => !v)}>{open ? "收起原因与指标" : "为什么涨跌 / 波段建议"}</button>
       {open ? <div className="mt-3 space-y-2 rounded-2xl bg-white/55 p-3 text-xs leading-relaxed text-muted"><p><b className="text-fg">综合判断：</b>{fund?.metrics?.combo || "暂无可靠波段结论"}</p>{swing ? <p><b className="text-fg">波段建议：</b>{swing.reason} · 环境 {swing.envLevel}</p> : null}{fund?.metrics ? <p>MACD {fund.metrics.macd.toFixed(4)} · BIAS {fund.metrics.bias.toFixed(2)}% · DIF {fund.metrics.dif.toFixed(4)} · DEA {fund.metrics.dea.toFixed(4)}</p> : null}{fund?.metrics?.sigConds.length ? <p>触发条件：{fund.metrics.sigConds.join(" · ")}</p> : null}</div> : null}
-
       {editing ? <div className="mt-3 grid grid-cols-2 gap-2"><input value={shares} onChange={(e) => setShares(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-bg-elevated px-3 text-sm ring-1 ring-border" placeholder="份额" /><input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-bg-elevated px-3 text-sm ring-1 ring-border" placeholder="成本价" /><button type="button" onClick={saveEdit} className="rounded-xl bg-accent py-2 text-sm font-semibold text-accent-fg">保存修改</button><button type="button" onClick={() => setEditing(false)} className="rounded-xl bg-bg-elevated py-2 text-sm font-semibold">取消</button></div> : <div className="mt-3 flex gap-2"><button type="button" onClick={() => setEditing(true)} className="flex-1 rounded-xl bg-bg-elevated py-2 text-sm">编辑</button><button type="button" onClick={onRemove} className="flex-1 rounded-xl bg-bg-elevated py-2 text-sm text-up">删除</button></div>}
     </article>
   );
