@@ -6,6 +6,7 @@ import "./BottomNavFix.css";
 import { useApp } from "@/lib/store";
 import { clockStr } from "@/lib/format";
 import { isTradeTime, isWeekend, sessionLabel } from "@/lib/market-hours";
+import { tradingDateLabel } from "@/lib/data/trading-day";
 import { cn } from "@/lib/cn";
 
 const NEWS_REFRESH_MS = 3 * 60_000;
@@ -59,7 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const failedSources = snapshot?.sources.filter((s) => s.status === "err").map((s) => s.name) || [];
   const statusText = snapshot
     ? isWeekend()
-      ? `周末休市 · 最近交易日数据 · ${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`
+      ? `周末休市 · 最近交易日 ${tradingDateLabel()} · ${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`
       : `${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`
     : lastError
       ? "行情暂时不可用 · 已保留本地数据"
