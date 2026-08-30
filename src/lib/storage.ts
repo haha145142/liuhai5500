@@ -1,6 +1,6 @@
 import type { Holding } from "./types";
 import type { FundQuote, NewsFeed, Snapshot } from "./types";
-import { DEFAULT_FUND_SECTOR_IDS } from "./data/fund-sectors";
+import { DEFAULT_FUND_SECTOR_IDS, FUND_SECTORS } from "./data/fund-sectors";
 
 const PORT_KEYS = ["fund_ai_pro_portfolio_v3", "fund_ai_pro_portfolio_v2", "fund_ai_pro_portfolio"];
 const DS_KEY = "fund_ai_pro_deepseek_key";
@@ -38,11 +38,11 @@ export function setDSModel(model: string) { localStorage.setItem(DS_MODEL, model
 
 export function loadSelectedSectors(): string[] {
   const saved = readJson<string[]>(SECTOR_KEY, DEFAULT_FUND_SECTOR_IDS);
-  const validIds = new Set(DEFAULT_FUND_SECTOR_IDS);
-  // Migrate the old stock-sector defaults to the new fund-theme defaults on first load.
-  const hasFundTheme = saved.some((id) => validIds.has(id));
-  if (!hasFundTheme) { saveSelectedSectors(DEFAULT_FUND_SECTOR_IDS); return [...DEFAULT_FUND_SECTOR_IDS]; }
-  return saved;
+  const validIds = new Set(FUND_SECTORS.map((s) => s.id));
+  const cleaned = Array.isArray(saved) ? saved.filter((id) => validIds.has(id)) : [];
+  if (cleaned.length) return cleaned;
+  saveSelectedSectors(DEFAULT_FUND_SECTOR_IDS);
+  return [...DEFAULT_FUND_SECTOR_IDS];
 }
 export function saveSelectedSectors(ids: string[]) { try { localStorage.setItem(SECTOR_KEY, JSON.stringify(ids)); } catch {} }
 
