@@ -79,10 +79,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       {pathname === "/" ? (
-        <main className="app-main home-top-main">
+        <section className="home-panel">
           {header}
-          {children}
-        </main>
+          <main className="app-main home-main">{children}</main>
+        </section>
       ) : (
         <>
           {header}
