@@ -23,9 +23,13 @@ export function Cockpit({ snap, news }: { snap: Snapshot; news: NewsItem[] }) {
   const [busy, setBusy] = useState(false);
 
   const deep = async () => {
+    if (snap.validation !== "cross_checked" && snap.validation !== "single_source" && snap.validation !== "cached_latest_trading_day") {
+      setAiText("当前市场快照尚未完成数据校验，暂不生成 AI 市场结论。");
+      return;
+    }
     setBusy(true);
     try {
-      const prompt = `证据：指数 ${JSON.stringify(snap.indices)}；板块 ${JSON.stringify(snap.sectors.slice(0, 8))}；资金 ${JSON.stringify(snap.flow)}；外围 ${JSON.stringify(snap.global)}；新闻标题 ${news.slice(0, 8).map((n) => n.title).join("；")}。请按7步输出中文结论。只使用证据，没有证据就写“暂无可靠数据”。`;
+      const prompt = `数据状态：${snap.validation}；数据日：${snap.marketDate || "未知"}。请严格只使用以下证据：指数 ${JSON.stringify(snap.indices)}；板块 ${JSON.stringify(snap.sectors.slice(0, 8))}；资金 ${JSON.stringify(snap.flow)}；外围 ${JSON.stringify(snap.global)}；新闻 ${JSON.stringify(news.slice(0, 8).map((n) => ({title:n.title,source:n.source,publishedAt:n.publishedAt,category:n.category,sentiment:n.sentiment})))}。按7步输出中文结论；没有证据就写“暂无可靠数据”；不得把抓取时间当成发布时间，不得把小单等同于散户。`;
       const r = await analyzeMarket({ data: { prompt } });
       setAiText(r.ok ? r.text : r.error || "AI 接口暂不可用");
     } finally {
@@ -55,7 +59,7 @@ export function Cockpit({ snap, news }: { snap: Snapshot; news: NewsItem[] }) {
         <p className="mt-3 text-sm text-fg">{ev.steps[6]?.body}</p>
         <button type="button" onClick={() => void deep()} disabled={busy} className="mt-3 w-full rounded-2xl bg-accent py-2.5 text-sm font-semibold text-accent-fg transition-transform active:scale-[0.98] disabled:opacity-60">{busy ? "分析中…" : "深度分析"}</button>
         {aiText ? <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-muted">{aiText}</p> : null}
-        <p className="mt-2 text-[10px] text-subtle">规则引擎基于已抓取证据；深度分析按需调用。不构成投资建议。</p>
+        <p className="mt-2 text-[10px] text-subtle">规则引擎基于已校验证据；深度分析按需调用。不构成投资建议。</p>
       </Glass>
 
       <Glass>
