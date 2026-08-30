@@ -3,6 +3,7 @@ import { Launcher } from "@/components/home/Launcher";
 import { Cockpit } from "@/components/market/Cockpit";
 import { IndexGrid } from "@/components/market/IndexGrid";
 import { PortfolioInsight } from "@/components/portfolio/PortfolioInsight";
+import { FundSectorWatch } from "@/components/fund-sector/FundSectorWatch";
 import { Glass, EmptyNote, Tone } from "@/components/ui/Glass";
 import { useApp } from "@/lib/store";
 import { calcPortfolioAnalysis } from "@/lib/calc/portfolio";
@@ -76,6 +77,8 @@ function Home() {
         <div><div className="text-base font-semibold tracking-tight text-fg">组合判断</div><div className="text-[10px] text-subtle">收益 · 风险 · 板块</div></div>
       </div>
       <PortfolioInsight holdings={portfolio} funds={Object.values(funds)} sectors={snapshot?.sectors || []} />
+
+      <FundSectorWatch />
 
       {snapshot ? (
         <Glass tight className="home-market-strip mb-3">
