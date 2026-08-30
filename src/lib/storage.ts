@@ -5,7 +5,7 @@ import { DEFAULT_FUND_SECTOR_IDS, FUND_SECTORS } from "./data/fund-sectors";
 const PORT_KEYS = ["fund_ai_pro_portfolio_v3", "fund_ai_pro_portfolio_v2", "fund_ai_pro_portfolio"];
 const DS_KEY = "fund_ai_pro_deepseek_key";
 const DS_MODEL = "fund_ai_pro_deepseek_model";
-const SECTOR_KEY = "fund_ai_pro_selected_sectors_v1";
+const SECTOR_KEY = "fund_ai_pro_selected_fund_sectors_v2";
 const WATCH_KEY = "fund_ai_pro_watchlist_v1";
 const SETTINGS_KEY = "fund_ai_pro_settings_v1";
 const SNAPSHOT_CACHE_KEY = "fund_ai_pro_snapshot_cache_v1";
@@ -36,14 +36,7 @@ export function setDSKey(key: string) { if (!key) localStorage.removeItem(DS_KEY
 export function getDSModel(): string { if (typeof window === "undefined") return "deepseek-chat"; return localStorage.getItem(DS_MODEL) || "deepseek-chat"; }
 export function setDSModel(model: string) { localStorage.setItem(DS_MODEL, model || "deepseek-chat"); }
 
-export function loadSelectedSectors(): string[] {
-  const saved = readJson<string[]>(SECTOR_KEY, DEFAULT_FUND_SECTOR_IDS);
-  const validIds = new Set(FUND_SECTORS.map((s) => s.id));
-  const cleaned = Array.isArray(saved) ? saved.filter((id) => validIds.has(id)) : [];
-  if (cleaned.length) return cleaned;
-  saveSelectedSectors(DEFAULT_FUND_SECTOR_IDS);
-  return [...DEFAULT_FUND_SECTOR_IDS];
-}
+export function loadSelectedSectors(): string[] { const saved = readJson<string[]>(SECTOR_KEY, DEFAULT_FUND_SECTOR_IDS); const validIds = new Set(FUND_SECTORS.map((s) => s.id)); const cleaned = Array.isArray(saved) ? saved.filter((id) => validIds.has(id)) : []; if (cleaned.length) return cleaned; saveSelectedSectors(DEFAULT_FUND_SECTOR_IDS); return [...DEFAULT_FUND_SECTOR_IDS]; }
 export function saveSelectedSectors(ids: string[]) { try { localStorage.setItem(SECTOR_KEY, JSON.stringify(ids)); } catch {} }
 
 export function loadWatchlist(): string[] { return readJson<string[]>(WATCH_KEY, []); }
