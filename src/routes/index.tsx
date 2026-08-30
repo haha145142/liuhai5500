@@ -2,12 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Launcher } from "@/components/home/Launcher";
 import { Cockpit } from "@/components/market/Cockpit";
 import { IndexGrid } from "@/components/market/IndexGrid";
+import { PortfolioInsight } from "@/components/portfolio/PortfolioInsight";
 import { Glass, EmptyNote, Tone } from "@/components/ui/Glass";
 import { useApp } from "@/lib/store";
 import { fmtMoney, fmtPctShort } from "@/lib/format";
 import { isTradeTime, isWeekend } from "@/lib/market-hours";
 import { tradingDateLabel } from "@/lib/data/trading-day";
-import { calcPortfolioAnalysis } from "@/lib/calc/portfolio";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -38,7 +38,6 @@ function Home() {
     pnl = 0;
   }
 
-  const analysis = calcPortfolioAnalysis(portfolio, Object.values(funds), snapshot?.sectors || []);
   const marketMode = snapshot?.validation === "cross_checked"
     ? "双源核验"
     : snapshot?.validation === "cached_latest_trading_day"
@@ -65,16 +64,7 @@ function Home() {
         </Link>
       </Glass>
 
-      {portfolio.length ? (
-        <Glass tight className="mb-2 mt-2">
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div><div className="text-[10px] text-subtle">组合风险</div><div className="mt-0.5 text-sm font-semibold">{analysis.risk}</div></div>
-            <div><div className="text-[10px] text-subtle">最大单项占比</div><div className="mt-0.5 text-sm font-semibold tabular-nums">{analysis.concentrationTop1Pct.toFixed(1)}%</div></div>
-            <div><div className="text-[10px] text-subtle">前三占比</div><div className="mt-0.5 text-sm font-semibold tabular-nums">{analysis.concentrationTop3Pct.toFixed(1)}%</div></div>
-          </div>
-          {analysis.notes.length ? <p className="mt-2 text-[10px] leading-relaxed text-subtle">{analysis.notes.join(" ")}</p> : <p className="mt-2 text-[10px] text-subtle">当前没有发现明显的集中度风险提示。</p>}
-        </Glass>
-      ) : null}
+      <PortfolioInsight holdings={portfolio} funds={Object.values(funds)} sectors={snapshot?.sectors || []} />
 
       {snapshot ? (
         <Glass tight className="mb-2 mt-2">
