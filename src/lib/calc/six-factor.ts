@@ -6,8 +6,6 @@ export function calcSixFactor(s: SectorQuote, benchPct: number | null): SixFacto
   const ch = hasChange ? Number(s.change) : 0;
   const fl = hasFlow ? Number(s.flow) : 0;
 
-  // Missing data is not the same thing as a neutral signal. When the core
-  // market quote itself is missing, do not synthesize a directional score.
   if (!hasChange) {
     return {
       position: 50,
@@ -27,10 +25,7 @@ export function calcSixFactor(s: SectorQuote, benchPct: number | null): SixFacto
 
   const trendVote = ch > 0.5 ? 1 : ch < -0.5 ? -1 : 0;
   const momVote = ch > 1 ? 1 : ch < -1 ? -1 : 0;
-  const flowYi = fl / 1e8;
-  // Flow contributes only when it actually exists. A missing flow is kept as
-  // "unknown" rather than being described as neutral money flow.
-  const fundVote = !hasFlow ? 0 : flowYi > 1 ? 1 : flowYi < -1 ? -1 : 0;
+  const fundVote = hasFlow ? (fl / 1e8 > 1 ? 1 : fl / 1e8 < -1 ? -1 : 0) : 0;
   const relDiff = ch - (benchPct ?? 0);
   const relVote = relDiff > 0.3 ? 1 : relDiff < -0.3 ? -1 : 0;
   let volVote = 0;
@@ -41,42 +36,35 @@ export function calcSixFactor(s: SectorQuote, benchPct: number | null): SixFacto
   if (st >= 3) streakVote = -0.5;
   else if (st <= -3) streakVote = 0.5;
 
-  const votes = [trendVote, momVote, fundVote, relVote, volVote, streakVote];
+  const votes = [trendVote, momVote, relVote, volVote, streakVote].concat(hasFlow ? [fundVote] : []);
   const bullN = votes.filter((v) => v >= 1).length;
   const bearN = votes.filter((v) => v <= -1).length;
-  let position = Math.round(50 + bullN * 7.5 - bearN * 7.5);
-  position = Math.max(10, Math.min(90, position));
+  const position = Math.max(10, Math.min(90, Math.round(50 + bullN * 7.5 - bearN * 7.5)));
 
   let confidence = 65 + (bullN - bearN) * 4;
   if (!hasFlow) confidence = Math.min(confidence, 55);
   confidence = Math.max(25, Math.min(92, confidence));
 
-  let advice: string;
-  let status: string;
-  let level: string;
+  let advice = "谨慎观望";
+  let status = "观望";
+  let level: string = "中";
   if (!hasFlow && Math.abs(bullN - bearN) >= 2) {
     status = "信号待资金确认";
     advice = "谨慎观望";
-    level = "中";
   } else if (position >= 80) {
-    status = "重仓";
+    status = "强势";
     advice = "积极观察";
     level = "高";
   } else if (position >= 60) {
     status = "偏强";
     advice = "正常持有";
-    level = "中";
-  } else if (position >= 40) {
-    status = "观望";
-    advice = "谨慎观望";
-    level = "中";
-  } else if (position >= 20) {
-    status = "偏弱";
-    advice = "减仓观望";
-    level = "低";
-  } else {
+  } else if (position < 20) {
     status = "回避";
     advice = "空仓观望";
+    level = "低";
+  } else if (position < 40) {
+    status = "偏弱";
+    advice = "减仓观望";
     level = "低";
   }
 
