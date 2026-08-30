@@ -1,4 +1,0 @@
-{
-  "buildCommand": "rm -rf .static && mkdir -p .static && cp attachments/index.html .static/index.html",
-  "outputDirectory": ".static"
-}
