@@ -163,13 +163,16 @@ export const useApp = create<AppState>((set, get) => ({
     if (get().fundsLoading) return;
     const list = get().portfolio;
     if (!list.length) return;
-    if (isWeekend() && Object.keys(get().funds).length) return;
+
+    const currentFunds = get().funds;
+    const codes = [...new Set(list.map((h) => h.code))];
+    const codesToFetch = isWeekend() ? codes.filter((code) => !currentFunds[code]) : codes;
+    if (!codesToFetch.length) return;
 
     set({ fundsLoading: true });
     try {
-      const codes = [...new Set(list.map((h) => h.code))];
       const entries = await Promise.allSettled(
-        codes.map(async (code) => {
+        codesToFetch.map(async (code) => {
           const raw = await getFund({ data: { code } });
           try {
             const validated = await validateFundQuote({ data: { quote: raw } });
