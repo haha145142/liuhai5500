@@ -19,9 +19,7 @@ export type PortfolioAnalysis = {
 export function calcPortfolioAnalysis(holdings: Holding[], funds: FundQuote[], sectors: SectorQuote[]): PortfolioAnalysis {
   const rows = holdings.map((h) => {
     const f = funds.find((x) => x.code === h.code);
-    const price = f?.valuationStatus === "estimate" && f.estimate != null
-      ? f.estimate
-      : f?.nav ?? null;
+    const price = f?.valuationStatus === "estimate" && f.estimate != null ? f.estimate : f?.nav ?? null;
     const value = price != null && Number.isFinite(price) && price > 0 ? price * h.shares : null;
     const pnl = value != null ? value - h.cost * h.shares : null;
     return { h, f, value, pnl };
@@ -33,10 +31,12 @@ export function calcPortfolioAnalysis(holdings: Holding[], funds: FundQuote[], s
   const pnl = pnlKnown ? rows.reduce((s, r) => s + (r.pnl ?? 0), 0) : null;
   const pnlPct = pnl != null && totalCost > 0 ? (pnl / totalCost) * 100 : null;
   const covered = rows.filter((r) => r.value != null).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
-  const concentrationTop1Pct = marketValue > 0 && covered[0]?.value != null ? ((covered[0].value as number) / marketValue) * 100 : 0;
+  const concentrationTop1Pct = marketValue > 0 && covered[0]?.value != null ? (covered[0].value / marketValue) * 100 : 0;
   const concentrationTop3Pct = marketValue > 0 ? (covered.slice(0, 3).reduce((s, r) => s + (r.value ?? 0), 0) / marketValue) * 100 : 0;
-  const dayKnown = rows.filter((r) => r.f?.dayPct != null);
-  const avgDayPct = dayKnown.length ? dayKnown.reduce((s, r) => s + (r.f?.dayPct ?? 0), 0) / dayKnown.length : null;
+
+  const dayKnown = rows.filter((r) => r.value != null && r.f?.dayPct != null);
+  const dayBase = dayKnown.reduce((s, r) => s + (r.value ?? 0), 0);
+  const avgDayPct = dayBase > 0 ? dayKnown.reduce((s, r) => s + (r.value ?? 0) * (r.f?.dayPct ?? 0), 0) / dayBase : null;
 
   const sectorMap = new Map<string, number>();
   for (const r of rows) {
@@ -53,6 +53,8 @@ export function calcPortfolioAnalysis(holdings: Holding[], funds: FundQuote[], s
   if (concentrationTop1Pct >= 50) notes.push(`第一重仓约占组合 ${concentrationTop1Pct.toFixed(1)}%，集中度偏高。`);
   else if (concentrationTop1Pct >= 35) notes.push(`第一重仓约占组合 ${concentrationTop1Pct.toFixed(1)}%，需要关注集中度。`);
   if (concentrationTop3Pct >= 75) notes.push(`前三大持仓约占组合 ${concentrationTop3Pct.toFixed(1)}%，组合对少数资产较敏感。`);
+  if (avgDayPct != null && avgDayPct > 1) notes.push(`按持仓市值加权，组合今日波动约 ${avgDayPct.toFixed(2)}%，高于普通震荡水平。`);
+  if (avgDayPct != null && avgDayPct < -1) notes.push(`按持仓市值加权，组合今日回撤约 ${Math.abs(avgDayPct).toFixed(2)}%，需要关注风险传导。`);
 
   let risk: PortfolioAnalysis["risk"] = "数据不足";
   if (covered.length === holdings.length && holdings.length > 0) {
@@ -63,7 +65,6 @@ export function calcPortfolioAnalysis(holdings: Holding[], funds: FundQuote[], s
   }
 
   const trend: PortfolioAnalysis["trend"] = avgDayPct == null ? "数据不足" : avgDayPct > 0.3 ? "偏强" : avgDayPct < -0.3 ? "偏弱" : "震荡";
-
   return { totalCost, marketValue, pnl, pnlPct, holdingsCovered: covered.length, holdingsTotal: holdings.length, concentrationTop1Pct, concentrationTop3Pct, avgDayPct, risk, trend, sectorExposures, notes };
 }
 
