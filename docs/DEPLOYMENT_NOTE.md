@@ -1,1 +1,1 @@
-Deployment source: Vercel should build from repository source. Tracked .vercel output was removed from the main tree to avoid stale prebuilt artifacts.
+Production build uses repository source; stale tracked Vercel output is excluded from the source tree.
