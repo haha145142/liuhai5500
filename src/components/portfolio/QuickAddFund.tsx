@@ -60,8 +60,6 @@ export function QuickAddFund() {
     }
 
     let active = true;
-    const cachedFund = funds[code];
-    setRemoteQuote(cachedFund);
     setQuoteLoading(true);
 
     void getFund({ data: { code } })
@@ -70,14 +68,14 @@ export function QuickAddFund() {
         if (fresh?.code === code) setRemoteQuote(fresh);
       })
       .catch(() => {
-        // Offline is a supported state: keep the local cache and local calculations.
+        // Offline is supported: local cache + local arithmetic remain usable.
       })
       .finally(() => {
         if (active) setQuoteLoading(false);
       });
 
     return () => { active = false; };
-  }, [code, funds]);
+  }, [code]);
 
   useEffect(() => {
     if (!/^\d{6}$/.test(code)) return;
@@ -147,7 +145,7 @@ export function QuickAddFund() {
       <div className="quick-add-preview">
         <div className="quick-preview-top">
           <span><Sparkles size={14} /> 即时计算</span>
-          <em>{quote ? (current.label) : "离线也可算"}</em>
+          <em>{quote ? current.label : "离线也可算"}</em>
         </div>
         <div className="quick-metrics">
           <Metric label="持仓成本" value={localCost == null ? "—" : fmtMoney(localCost)} />
