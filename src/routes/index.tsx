@@ -5,7 +5,8 @@ import { IndexGrid } from "@/components/market/IndexGrid";
 import { Glass, EmptyNote, Tone } from "@/components/ui/Glass";
 import { useApp } from "@/lib/store";
 import { fmtMoney, fmtPctShort } from "@/lib/format";
-import { isTradeTime } from "@/lib/market-hours";
+import { isTradeTime, isWeekend } from "@/lib/market-hours";
+import { tradingDateLabel } from "@/lib/data/trading-day";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -21,8 +22,6 @@ function Home() {
   let cost = 0;
   for (const h of portfolio) {
     const f = funds[h.code];
-    // Home page follows the same valuation rule as the portfolio card:
-    // intraday estimate only while A-share trading is open, official NAV otherwise.
     const px = live ? (f?.estimate ?? f?.nav ?? null) : (f?.nav ?? null);
     cost += h.cost * h.shares;
     if (px == null) {
@@ -37,6 +36,15 @@ function Home() {
     total = 0;
     pnl = 0;
   }
+
+  const marketMode = snapshot?.validation === "cross_checked"
+    ? "双源核验"
+    : snapshot?.validation === "cached_latest_trading_day"
+      ? "最近交易日数据"
+      : snapshot?.validation === "single_source"
+        ? "单源可用"
+        : "等待行情";
+  const marketDate = snapshot?.marketDate || (isWeekend() ? tradingDateLabel() : "今日");
 
   return (
     <div>
@@ -54,6 +62,17 @@ function Home() {
           查看持仓
         </Link>
       </Glass>
+
+      {snapshot ? (
+        <Glass tight className="mb-2 mt-2">
+          <div className="flex items-center justify-between gap-3 text-[11px] text-muted">
+            <span>{isWeekend() ? "周末休市" : "市场数据"} · 数据日 {marketDate}</span>
+            <span className="rounded-full bg-bg-elevated px-2 py-0.5 font-semibold text-accent">{marketMode}</span>
+          </div>
+          <p className="mt-1 text-[10px] text-subtle">通过多源校验后显示；无法确认的异常值不会覆盖上一次可靠数据。</p>
+        </Glass>
+      ) : null}
+
       {snapshot ? <IndexGrid indices={snapshot.indices} /> : <EmptyNote>正在后台接入指数…</EmptyNote>}
       {snapshot ? (
         <Cockpit snap={snapshot} news={news?.items || []} />
