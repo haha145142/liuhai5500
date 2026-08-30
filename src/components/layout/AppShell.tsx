@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
 import { TabBar } from "./TabBar";
+import "./BottomNavFix.css";
 import { useApp } from "@/lib/store";
 import { clockStr } from "@/lib/format";
 import { isTradeTime, sessionLabel } from "@/lib/market-hours";
@@ -35,8 +36,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.clearInterval(id);
   }, [refreshSnapshot, refreshFunds, settings.autoRefreshMs]);
 
-  // 新闻不能跟随行情刷新节奏无限频繁请求，也不能只在首次进入时冻结。
-  // 仅在首页/资讯页保持 60 秒轻量更新，服务端本身还有 60 秒缓存。
   useEffect(() => {
     if (pathname !== "/" && !pathname.startsWith("/news")) return;
     const id = window.setInterval(() => {
