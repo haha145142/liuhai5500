@@ -62,6 +62,7 @@ export function quoteFromFundState(input: {
   dayPct?: number | null;
   navDate?: string | null;
   estimateTime?: string | null;
+  officialNavPublished?: boolean | null;
   tradeTime: boolean;
 }): HoldingEntryQuote {
   if (input.tradeTime && input.estimate != null && Number.isFinite(input.estimate) && input.estimate > 0) {
@@ -74,11 +75,14 @@ export function quoteFromFundState(input: {
   }
 
   if (input.nav != null && Number.isFinite(input.nav) && input.nav > 0) {
+    const officialToday = input.officialNavPublished === true;
     return {
       price: input.nav,
       pct: input.dayPct ?? null,
-      label: input.navDate ? `官方净值 · ${input.navDate}` : "官方净值",
-      mode: input.navDate ? "official_today" : "latest_official",
+      label: officialToday
+        ? (input.navDate ? `今日官方净值 · ${input.navDate}` : "今日官方净值")
+        : (input.navDate ? `最近官方净值 · ${input.navDate}` : "最近官方净值"),
+      mode: officialToday ? "official_today" : "latest_official",
     };
   }
 
