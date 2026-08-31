@@ -133,7 +133,8 @@ export const useApp = create<AppState>((set, get) => ({
         const recentSnapshot = recent.status === "fulfilled" ? recent.value : null;
         const base = cached || { indices: [], sectors: [], boards: [], flow: null, global: [], sources: [], fetchedAt: Date.now() };
         const historical: Snapshot = { ...base, indices: fallbackData?.indices?.length ? fallbackData.indices : base.indices, sectors: fallbackData?.sectors?.length ? fallbackData.sectors : base.sectors, marketDate: fallbackData?.marketDate || latest, validation: "cached_latest_trading_day", fetchedAt: Date.now(), sources: [...base.sources.filter((s) => s.name !== "最近交易日历史行情"), { name: "最近交易日历史行情", status: fallbackData?.marketDate ? "ok" : "warn", note: fallbackData?.note || "最近交易日历史行情暂不可用" }] };
-        const merged = mergeSnapshot(historical, recentSnapshot ? { ...recentSnapshot, marketDate: latest, validation: "cached_latest_trading_day" as const } : historical);
+        const canMergeRecent = !!recentSnapshot && recentSnapshot.marketDate === latest;
+        const merged = mergeSnapshot(historical, canMergeRecent ? { ...recentSnapshot!, marketDate: latest, validation: "cached_latest_trading_day" as const } : historical);
         const snapshot: Snapshot = { ...merged, marketDate: latest, validation: "cached_latest_trading_day", fetchedAt: Date.now() };
         const hasUsableData = usableIndices(snapshot.indices) > 0 || usableSectors(snapshot.sectors) > 0 || !!snapshot.flow || usableGlobal(snapshot.global) > 0;
         if (hasUsableData) saveCachedSnapshot(snapshot);
