@@ -85,7 +85,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           type="button"
           onClick={() => setDrawerOpen(true)}
           aria-label="打开侧边菜单"
-          className="app-menu-button"
+          className="relative z-10 mr-2 flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/65 bg-white/55 text-slate-700 shadow-sm backdrop-blur-md transition active:scale-95"
         >
           <Menu className="size-6" strokeWidth={2} />
         </button>
