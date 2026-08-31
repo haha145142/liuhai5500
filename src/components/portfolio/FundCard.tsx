@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { SwingPlan } from "@/components/portfolio/SwingPlan";
 import { ValuationTrustRow } from "@/components/valuation/ValuationTrustRow";
-import { Tone } from "@/components/ui/Glass";
+import { DataStatus, Tone } from "@/components/ui/Glass";
 import { calcSixFactor } from "@/lib/calc/six-factor";
 import { calcSwingTrade } from "@/lib/calc/indicators";
 import { synthesizeSwing } from "@/lib/calc/swing-synthesis";
@@ -42,7 +42,8 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
   const estimateGap = fund?.estimate != null && fund.nav ? ((fund.estimate - fund.nav) / fund.nav) * 100 : null;
   const periods = useMemo(() => [["1周", 5], ["1月", 20], ["3月", 60], ["6月", 120], ["1年", 250]] as const, []);
   const saveEdit = () => { const s = Number(shares); const c = Number(cost); if (s > 0 && c > 0) { onUpdate({ shares: s, cost: c }); setEditing(false); } };
-  const quoteSourceLabel = quote.mode === "official_today" ? "今日官方净值已发布" : quote.mode === "live_estimate" ? `盘中自算估值 · ${quote.confidence === "high" ? "高" : "中"}置信度` : quote.mode === "latest_official" ? "最近官方净值" : "暂无可靠行情";
+  const quoteStatusMode = quote.mode === "live_estimate" ? "live" : quote.mode === "official_today" ? "official" : quote.mode === "latest_official" ? "latest" : "unavailable";
+  const quoteStatusDetail = quote.mode === "live_estimate" ? quote.label : quote.mode === "official_today" ? quote.dataDate || undefined : quote.mode === "latest_official" ? quote.dataDate || undefined : quote.reason;
   const estimateAudit = fund?.estimateMethod ? `${fund.estimateMethod} · 覆盖 ${safeFixed(fund.estimateCoverage, 1, "%")} · ${fund.estimateValidation || "待验证"}${fund.estimateDeviation != null ? ` · 偏差 ${safeFixed(fund.estimateDeviation, 2, "个百分点")}` : ""}` : null;
   const valuationSummary = fund ? buildValuationDisplaySummary({
     valuationStatus: fund.valuationStatus,
@@ -57,7 +58,7 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="truncate text-[17px] font-semibold tracking-tight text-fg">{fund?.name || holding.name || holding.code}</div>
-          <div className="mt-1 flex items-center gap-2 text-[10px] text-muted"><span>{holding.code}</span><span>·</span><span>{quote.label}</span></div>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-muted"><span>{holding.code}</span><DataStatus mode={quoteStatusMode} detail={quoteStatusDetail} /></div>
         </div>
         <div className="shrink-0 text-right">
           <Tone v={day} className="text-[25px] font-bold leading-none tracking-tight">{fmtPctShort(day)}</Tone>
@@ -77,7 +78,7 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
           </div>
         </div>
         <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted">
-          <span>{quoteSourceLabel}</span>
+          <span>{quote.label}</span>
           <span className="shrink-0">成本 {fmtPrice(holding.cost, 4)} · {holding.shares} 份</span>
         </div>
         {fund?.nav != null || fund?.estimate != null ? (
