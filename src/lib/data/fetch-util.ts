@@ -3,32 +3,43 @@ export async function fetchText(
   timeout = 8000,
   headers: Record<string, string> = {},
 ): Promise<string> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeout);
+  const delays = [0, 350, 900];
+  let lastError: unknown = null;
 
-  try {
-    const r = await fetch(url, {
-      signal: ctrl.signal,
-      cache: "no-store",
-      headers: {
-        Accept: "application/json,text/plain,*/*",
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        Connection: "close",
-        ...headers,
-      },
-    });
+  for (let attempt = 0; attempt < delays.length; attempt += 1) {
+    if (delays[attempt] > 0) await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeout);
+    try {
+      const r = await fetch(url, {
+        signal: ctrl.signal,
+        cache: "no-store",
+        headers: {
+          Accept: "application/json,text/plain,*/*",
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          ...headers,
+        },
+      });
 
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return await r.text();
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`请求超时（${Math.ceil(timeout / 1000)}秒）`);
+      if (!r.ok) {
+        const retryable = r.status === 408 || r.status === 425 || r.status === 429 || r.status >= 500;
+        if (!retryable || attempt === delays.length - 1) throw new Error(`HTTP ${r.status}`);
+        continue;
+      }
+      return await r.text();
+    } catch (error) {
+      lastError = error;
+      if (error instanceof Error && error.name === "AbortError") {
+        lastError = new Error(`请求超时（${Math.ceil(timeout / 1000)}秒）`);
+      }
+      if (attempt === delays.length - 1) break;
+    } finally {
+      clearTimeout(t);
     }
-    throw error instanceof Error ? error : new Error("请求失败");
-  } finally {
-    clearTimeout(t);
   }
+
+  throw lastError instanceof Error ? lastError : new Error("请求失败");
 }
 
 export function parseMaybeJsonp(text: string): unknown {
