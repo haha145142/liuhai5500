@@ -2,6 +2,7 @@ import { getResilientFund } from "./resilient-fund";
 import { getSnapshot as getStableSnapshot } from "./server-stable";
 import { getMultiSourceQuote } from "./multi-source-quotes";
 import { validateGlobalQuotes } from "./global-quote-validation";
+import { preserveReliableSnapshot } from "./reliable-snapshot";
 import type { FundQuote } from "../types";
 
 export { calcIndicators } from "./server-stable";
@@ -44,27 +45,22 @@ const INDEX_CODES = ["000001", "399001", "399006", "000688"] as const;
  * by Sina so a Tencent outage does not blank the whole global strip.
  */
 export const getSnapshot = async () => {
-  const snapshot = await getStableSnapshot();
+  const snapshot = preserveReliableSnapshot(await getStableSnapshot());
   const checked = await Promise.all(INDEX_CODES.map(async (code) => {
     try { return { code, quote: await getMultiSourceQuote(code) }; }
     catch { return { code, quote: null }; }
   }));
 
-  let changed = false;
   const indices = snapshot.indices.map((index) => {
     const hit = checked.find((item) => item.code === index.code)?.quote;
     if (!hit || hit.pct == null || hit.price == null) return index;
     if (["three_source", "two_source", "single_source"].includes(hit.agreement)) {
-      changed = true;
-      return { ...index, price: hit.price, pct: hit.pct, change: index.change ?? null };
+      return { ...index, price: hit.price, pct: hit.pct };
     }
     return index;
   });
 
   const global = await validateGlobalQuotes(snapshot.global);
-  const globalChanged = global.fallback > 0;
-  if (!changed && !globalChanged) return snapshot;
-
   const sources = snapshot.sources.map((entry) => {
     if (entry.name === "指数") {
       return { ...entry, note: "腾讯 + 东方财富 + 新浪多源校验；分歧时保留稳定结果" };
@@ -75,11 +71,11 @@ export const getSnapshot = async () => {
     return entry;
   });
 
-  return {
+  return preserveReliableSnapshot({
     ...snapshot,
     indices,
     global: global.list,
     sources,
     validation: checked.some((x) => x.quote?.agreement === "three_source") ? "cross_checked" : snapshot.validation,
-  };
+  });
 };
