@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { EmptyNote, Glass, SectionTitle, Tone } from "@/components/ui/Glass";
+import { EmptyNote, Glass, SectionTitle, Tone, DataStatus } from "@/components/ui/Glass";
 import { calcSwingTrade } from "@/lib/calc/indicators";
 import { fmtPctShort, fmtPrice } from "@/lib/format";
+import { selectFundDisplayQuote } from "@/lib/data/quote-mode";
 import { useApp } from "@/lib/store";
 
 export const Route = createFileRoute("/band")({ component: BandPage });
@@ -27,24 +28,29 @@ function BandPage() {
       {portfolio.map((h) => {
         const f = funds[h.code];
         const m = f?.metrics;
-        const px = f?.estimate ?? f?.nav ?? null;
+        const quote = selectFundDisplayQuote(f);
+        const px = quote.price;
         const swing = calcSwingTrade(m ?? null, h.cost, px ?? 0);
+        const statusMode = quote.mode === "live_estimate" ? "live" : quote.mode === "official_today" ? "official" : quote.mode === "latest_official" ? "latest" : "unavailable";
         return (
           <Glass key={h.code}>
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-sm font-semibold">{f?.name || h.name}</div>
-                <div className="text-[11px] text-muted">{h.code}</div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold">{f?.name || h.name}</div>
+                <div className="mt-1 text-[11px] text-muted">{h.code}</div>
               </div>
-              <Tone v={f?.dayPct} className="font-semibold">
-                {fmtPctShort(f?.estimatePct ?? f?.dayPct)}
-              </Tone>
+              <div className="shrink-0 text-right">
+                <Tone v={quote.pct} className="font-semibold">
+                  {fmtPctShort(quote.pct)}
+                </Tone>
+                <div className="mt-1"><DataStatus mode={statusMode} detail={quote.dataDate || undefined} /></div>
+              </div>
             </div>
             {m ? (
               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                <Stat k="RSI" v={fmtPrice(m.rsi, 1)} />
-                <Stat k="BIAS" v={`${fmtPrice(m.bias, 2)}%`} />
-                <Stat k="MACD" v={fmtPrice(m.macd, 3)} />
+                <Stat k="RSI" v={Number.isFinite(m.rsi) ? fmtPrice(m.rsi, 1) : "—"} />
+                <Stat k="BIAS" v={Number.isFinite(m.bias) ? `${fmtPrice(m.bias, 2)}%` : "—"} />
+                <Stat k="MACD" v={Number.isFinite(m.macd) ? fmtPrice(m.macd, 3) : "—"} />
                 <Stat k="波段" v={`${m.band ?? "—"} ${m.bandScore ?? "—"}`} />
                 <Stat k="趋势" v={`${m.trend ?? "—"} ${m.trendScore ?? "—"}`} />
                 <Stat k="信号" v={m.sigStrength == null ? "—" : String(m.sigStrength)} />
