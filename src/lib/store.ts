@@ -5,8 +5,13 @@ import { getFund, getNews, getSnapshot } from "./data/server";
 import { crossCheckIndices } from "./data/cross-check";
 import { validateFundQuote } from "./data/validation";
 import { getLatestTradingMarketData } from "./data/market-fallback";
-import { isWeekend } from "./market-hours";
+import { getMarketPhase } from "./market-hours";
 import { tradingDateLabel } from "./data/trading-day";
+import { cnTime } from "./format";
+
+let lastFundRoutineKey = "";
+let lastPostCloseFundAttemptAt = 0;
+let lastWeekendSnapshotKey = "";
 
 type AppState = {
   ready: boolean;
@@ -33,6 +38,22 @@ type AppState = {
   setSettings: (s: Partial<AppSettings>) => void;
 };
 
+function chinaTodayLabel(date = new Date()) {
+  const t = cnTime(date);
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
+}
+
+function withLatestOfficialMode(quote: FundQuote): FundQuote {
+  return {
+    ...quote,
+    estimate: null,
+    estimatePct: null,
+    estimateTime: null,
+    valuationStatus: quote.nav != null ? "official_nav" : "stale",
+    estimateConfidence: quote.nav != null ? "high" : "low",
+  };
+}
+
 export const useApp = create<AppState>((set, get) => ({
   ready: false, loading: false, newsLoading: false, fundsLoading: false,
   snapshot: null, news: null, portfolio: [], funds: {}, selectedSectors: [], watchlist: [],
@@ -45,31 +66,50 @@ export const useApp = create<AppState>((set, get) => ({
 
   refreshSnapshot: async () => {
     if (get().loading) return;
-    if (isWeekend()) {
-      const cached = get().snapshot || loadCachedSnapshot();
-      if (cached) {
-        const snapshot = { ...cached, marketDate: tradingDateLabel(), validation: "cached_latest_trading_day" as const };
-        saveCachedSnapshot(snapshot);
-        set({ snapshot, loading: false, lastError: null });
+    const phase = getMarketPhase();
+    const cached = get().snapshot || loadCachedSnapshot();
+
+    // 11:30–13:00: freeze the validated morning snapshot. Do not jump back to yesterday.
+    if (phase === "lunch") {
+      const today = chinaTodayLabel();
+      if (cached?.marketDate === today) {
+        set({ snapshot: cached, loading: false, lastError: null });
+        return;
+      }
+    }
+
+    // Before open and on weekends, show the latest completed trading day. Only fetch
+    // historical fallback when the browser has no current cache for that trading day.
+    if (phase === "preopen" || phase === "weekend") {
+      const latest = tradingDateLabel();
+      const cacheKey = `${phase}:${latest}`;
+      if (cached?.marketDate === latest && cached.indices.length) {
+        set({ snapshot: { ...cached, validation: "cached_latest_trading_day" as const }, loading: false, lastError: null });
+        return;
+      }
+      if (phase === "weekend" && lastWeekendSnapshotKey === cacheKey) {
+        if (cached) set({ snapshot: { ...cached, validation: "cached_latest_trading_day" as const }, loading: false, lastError: null });
         return;
       }
       set({ loading: true, lastError: null });
       try {
+        lastWeekendSnapshotKey = cacheKey;
         const fallback = await getLatestTradingMarketData();
-        const base = loadCachedSnapshot();
+        const base = cached || { indices: [], sectors: [], boards: [], flow: null, global: [], sources: [], fetchedAt: Date.now() };
         const snapshot: Snapshot = {
-          ...(base || { indices: [], sectors: [], boards: [], flow: null, global: [], sources: [], fetchedAt: Date.now() }),
+          ...base,
           indices: fallback.indices,
           sectors: fallback.sectors,
-          marketDate: fallback.marketDate || tradingDateLabel(),
+          marketDate: fallback.marketDate || latest,
           validation: "cached_latest_trading_day",
           fetchedAt: Date.now(),
-          sources: [...(base?.sources || []), { name: "最近交易日历史行情", status: fallback.marketDate ? "ok" : "warn", note: fallback.note }],
+          sources: [...base.sources.filter((s) => s.name !== "最近交易日历史行情"), { name: "最近交易日历史行情", status: fallback.marketDate ? "ok" : "warn", note: fallback.note }],
         };
-        if (snapshot.indices.some((x) => x.pct != null) || snapshot.sectors.some((x) => x.change != null)) saveCachedSnapshot(snapshot);
+        if (snapshot.indices.some((x) => x.pct != null || x.price != null) || snapshot.sectors.some((x) => x.change != null)) saveCachedSnapshot(snapshot);
         set({ snapshot, loading: false, lastError: null });
       } catch {
-        set({ loading: false, lastError: "暂无最近交易日行情数据" });
+        if (cached) set({ snapshot: { ...cached, validation: "cached_latest_trading_day" as const, marketDate: cached.marketDate || latest }, loading: false, lastError: "最近交易日历史源暂不可用 · 已保留本地数据" });
+        else set({ loading: false, lastError: "暂无最近交易日行情数据" });
       }
       return;
     }
@@ -80,6 +120,10 @@ export const useApp = create<AppState>((set, get) => ({
       const checked = await crossCheckIndices({ data: { indices: snapshot.indices } });
       const previous = get().snapshot;
       const indices = checked.validated.map((x) => x.pct != null || x.price != null ? x : previous?.indices.find((p) => p.code === x.code) || x);
+      const phaseAfterFetch = getMarketPhase();
+      // If the clock crossed into lunch while the request was in flight, the morning
+      // result is still the authoritative state for the noon break.
+      const shouldKeepPrevious = phaseAfterFetch === "lunch" && previous?.marketDate === chinaTodayLabel();
       const normalized: Snapshot = {
         ...snapshot,
         indices,
@@ -89,12 +133,13 @@ export const useApp = create<AppState>((set, get) => ({
           ? snapshot.sources.map((s) => s.name === "指数" ? { ...s, note: `${s.note} · ${checked.note}` } : s)
           : [...snapshot.sources, { name: "交叉验证", status: "warn", note: checked.note }],
       };
-      const hasUsableMarket = normalized.indices.some((x) => x.pct != null || x.price != null) || normalized.sectors.some((x) => x.change != null) || normalized.flow != null || normalized.global.some((x) => x.pct != null || x.price != null);
-      if (hasUsableMarket) saveCachedSnapshot(normalized);
-      set({ snapshot: hasUsableMarket ? normalized : previous || loadCachedSnapshot(), loading: false });
+      const finalSnapshot = shouldKeepPrevious ? previous! : normalized;
+      const hasUsableMarket = finalSnapshot.indices.some((x) => x.pct != null || x.price != null) || finalSnapshot.sectors.some((x) => x.change != null) || finalSnapshot.flow != null || finalSnapshot.global.some((x) => x.pct != null || x.price != null);
+      if (hasUsableMarket) saveCachedSnapshot(finalSnapshot);
+      set({ snapshot: hasUsableMarket ? finalSnapshot : previous || loadCachedSnapshot(), loading: false });
     } catch (e) {
-      const cached = get().snapshot || loadCachedSnapshot();
-      if (cached) set({ snapshot: { ...cached, validation: "cached_latest_trading_day", marketDate: cached.marketDate || tradingDateLabel() }, loading: false, lastError: "实时数据源暂不可用 · 已保留最近交易日数据" });
+      const fallback = get().snapshot || loadCachedSnapshot();
+      if (fallback) set({ snapshot: { ...fallback, validation: phase === "postclose" ? fallback.validation : "cached_latest_trading_day", marketDate: fallback.marketDate || tradingDateLabel() }, loading: false, lastError: "实时数据源暂不可用 · 已保留最近可靠数据" });
       else set({ loading: false, lastError: e instanceof Error ? e.message : "行情暂时不可用" });
     }
   },
@@ -122,28 +167,44 @@ export const useApp = create<AppState>((set, get) => ({
     if (get().fundsLoading) return;
     const list = get().portfolio;
     if (!list.length) return;
+
+    const phase = getMarketPhase();
+    // At lunch the morning values remain frozen. No network refresh here.
+    if (phase === "lunch") return;
+
     const currentFunds = get().funds;
-    const weekend = isWeekend();
     const codes = [...new Set(list.map((h) => h.code))];
-    const codesToFetch = weekend ? codes.filter((code) => !currentFunds[code]) : codes;
-    if (!codesToFetch.length) return;
+    const referenceDate = phase === "weekend" || phase === "preopen" ? tradingDateLabel() : chinaTodayLabel();
+
+    // Before open / weekend: load the most recent official NAV once for this trading day.
+    if (phase === "weekend" || phase === "preopen") {
+      const routineKey = `${phase}:${referenceDate}:${codes.join(",")}`;
+      if (lastFundRoutineKey === routineKey) return;
+      lastFundRoutineKey = routineKey;
+    }
+
+    // After close: poll until today's official NAV is published, then stop.
+    if (phase === "postclose") {
+      const allOfficial = codes.every((code) => {
+        const q = currentFunds[code];
+        return q?.nav != null && q.navDate === referenceDate && q.officialNavPublished === true;
+      });
+      if (allOfficial) return;
+      if (Date.now() - lastPostCloseFundAttemptAt < 180_000) return;
+      lastPostCloseFundAttemptAt = Date.now();
+    }
+
     set({ fundsLoading: true });
     try {
-      const entries = await Promise.allSettled(codesToFetch.map(async (code) => {
+      const entries = await Promise.allSettled(codes.map(async (code) => {
         const raw = await getFund({ data: { code } });
         try {
           const validated = await validateFundQuote({ data: { quote: raw } });
-          const quote = weekend ? {
-            ...validated.quote,
-            estimate: null,
-            estimatePct: null,
-            estimateTime: null,
-            valuationStatus: validated.quote.nav != null ? "official_nav" as const : "stale" as const,
-            estimateConfidence: "low" as const,
-          } : validated.quote;
+          const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(validated.quote) : validated.quote;
           return [code, quote] as const;
         } catch {
-          return [code, raw] as const;
+          const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(raw) : raw;
+          return [code, quote] as const;
         }
       }));
       const funds = { ...get().funds };
@@ -155,7 +216,9 @@ export const useApp = create<AppState>((set, get) => ({
       }
       if (Object.keys(funds).length) saveCachedFunds(funds);
       set({ funds });
-    } finally { set({ fundsLoading: false }); }
+    } finally {
+      set({ fundsLoading: false });
+    }
   },
 
   addHolding: (h) => { const list = get().portfolio.slice(); const i = list.findIndex((x) => x.code === h.code); if (i >= 0) list[i] = { ...list[i], ...h }; else list.push(h); savePortfolio(list); set({ portfolio: list }); void get().refreshFunds(); },
