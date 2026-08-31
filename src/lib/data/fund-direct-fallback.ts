@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { calcIndicators } from "../calc/indicators";
 import type { FundHistoryPoint, FundQuote } from "../types";
 import { fetchText, n } from "./fetch-util";
+import { tradingDateLabel } from "./trading-day";
 
 const ROOT = "https://fund.eastmoney.com/pingzhongdata";
 
@@ -72,6 +73,8 @@ export const getDirectFundFallback = createServerFn({ method: "POST" })
         const dayPct = latest.changePct ?? (previous?.nav ? (latest.nav / previous.nav - 1) * 100 : null);
         const weekBase = parsed.historyPoints.at(-6)?.nav;
         const monthBase = parsed.historyPoints.at(-22)?.nav;
+        const expectedDate = tradingDateLabel();
+        const officialToday = latest.date === expectedDate;
         return {
           code: parsed.code,
           name: parsed.name,
@@ -87,15 +90,15 @@ export const getDirectFundFallback = createServerFn({ method: "POST" })
           history,
           historyPoints: parsed.historyPoints,
           metrics,
-          source: "东方财富 pingzhongdata 直接历史净值兜底",
-          officialNavPublished: true,
-          valuationStatus: "official_nav",
+          source: officialToday ? "东方财富 pingzhongdata · 今日历史净值" : "东方财富 pingzhongdata · 最近官方历史净值",
+          officialNavPublished: officialToday,
+          valuationStatus: officialToday ? "official_nav" : "waiting_official_nav",
           estimateConfidence: "medium",
-          estimateMethod: "历史官方净值直接读取；无盘中估值时不猜测",
+          estimateMethod: "历史官方净值直接读取；无可靠盘中估值时不猜测",
           estimateCoverage: 0,
           externalEstimatePct: null,
           estimateDeviation: null,
-          estimateValidation: "直接历史净值",
+          estimateValidation: officialToday ? "直接历史净值 · 今日已发布" : `直接历史净值 · 最近交易日 ${latest.date}`,
           historyMae20: null,
           historySample20: Math.min(20, parsed.historyPoints.length),
           historyMaxError: null,
