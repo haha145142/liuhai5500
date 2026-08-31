@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import appCss from "../styles.css?url";
 import uiPerformanceCss from "../ui-performance.css?url";
 import liquidGlassCss from "../liquid-glass-v4.css?url";
+import finalPolishCss from "../final-polish.css?url";
 
 const APP_NAME = "Fund AI Pro";
 
@@ -25,6 +26,7 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: appCss },
       { rel: "stylesheet", href: uiPerformanceCss },
       { rel: "stylesheet", href: liquidGlassCss },
+      { rel: "stylesheet", href: finalPolishCss },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
