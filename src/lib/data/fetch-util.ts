@@ -1,9 +1,9 @@
 export async function fetchText(
   url: string,
-  timeout = 8000,
+  timeout = 5000,
   headers: Record<string, string> = {},
 ): Promise<string> {
-  const delays = [0, 350, 900];
+  const delays = [0, 250, 700];
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < delays.length; attempt += 1) {
