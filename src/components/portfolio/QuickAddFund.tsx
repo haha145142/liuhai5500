@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Sparkles, WifiOff } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
-import { requestFund } from "@/lib/data/fund-request-cache";
+import { requestFund, requestFundFast } from "@/lib/data/fund-request-cache";
 import { selectFundDisplayQuote } from "@/lib/data/quote-mode";
 import { previewHoldingEntry, quoteFromFundState } from "@/lib/calc/holding-entry";
 import { buildValuationDisplaySummary } from "@/lib/data/valuation-display";
@@ -11,6 +11,10 @@ import "./QuickAddFund.css";
 
 function safeFixed(value: number | null | undefined, digits: number) {
   return value != null && Number.isFinite(value) ? value.toFixed(digits) : "—";
+}
+
+function hasUsableQuote(value: FundQuote | null | undefined): value is FundQuote {
+  return !!value && (value.nav != null || value.historyPoints.length > 0 || value.metrics != null);
 }
 
 export function QuickAddFund() {
@@ -68,7 +72,7 @@ export function QuickAddFund() {
     ? ownEstimate
       ? `自有穿透估值 · 覆盖 ${safeFixed(quote.estimateCoverage, 1)}% · ${quote.estimateValidation || "待验证"}${quote.estimateDeviation != null ? ` · 偏差 ${safeFixed(quote.estimateDeviation, 2)} 个百分点` : ""}`
       : "估值引擎正在等待可靠持仓数据"
-    : "输入基金代码后自动启动穿透估值";
+    : "输入基金代码后自动启动估值";
 
   useEffect(() => {
     if (!/^\d{6}$/.test(code)) {
@@ -76,23 +80,32 @@ export function QuickAddFund() {
       setQuoteLoading(false);
       return;
     }
+
     let active = true;
     setQuoteLoading(true);
     setMessage("");
+
+    // Fast path: return official NAV/history and technical indicators first.
+    void requestFundFast(code).then((fast) => {
+      if (active && hasUsableQuote(fast)) setRemoteQuote(fast);
+    }).catch(() => {});
+
+    // Full path: keep the existing multi-source/validated valuation in parallel.
     void requestFund(code)
       .then((fresh) => {
-        if (active && fresh?.code === code) setRemoteQuote(fresh);
+        if (active && fresh?.code === code && hasUsableQuote(fresh)) setRemoteQuote(fresh);
       })
       .catch(() => {})
       .finally(() => { if (active) setQuoteLoading(false); });
+
     return () => { active = false; };
   }, [code]);
 
   const preview = useMemo(() => {
     if (!code && !shares && !cost) return "输入完成后，这里立即计算；行情异步更新，不阻塞录入";
     if (previewResult.costValue == null) return "输入份额和成本价，持仓成本马上计算";
-    if (quote?.name) return `${quote.name} · ${previewResult.quoteLabel}${quoteLoading ? " · 正在校验" : ""}`;
-    return quoteLoading ? "正在读取最新行情 · 本地成本计算已立即生效" : "暂无可靠行情 · 先按成本即时计算，联网后自动补齐";
+    if (quote?.name) return `${quote.name} · ${previewResult.quoteLabel}${quoteLoading ? " · 后台增强校验中" : ""}`;
+    return quoteLoading ? "正在读取基金基础数据 · 本地成本计算已立即生效" : "暂未取得行情 · 联网后自动补齐";
   }, [code, cost, previewResult.costValue, previewResult.quoteLabel, quote?.name, quoteLoading, shares]);
 
   const save = () => {
