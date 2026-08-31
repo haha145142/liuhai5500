@@ -1,4 +1,5 @@
 import { fetchText, n } from "./fetch-util";
+import { selectConsensusQuote } from "./reliable-quote-selection";
 
 export type QuotePoint = {
   code: string;
@@ -114,7 +115,12 @@ export async function getMultiSourceQuote(code: string): Promise<MultiSourceQuot
   else if (pool.length === 1) agreement = "single_source";
   else agreement = "disputed";
 
-  const anchor = pool.slice().sort((a, b) => a.latencyMs - b.latencyMs)[0];
+  const consensus = agreement === "three_source" || agreement === "two_source"
+    ? selectConsensusQuote(pool.filter((q) => q.price != null && q.pct != null).map((q) => ({ price: q.price as number, pct: q.pct as number })))
+    : pool.length === 1
+      ? { price: pool[0].price as number, pct: pool[0].pct as number }
+      : null;
+
   const validation = agreement === "three_source" || agreement === "two_source" ? "cross_checked" : agreement === "single_source" ? "single_source" : agreement === "disputed" ? "disputed" : "unavailable";
-  return { code, price: anchor.price, pct: anchor.pct, sources: results, health: results.map(healthOf), usableSources: healthy.length, agreement, deviationPct, validation };
+  return { code, price: consensus?.price ?? null, pct: consensus?.pct ?? null, sources: results, health: results.map(healthOf), usableSources: healthy.length, agreement, deviationPct, validation };
 }
