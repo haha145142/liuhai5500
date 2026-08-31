@@ -11,6 +11,10 @@ import { selectFundDisplayQuote } from "@/lib/data/quote-mode";
 import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
 import type { FundQuote, Holding, SectorQuote } from "@/lib/types";
 
+function safeFixed(value: number | null | undefined, digits: number, suffix = "") {
+  return value == null || !Number.isFinite(value) ? "—" : `${value.toFixed(digits)}${suffix}`;
+}
+
 function periodReturn(fund: FundQuote | undefined, tradingDays: number, current: number | null) {
   if (!fund || current == null || fund.history.length <= tradingDays) return null;
   const base = fund.history[fund.history.length - 1 - tradingDays];
@@ -39,7 +43,7 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
   const periods = useMemo(() => [["1周", 5], ["1月", 20], ["3月", 60], ["6月", 120], ["1年", 250]] as const, []);
   const saveEdit = () => { const s = Number(shares); const c = Number(cost); if (s > 0 && c > 0) { onUpdate({ shares: s, cost: c }); setEditing(false); } };
   const quoteSourceLabel = quote.mode === "official_today" ? "今日官方净值已发布" : quote.mode === "live_estimate" ? `盘中自算估值 · ${quote.confidence === "high" ? "高" : "中"}置信度` : quote.mode === "latest_official" ? "最近官方净值" : "暂无可靠行情";
-  const estimateAudit = fund?.estimateMethod ? `${fund.estimateMethod} · 覆盖 ${fund.estimateCoverage?.toFixed(1) ?? "—"}% · ${fund.estimateValidation || "待验证"}${fund.estimateDeviation != null ? ` · 偏差 ${fund.estimateDeviation.toFixed(2)}个百分点` : ""}` : null;
+  const estimateAudit = fund?.estimateMethod ? `${fund.estimateMethod} · 覆盖 ${safeFixed(fund.estimateCoverage, 1, "%")} · ${fund.estimateValidation || "待验证"}${fund.estimateDeviation != null ? ` · 偏差 ${safeFixed(fund.estimateDeviation, 2, "个百分点")}` : ""}` : null;
   const valuationSummary = fund ? buildValuationDisplaySummary({
     valuationStatus: fund.valuationStatus,
     estimateConfidence: fund.estimateConfidence,
@@ -123,8 +127,8 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
       {fund?.metrics ? (
         <div className="mt-3 flex items-center justify-between rounded-2xl bg-bg-elevated px-3 py-2.5">
           <div><div className="text-[10px] text-subtle">技术状态</div><div className="mt-0.5 text-sm font-semibold">{fund.metrics.band} · {fund.metrics.trend}</div></div>
-          <div className="text-right"><div className="text-[10px] text-subtle">RSI</div><div className="text-sm font-semibold tabular-nums">{fund.metrics.rsi.toFixed(1)}</div></div>
-          <div className="text-right"><div className="text-[10px] text-subtle">波段</div><div className="text-sm font-semibold tabular-nums text-accent">{fund.metrics.bandScore}</div></div>
+          <div className="text-right"><div className="text-[10px] text-subtle">RSI</div><div className="text-sm font-semibold tabular-nums">{safeFixed(fund.metrics.rsi, 1)}</div></div>
+          <div className="text-right"><div className="text-[10px] text-subtle">波段</div><div className="text-sm font-semibold tabular-nums text-accent">{fund.metrics.bandScore == null || !Number.isFinite(fund.metrics.bandScore) ? "—" : fund.metrics.bandScore}</div></div>
         </div>
       ) : <p className="mt-3 text-[11px] text-muted">净值历史不足 35 个交易日，暂不生成可靠波段信号。</p>}
 
@@ -137,7 +141,7 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
         <div className="mt-2 space-y-2 rounded-2xl bg-white/40 p-3 text-[11px] leading-relaxed text-muted">
           <p><b className="text-fg">综合判断：</b>{fund?.metrics?.combo || "暂无可靠波段结论"}</p>
           {swing ? <p><b className="text-fg">波段建议：</b>{swing.reason} · 环境 {swing.envLevel}</p> : null}
-          {fund?.metrics ? <p>MACD {fund.metrics.macd.toFixed(4)} · BIAS {fund.metrics.bias.toFixed(2)}% · DIF {fund.metrics.dif.toFixed(4)} · DEA {fund.metrics.dea.toFixed(4)}</p> : null}
+          {fund?.metrics ? <p>MACD {safeFixed(fund.metrics.macd, 4)} · BIAS {safeFixed(fund.metrics.bias, 2, "%")} · DIF {safeFixed(fund.metrics.dif, 4)} · DEA {safeFixed(fund.metrics.dea, 4)}</p> : null}
           {fund?.metrics?.sigConds.length ? <p>触发条件：{fund.metrics.sigConds.join(" · ")}</p> : null}
           {synthesis?.support.length ? <p><b className="text-fg">支持：</b>{synthesis.support.join(" · ")}</p> : null}
           {synthesis?.risks.length ? <p><b className="text-fg">风险：</b>{synthesis.risks.join(" · ")}</p> : null}
