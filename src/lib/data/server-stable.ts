@@ -5,6 +5,7 @@ import { calcIndicators } from "../calc/indicators";
 import type { BoardQuote, DataSource, FundQuote, GlobalQuote, IndexQuote, MarketOrder, NewsFeed, NewsItem, RankRow, SectorQuote, Snapshot } from "../types";
 import { safeText } from "../format";
 import { isWeekend, tradingDateLabel } from "./trading-day";
+import { cnTime } from "../format";
 
 const EM_UT = "fa5fd1943c7b386f172d6893dbfba10b";
 type Entry<T> = { ts: number; data: T };
@@ -13,18 +14,22 @@ function cache<T>(key: string, ttl: number, value: T | null): T | null { if (val
 function source(name: string, ok: boolean, note: string): DataSource { return { name, status: ok ? "ok" : "err", note }; }
 async function em(url: string, timeout = 8000) { return parseMaybeJsonp(await fetchText(url, timeout, { Referer: "https://quote.eastmoney.com/" })); }
 function emptyIndices(): IndexQuote[] { return INDEX_DEFS.map(d => ({ name: d.name, code: d.code, secid: d.secid, price: null, pct: null, change: null })); }
+function chinaTodayLabel(date = new Date()) { const t = cnTime(date); return `${t.getUTCFullYear()}-${String(t.getUTCMonth()+1).padStart(2,"0")}-${String(t.getUTCDate()).padStart(2,"0")}`; }
+function finite(v: number | null | undefined) { return typeof v === "number" && Number.isFinite(v) ? v : null; }
+function safePct(v: number | null | undefined) { const x = finite(v); return x != null && Math.abs(x) <= 30 ? x : null; }
+function safeMoney(v: number | null | undefined) { const x = finite(v); return x != null && Math.abs(x) <= 1e14 ? x : null; }
 
 async function fetchIndices(): Promise<{ list: IndexQuote[]; source: DataSource; validation: Snapshot["validation"] }> {
   let emq: IndexQuote[] | null = null, tq: IndexQuote[] | null = null;
   try {
     const j = await em(`https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&fields=f12,f14,f2,f3,f4&secids=${INDEX_DEFS.map(x => x.secid).join(",")}&ut=${EM_UT}&_=${Date.now()}`) as any;
     const arr = asArr(j?.data?.diff);
-    const list = INDEX_DEFS.map(d => { const x = arr.find(v => String(v.f12) === d.code) || {}; return { name: d.name, code: d.code, secid: d.secid, price: n(x.f2), pct: n(x.f3), change: n(x.f4) }; });
+    const list = INDEX_DEFS.map(d => { const x = arr.find(v => String(v.f12) === d.code) || {}; return { name: d.name, code: d.code, secid: d.secid, price: safeMoney(n(x.f2)), pct: safePct(n(x.f3)), change: safeMoney(n(x.f4)) }; });
     if (list.some(x => x.pct != null)) emq = list;
   } catch {}
   try {
     const lines = (await fetchText("https://qt.gtimg.cn/q=sh000001,sz399001,sz399006,sh000688", 8000)).split(";");
-    const list = INDEX_DEFS.map((d, i) => { const m = (lines[i] || "").match(/=\"([^\"]*)\"/); const p = m ? m[1].split("~") : []; return { name: d.name, code: d.code, secid: d.secid, price: n(p[3]), pct: n(p[32]), change: n(p[31]) }; });
+    const list = INDEX_DEFS.map((d, i) => { const m = (lines[i] || "").match(/=\"([^\"]*)\"/); const p = m ? m[1].split("~") : []; return { name: d.name, code: d.code, secid: d.secid, price: safeMoney(n(p[3])), pct: safePct(n(p[32])), change: safeMoney(n(p[31])) }; });
     if (list.some(x => x.pct != null)) tq = list;
   } catch {}
   if (emq && tq) {
@@ -40,14 +45,18 @@ async function fetchBoards(): Promise<{ sectors: SectorQuote[]; boards: BoardQuo
   const fields = "f12,f14,f3,f62,f66,f69,f72,f75,f6";
   async function clist(fs: string, type: "industry" | "concept") {
     const j = await em(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=80&po=1&np=1&fltt=2&invt=2&fid=f3&fs=${encodeURIComponent(fs)}&fields=${fields}&ut=${EM_UT}&_=${Date.now()}`, 10000) as any;
-    return asArr(j?.data?.diff).map(x => ({ code: String(x.f12 || ""), name: String(x.f14 || ""), type, change: n(x.f3), flow: n(x.f62), extraLarge: n(x.f66), large: n(x.f69), mid: n(x.f72), small: n(x.f75), turnover: n(x.f6) }));
+    return asArr(j?.data?.diff).map(x => ({ code: String(x.f12 || ""), name: String(x.f14 || ""), type, change: safePct(n(x.f3)), flow: safeMoney(n(x.f62)), extraLarge: safeMoney(n(x.f66)), large: safeMoney(n(x.f69)), mid: safeMoney(n(x.f72)), small: safeMoney(n(x.f75)), turnover: safeMoney(n(x.f6)) }));
   }
   try {
     const [ind, con] = await Promise.all([clist("m:90+t:2", "industry"), clist("m:90+t:3", "concept")]);
     const all = [...ind, ...con];
     const boards = all.filter(x => x.name && x.change != null).map(x => ({ code: x.code, name: x.name, type: x.type, change: x.change, flow: x.flow }));
-    const sectors = SECTOR_RULES.map(r => { const hit = all.find(x => x.code === r.bkCode) || all.find(x => x.name === r.name) || all.find(x => r.searchKeys.some(k => x.name.includes(k))); return { id: r.id, name: r.name, bkCode: r.bkCode, change: hit?.change ?? null, flow: hit?.flow ?? null, super: hit?.extraLarge ?? null, large: hit?.large ?? null, mid: hit?.mid ?? null, small: hit?.small ?? null, turnover: hit?.turnover ?? null, available: hit?.change != null, streak: 0, etfCode: r.etf?.code, etfName: r.etf?.name, validation: hit?.change != null ? "single_source" as const : "unavailable" as const }; });
-    return { sectors, boards: boards.sort((a, b) => (b.change ?? -999) - (a.change ?? -999)), source: source("板块", sectors.some(x => x.available), "东方财富板块行情 + 资金") };
+    const sectors = SECTOR_RULES.map(r => {
+      const hit = all.find(x => x.code === r.bkCode) || all.find(x => x.name === r.name) || all.find(x => r.searchKeys.some(k => x.name.includes(k)));
+      const flowFields = { flow: hit?.flow ?? null, super: hit?.extraLarge ?? null, large: hit?.large ?? null, mid: hit?.mid ?? null, small: hit?.small ?? null, turnover: hit?.turnover ?? null };
+      return { id: r.id, name: r.name, bkCode: r.bkCode, change: hit?.change ?? null, ...flowFields, available: hit?.change != null, streak: 0, etfCode: r.etf?.code, etfName: r.etf?.name, validation: hit?.change != null ? "single_source" as const : "unavailable" as const };
+    });
+    return { sectors, boards: boards.sort((a, b) => (b.change ?? -999) - (a.change ?? -999)), source: source("板块", sectors.some(x => x.available), "东方财富板块行情 + 资金字段；异常值已过滤") };
   } catch {
     return { sectors: SECTOR_RULES.map(r => ({ id: r.id, name: r.name, bkCode: r.bkCode, change: null, flow: null, super: null, large: null, mid: null, small: null, turnover: null, available: false, streak: 0, etfCode: r.etf?.code, etfName: r.etf?.name, validation: "unavailable" as const })), boards: [], source: source("板块", false, "数据源暂不可用") };
   }
@@ -57,20 +66,28 @@ async function fetchFlow(): Promise<{ flow: MarketOrder | null; source: DataSour
   try {
     const j = await em(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=400&po=1&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent("m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23")}&fields=f62,f66,f69,f72,f75&ut=${EM_UT}&_=${Date.now()}`, 10000) as any;
     const arr = asArr(j?.data?.diff); if (!arr.length) throw new Error("empty");
-    const sum = (k: string) => arr.reduce((s, x) => s + (n(x[k]) || 0), 0);
+    const sum = (k: string) => arr.reduce((s, x) => s + (safeMoney(n(x[k])) || 0), 0);
     const main = sum("f62"); const superFlow = sum("f66"); const large = sum("f69"); const mid = sum("f72"); const small = sum("f75");
     const internalDelta = Math.abs(main - (superFlow + large));
+    const balanceDelta = Math.abs(main - (superFlow + large + mid + small));
     const tolerance = Math.max(1, Math.abs(main) * 0.02);
+    const balanceTolerance = Math.max(1, Math.abs(main) * 0.05);
     const validated = internalDelta <= tolerance;
-    return { flow: { main, super: superFlow, large, mid, small, count: arr.length }, source: source("资金", true, `东方财富全A ${arr.length} 只；主力=超大单+大单${validated ? "，内部一致" : "，内部存在偏差"}`) };
+    const balanced = balanceDelta <= balanceTolerance;
+    const validation = validated && balanced ? "fully_consistent" : (validated || balanced ? "partially_consistent" : "unreliable");
+    return {
+      flow: { main, super: superFlow, large, mid, small, count: arr.length, validation, internalDelta, balanceDelta, note: validation === "fully_consistent" ? "主力=超大单+大单，且分项余额一致" : validation === "partially_consistent" ? "资金分项存在轻微偏差，保留并标记" : "资金分项内部校验未通过，属于低可信数据" },
+      source: source("资金", validation !== "unreliable", `东方财富全A ${arr.length} 只；内部校验：${validation}`)
+    };
   } catch { return { flow: null, source: source("资金", false, "数据源暂不可用") }; }
 }
 
 async function fetchGlobal(): Promise<{ list: GlobalQuote[]; source: DataSource }> {
   try {
     const lines = (await fetchText(`https://qt.gtimg.cn/q=${GLOBAL_DEFS.map(x => x.tencent).join(",")}`, 8000)).split(";");
-    const list = GLOBAL_DEFS.map((d, i) => { const m = (lines[i] || "").match(/=\"([^\"]*)\"/); const p = m ? m[1].split("~") : []; return { name: d.name, price: n(p[3]), pct: n(p[32]) ?? n(p[31]) }; });
-    return { list, source: source("外围", list.some(x => x.pct != null), "腾讯财经") };
+    const list = GLOBAL_DEFS.map((d, i) => { const m = (lines[i] || "").match(/=\"([^\"]*)\"/); const p = m ? m[1].split("~") : []; return { name: d.name, price: safeMoney(n(p[3])), pct: safePct(n(p[32]) ?? n(p[31])) }; });
+    const usable = list.filter(x => x.price != null || x.pct != null).length;
+    return { list, source: source("外围", usable > 0, usable > 0 ? `腾讯财经；有效 ${usable}/${list.length}` : "腾讯财经无有效数据") };
   } catch { return { list: [], source: source("外围", false, "数据源暂不可用") }; }
 }
 
@@ -78,7 +95,8 @@ export const getSnapshot = createServerFn({ method: "GET" }).handler(async (): P
   const weekend = isWeekend(); const ttl = weekend ? 7 * 86400000 : 20000; const hit = cache<Snapshot>("snap", ttl, null); if (hit) return hit;
   const [idx, bk, fl, gl] = await Promise.all([fetchIndices(), fetchBoards(), fetchFlow(), fetchGlobal()]);
   const usable = idx.list.some(x => x.pct != null) || bk.sectors.some(x => x.change != null) || !!fl.flow;
-  return cache("snap", ttl, { indices: idx.list, sectors: bk.sectors, boards: bk.boards.slice(0, 40), flow: fl.flow, global: gl.list, sources: [idx.source, bk.source, fl.source, gl.source], fetchedAt: Date.now(), marketDate: weekend ? tradingDateLabel() : new Date().toISOString().slice(0, 10), validation: weekend ? "cached_latest_trading_day" : (idx.validation || (usable ? "single_source" : "cached_latest_trading_day")) })!;
+  const marketDate = weekend ? tradingDateLabel() : chinaTodayLabel();
+  return cache("snap", ttl, { indices: idx.list, sectors: bk.sectors, boards: bk.boards.slice(0, 40), flow: fl.flow, global: gl.list, sources: [idx.source, bk.source, fl.source, gl.source], fetchedAt: Date.now(), marketDate, validation: weekend ? "cached_latest_trading_day" : (idx.validation || (usable ? "single_source" : "cached_latest_trading_day")) })!;
 });
 
 function makeId(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return String(h); }
@@ -104,7 +122,7 @@ export const getFund = createServerFn({ method: "POST" }).validator((input: { co
     const gz = parseMaybeJsonp(raw) as any;
     const histRaw = await fetchText(`https://api.fund.eastmoney.com/f10/lsjz?fundcode=${code}&pageIndex=1&pageSize=300`, 10000, { Referer: "https://fund.eastmoney.com/" });
     const hj = parseMaybeJsonp(histRaw) as any;
-    const ordered = (hj?.Data?.LSJZList || []).map((x: any) => ({ date: String(x.FSRQ || ""), nav: n(x.DWJZ) ?? 0, changePct: n(x.JZZZL) })).filter((x: any) => x.date && x.nav > 0).reverse();
+    const ordered = (hj?.Data?.LSJZList || []).map((x: any) => ({ date: String(x.FSRQ || ""), nav: n(x.DWJZ) ?? 0, changePct: n(x.JZZL) })).filter((x: any) => x.date && x.nav > 0).reverse();
     const history = ordered.map((x: any) => x.nav);
     const latest = ordered[ordered.length - 1];
     const weekBase = ordered[Math.max(0, ordered.length - 6)];
