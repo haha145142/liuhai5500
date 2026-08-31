@@ -1,4 +1,5 @@
 import { cnTime } from "./format";
+import { isAshareTradingDay } from "./data/trading-day";
 
 export type MarketPhase = "preopen" | "morning" | "lunch" | "afternoon" | "postclose" | "weekend";
 
@@ -7,9 +8,12 @@ export function isWeekend(d = new Date()): boolean {
   return day === 0 || day === 6;
 }
 
-/** A-share continuous auction: 09:30–11:30, 13:00–15:00 CST, weekdays. */
+/**
+ * A-share continuous auction: 09:30–11:30, 13:00–15:00 CST.
+ * Weekends and configured exchange holidays are treated as non-trading days.
+ */
 export function getMarketPhase(d = new Date()): MarketPhase {
-  if (isWeekend(d)) return "weekend";
+  if (!isAshareTradingDay(d)) return "weekend";
   const t = cnTime(d);
   const mins = t.getUTCHours() * 60 + t.getUTCMinutes();
   if (mins < 9 * 60 + 30) return "preopen";
@@ -26,8 +30,8 @@ export function isTradeTime(d = new Date()): boolean {
 
 export function sessionLabel(d = new Date()): string {
   switch (getMarketPhase(d)) {
-    case "weekend": return "周末休市";
-    case "preopen": return "开盘前";
+    case "weekend": return "休市 · 显示最近交易日";
+    case "preopen": return "开盘前 · 最近交易日数据";
     case "morning": return "上午盘中实时";
     case "lunch": return "午间休市 · 沿用上午数据";
     case "afternoon": return "下午盘中实时";
