@@ -37,11 +37,14 @@ const EXCHANGE_CLOSED_2026 = new Set([
   "2026-10-07",
 ]);
 
-export function isExchangeClosed(date = new Date()): boolean {
-  const d = cnDate(date);
+function isNormalizedClosedDate(d: Date): boolean {
   const day = d.getUTCDay();
   if (day === 0 || day === 6) return true;
   return EXCHANGE_CLOSED_2026.has(dateLabel(d));
+}
+
+export function isExchangeClosed(date = new Date()): boolean {
+  return isNormalizedClosedDate(cnDate(date));
 }
 
 /** Canonical trading-day predicate used by market-hours.ts. */
@@ -60,7 +63,7 @@ export function isTradingDay(date = new Date()): boolean {
 
 export function latestTradingDate(date = new Date()): Date {
   const d = cnDate(date);
-  while (isExchangeClosed(d)) {
+  while (isNormalizedClosedDate(d)) {
     d.setUTCDate(d.getUTCDate() - 1);
   }
   return d;
