@@ -3,7 +3,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { Menu, RefreshCw } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { clockStr } from "@/lib/format";
-import { isTradeTime, isWeekend, sessionLabel } from "@/lib/market-hours";
+import { sessionLabel } from "@/lib/market-hours";
 import { tradingDateLabel } from "@/lib/data/trading-day";
 import { cn } from "@/lib/cn";
 import { QuickAddFund } from "@/components/portfolio/QuickAddFund";
@@ -24,15 +24,48 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  useEffect(() => { hydrate(); const id = window.setTimeout(() => { void refreshSnapshot(); void refreshNews(); void refreshFunds(); }, BOOT_DELAY_MS); return () => window.clearTimeout(id); }, [hydrate, refreshSnapshot, refreshNews, refreshFunds]);
-  useEffect(() => { const id = window.setInterval(() => { if (document.hidden) return; void refreshSnapshot(); if (isTradeTime()) void refreshFunds(); }, Math.max(30_000, settings.autoRefreshMs)); return () => window.clearInterval(id); }, [refreshSnapshot, refreshFunds, settings.autoRefreshMs]);
-  useEffect(() => { if (pathname !== "/" && !pathname.startsWith("/news")) return; const id = window.setInterval(() => { if (document.hidden) return; void refreshNews(); }, Math.max(60_000, settings.newsRefreshMs || NEWS_REFRESH_MS)); return () => window.clearInterval(id); }, [pathname, refreshNews, settings.newsRefreshMs]);
+  useEffect(() => {
+    hydrate();
+    const id = window.setTimeout(() => {
+      void refreshSnapshot();
+      void refreshNews();
+      void refreshFunds();
+    }, BOOT_DELAY_MS);
+    return () => window.clearTimeout(id);
+  }, [hydrate, refreshSnapshot, refreshNews, refreshFunds]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      void refreshSnapshot();
+      // The store decides whether this is a live-refresh, lunch freeze,
+      // post-close official-NAV poll, or latest-trading-day fallback.
+      void refreshFunds();
+    }, Math.max(30_000, settings.autoRefreshMs));
+    return () => window.clearInterval(id);
+  }, [refreshSnapshot, refreshFunds, settings.autoRefreshMs]);
+
+  useEffect(() => {
+    if (pathname !== "/" && !pathname.startsWith("/news")) return;
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      void refreshNews();
+    }, Math.max(60_000, settings.newsRefreshMs || NEWS_REFRESH_MS));
+    return () => window.clearInterval(id);
+  }, [pathname, refreshNews, settings.newsRefreshMs]);
+
   useEffect(() => { setDrawerOpen(false); }, [pathname]);
 
-  const onRefresh = () => { void refreshSnapshot(); if (isTradeTime()) void refreshFunds(); if (pathname.startsWith("/news") || pathname === "/") void refreshNews(); };
+  const onRefresh = () => {
+    void refreshSnapshot();
+    void refreshFunds();
+    if (pathname.startsWith("/news") || pathname === "/") void refreshNews();
+  };
   const failedSources = snapshot?.sources.filter((s) => s.status === "err").map((s) => s.name) || [];
   const validationLabel = snapshot?.validation === "cross_checked" ? "双源核验" : snapshot?.validation === "cached_latest_trading_day" ? "最近交易日缓存" : snapshot?.validation === "single_source" ? "单源可用" : "数据状态待确认";
-  const statusText = snapshot ? (isWeekend() ? `周末休市 · 数据日 ${snapshot.marketDate || tradingDateLabel()} · ${validationLabel} · ${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}` : `数据日 ${snapshot.marketDate || "今日"} · ${validationLabel} · ${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`) : lastError ? "行情暂时不可用 · 已保留本地数据" : "后台连接行情…";
+  const statusText = snapshot
+    ? `${snapshot.marketDate || tradingDateLabel()} · ${validationLabel}${failedSources.length ? ` · ${failedSources.join("、")}暂不可用` : ""} · 更新 ${clockStr(new Date(snapshot.fetchedAt))}`
+    : lastError ? "行情暂时不可用 · 已保留本地数据" : "后台连接行情…";
 
   const header = <header className="app-header"><div className="app-header-card !min-h-[88px] !rounded-[26px] !px-3.5 !py-3.5"><button type="button" onClick={() => setDrawerOpen(true)} aria-label="打开侧边菜单" className="relative z-10 mr-2 flex !size-11 shrink-0 items-center justify-center rounded-2xl border border-white/75 bg-white/58 text-slate-700 shadow-[0_7px_22px_rgba(70,95,120,.10)] backdrop-blur-xl transition active:scale-95"><Menu className="size-5" strokeWidth={2} /></button><div className="min-w-0 flex-1"><h1 className="app-header-title !text-[22px]">Fund AI Pro</h1><p className="app-header-meta !mt-1 !text-[11px] !leading-[1.3]">{sessionLabel()} · {statusText}</p></div><button type="button" onClick={onRefresh} aria-label="刷新" className="app-refresh-button !size-11 !w-11 !h-11 !m-0 !ml-2 !rounded-full"><RefreshCw className={cn("size-4", loading && "animate-spin")} /></button></div></header>;
   const mainContent = pathname === "/portfolio" ? <><QuickAddFund />{children}</> : children;
