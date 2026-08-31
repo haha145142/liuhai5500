@@ -30,7 +30,7 @@ type AppState = {
   refreshSnapshot: () => Promise<void>;
   refreshNews: () => Promise<void>;
   refreshFunds: () => Promise<void>;
-  addHolding: (h: Holding) => void;
+  addHolding: (h: Holding, quote?: FundQuote) => void;
   updateHolding: (code: string, patch: Partial<Holding>) => void;
   removeHolding: (code: string) => void;
   setSectors: (ids: string[]) => void;
@@ -226,7 +226,20 @@ export const useApp = create<AppState>((set, get) => ({
       if ((phase === "weekend" || phase === "preopen") && updatedCount > 0) lastFundRoutineKey = `${phase}:${referenceDate}:${codes.join(",")}`;
     } finally { set({ fundsLoading: false }); }
   },
-  addHolding: (h) => { const list = get().portfolio.slice(); const i = list.findIndex((x) => x.code === h.code); if (i >= 0) list[i] = { ...list[i], ...h }; else list.push(h); savePortfolio(list); set({ portfolio: list }); void get().refreshFunds(); },
+  addHolding: (h, quote) => {
+    const list = get().portfolio.slice();
+    const i = list.findIndex((x) => x.code === h.code);
+    if (i >= 0) list[i] = { ...list[i], ...h };
+    else list.push(h);
+    const currentFunds = get().funds;
+    const nextFunds = quote && (quote.nav != null || quote.estimate != null || quote.history.length > 0)
+      ? { ...currentFunds, [h.code]: quote }
+      : currentFunds;
+    savePortfolio(list);
+    if (nextFunds !== currentFunds) saveCachedFunds(nextFunds);
+    set({ portfolio: list, funds: nextFunds });
+    void get().refreshFunds();
+  },
   updateHolding: (code, patch) => { const list = get().portfolio.map((x) => (x.code === code ? { ...x, ...patch } : x)); savePortfolio(list); set({ portfolio: list }); },
   removeHolding: (code) => { const list = get().portfolio.filter((x) => x.code !== code); savePortfolio(list); set({ portfolio: list }); },
   setSectors: (ids) => { saveSelectedSectors(ids); set({ selectedSectors: ids }); },
