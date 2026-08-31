@@ -65,6 +65,24 @@ function usableGlobal(global: Snapshot["global"]) {
   return global.filter((x) => x.pct != null || x.price != null).length;
 }
 
+async function mapSettledLimited<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      try {
+        results[index] = { status: "fulfilled", value: await mapper(items[index]) };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, limit), items.length) }, () => worker()));
+  return results;
+}
+
 function mergeSnapshot(previous: Snapshot | null, incoming: Snapshot): Snapshot {
   if (!previous) return incoming;
   const byCode = new Map(previous.indices.map((x) => [x.code, x]));
@@ -195,11 +213,11 @@ export const useApp = create<AppState>((set, get) => ({
     }
     set({ fundsLoading: true });
     try {
-      const entries = await Promise.allSettled(codes.map(async (code) => {
+      const entries = await mapSettledLimited(codes, 3, async (code) => {
         const raw = await getFund({ data: { code } });
         try { const validated = await validateFundQuote({ data: { quote: raw } }); const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(validated.quote, referenceDate) : validated.quote; return [code, quote] as const; }
         catch { const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(raw, referenceDate) : raw; return [code, quote] as const; }
-      }));
+      });
       const funds = { ...get().funds };
       let updatedCount = 0;
       for (const result of entries) { if (result.status !== "fulfilled") continue; const [code, quote] = result.value; const hasUsableValue = quote.nav != null || quote.estimate != null || quote.history.length > 0; if (hasUsableValue) { funds[code] = quote; updatedCount += 1; } }
