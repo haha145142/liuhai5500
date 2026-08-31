@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { summarizeValuationHistory } from "./valuation-history-stats";
+import { summarizeValuationHistory, type ValuationSettlementSample } from "./valuation-history-stats";
 
 test("同一交易日只统计一次，未结算样本不进入准确率", () => {
   const stats = summarizeValuationHistory("000001", [
@@ -18,13 +18,13 @@ test("同一交易日只统计一次，未结算样本不进入准确率", () =>
 });
 
 test("最近窗口只使用已结算样本", () => {
-  const samples = Array.from({ length: 25 }, (_, index) => {
+  const samples: ValuationSettlementSample[] = Array.from({ length: 25 }, (_, index) => {
     const day = String(index + 1).padStart(2, "0");
     return {
       code: "000002",
       date: `2026-08-${day}`,
       absoluteErrorPctPoints: index / 10,
-      status: "settled" as const,
+      status: "settled",
     };
   });
   samples.push({ code: "000002", date: "2026-08-31", absoluteErrorPctPoints: null, status: "missing_intraday" });
