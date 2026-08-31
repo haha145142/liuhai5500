@@ -46,10 +46,16 @@ const INDEX_CODES = ["000001", "399001", "399006", "000688"] as const;
  */
 export const getSnapshot = async () => {
   const snapshot = preserveReliableSnapshot(await getStableSnapshot());
-  const checked = await Promise.all(INDEX_CODES.map(async (code) => {
-    try { return { code, quote: await getMultiSourceQuote(code) }; }
-    catch { return { code, quote: null }; }
-  }));
+
+  // These independent validations run together so a slow global source never
+  // needlessly waits behind the four A-share index checks.
+  const [checked, global] = await Promise.all([
+    Promise.all(INDEX_CODES.map(async (code) => {
+      try { return { code, quote: await getMultiSourceQuote(code) }; }
+      catch { return { code, quote: null }; }
+    })),
+    validateGlobalQuotes(snapshot.global),
+  ]);
 
   const indices = snapshot.indices.map((index) => {
     const hit = checked.find((item) => item.code === index.code)?.quote;
@@ -60,7 +66,6 @@ export const getSnapshot = async () => {
     return index;
   });
 
-  const global = await validateGlobalQuotes(snapshot.global);
   const sources = snapshot.sources.map((entry) => {
     if (entry.name === "指数") {
       return { ...entry, note: "腾讯 + 东方财富 + 新浪多源校验；分歧时保留稳定结果" };
