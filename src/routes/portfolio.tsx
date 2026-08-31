@@ -5,7 +5,7 @@ import { EmptyNote, Glass, SectionTitle, Tone } from "@/components/ui/Glass";
 import { matchFundSector } from "@/lib/data/sectors";
 import { fmtMoney, fmtPctShort } from "@/lib/format";
 import { useApp } from "@/lib/store";
-import { isTradeTime } from "@/lib/market-hours";
+import { selectFundDisplayQuote } from "@/lib/data/quote-mode";
 import type { FundQuote, Holding } from "@/lib/types";
 
 export const Route = createFileRoute("/portfolio")({ component: PortfolioPage });
@@ -32,8 +32,7 @@ function navAt(fund: FundQuote | undefined, tradingDaysAgo: number) {
 }
 
 function currentPrice(fund: FundQuote | undefined) {
-  if (!fund) return null;
-  return isTradeTime() ? (fund.estimate ?? null) : (fund.nav ?? null);
+  return selectFundDisplayQuote(fund).price;
 }
 
 function monthKey(date: Date) {
@@ -82,7 +81,6 @@ function PortfolioPage() {
   }, [alerts]);
 
   const bench = snapshot?.indices[0]?.pct ?? null;
-  const live = isTradeTime();
   const summary = useMemo(() => {
     let costSum = 0;
     let total = 0;
@@ -91,18 +89,19 @@ function PortfolioPage() {
     let missing = false;
     for (const h of portfolio) {
       const f = funds[h.code];
-      const px = currentPrice(f);
+      const quote = selectFundDisplayQuote(f);
+      const px = quote.price;
       const costVal = h.cost * h.shares;
       costSum += costVal;
       if (px == null) { missing = true; continue; }
       total += px * h.shares;
       pnl += (px - h.cost) * h.shares;
-      if (f) dayPnl += px * h.shares * ((live ? (f.estimatePct ?? null) : (f.dayPct ?? null)) || 0) / 100;
+      if (quote.pct != null) dayPnl += px * h.shares * quote.pct / 100;
     }
     const healthBase = portfolio.filter((h) => (funds[h.code]?.metrics?.bandScore ?? 50) <= 45).length;
     const health = portfolio.length ? Math.max(20, Math.min(95, 88 - healthBase * 12 - (missing ? 8 : 0))) : null;
     return { costSum, total, pnl, dayPnl, missing, health, healthBase };
-  }, [funds, live, portfolio]);
+  }, [funds, portfolio]);
 
   const periodSummary = useMemo(() => {
     return [
@@ -113,7 +112,7 @@ function PortfolioPage() {
       let found = false;
       for (const h of portfolio) {
         const f = funds[h.code];
-        const now = live ? (f?.estimate ?? null) : (f?.nav ?? null);
+        const now = currentPrice(f);
         const base = navAt(f, Number(days));
         if (now != null && base != null) {
           amount += (now - base) * h.shares;
@@ -123,7 +122,7 @@ function PortfolioPage() {
       }
       return { label: String(label), amount: found ? amount : null, pct: found && baseValue ? (amount / baseValue) * 100 : null };
     });
-  }, [funds, portfolio, live]);
+  }, [funds, portfolio]);
 
   const calendar = useMemo(() => {
     const cells = monthCells(calendarCursor);
@@ -144,7 +143,7 @@ function PortfolioPage() {
   return (
     <div>
       <Glass>
-        <SectionTitle title="我的持仓" hint={`${portfolio.length} 只`} right={<span className="text-xs text-muted">{live ? "盘中估值" : "收盘官方净值"}</span>} />
+        <SectionTitle title="我的持仓" hint={`${portfolio.length} 只`} right={<span className="text-xs text-muted">当前统一数据口径</span>} />
         <div className="flex items-end justify-between gap-3">
           <div>
             <div className="text-xs text-muted">整体盈亏</div>
@@ -154,16 +153,16 @@ function PortfolioPage() {
             </Tone>
           </div>
           <div className="text-right text-xs text-muted">
-            {live ? "盘中交叉校验" : "官方净值口径"}<br />
+            组合口径统一<br />
             总资产 {summary.missing ? "—" : fmtMoney(summary.total)}<br />
             成本 {fmtMoney(summary.costSum)}
           </div>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <div className="rounded-2xl bg-bg-elevated p-3">
-            <div className="text-[11px] text-subtle">{live ? "今日实时收益" : "最近交易日收益"}</div>
+            <div className="text-[11px] text-subtle">今日收益</div>
             <Tone v={summary.dayPnl} className="mt-1 block text-xl font-semibold">{fmtMoney(summary.dayPnl)}</Tone>
-            <div className="text-[10px] text-muted">数据源自动随交易时段切换</div>
+            <div className="text-[10px] text-muted">盘中 → 上午收盘 → 下午实时 → 官方净值</div>
           </div>
           <div className="rounded-2xl bg-bg-elevated p-3">
             <div className="text-[11px] text-subtle">组合健康度</div>
@@ -174,7 +173,7 @@ function PortfolioPage() {
       </Glass>
 
       <Glass>
-        <SectionTitle title="最近收益" hint="按当前持仓回算" />
+        <SectionTitle title="最近收益" hint="按当前统一数据口径回算" />
         <div className="grid grid-cols-5 gap-1.5">
           {periodSummary.map((p) => (
             <div key={p.label} className="rounded-2xl bg-bg-elevated p-2 text-center">
@@ -186,7 +185,7 @@ function PortfolioPage() {
         </div>
         <div className="mt-3 rounded-2xl bg-accent/8 p-3 text-xs text-muted">
           <b className="text-fg">总收益：</b>{summary.missing ? "部分基金尚无可用净值" : `${fmtMoney(summary.pnl)} · ${summary.costSum ? fmtPctShort((summary.pnl / summary.costSum) * 100) : "—"}`}
-          <span className="ml-2">盘中使用估值，收盘后自动切回官方净值。</span>
+          <span className="ml-2">全站统一按照交易时段选择可靠的实时估值、上午收盘快照、下午实时估值和官方净值。</span>
         </div>
       </Glass>
 
