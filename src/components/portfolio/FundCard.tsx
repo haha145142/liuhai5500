@@ -26,7 +26,7 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
   const quote = selectFundDisplayQuote(fund);
   const returnData = calcHoldingReturn(holding, fund);
   const px = returnData.price;
-  const day = fund?.dayPct ?? null;
+  const day = quote.pct;
   const value = returnData.marketValue;
   const costVal = returnData.costValue;
   const pnl = returnData.holdingPnl;
