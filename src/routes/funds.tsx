@@ -32,6 +32,11 @@ function FundsPage() {
       setRows(r.rows);
       setSource(r.source);
       setLoading(false);
+    }).catch(() => {
+      if (!live) return;
+      setRows([]);
+      setSource("数据源暂不可用");
+      setLoading(false);
     });
     return () => {
       live = false;
@@ -56,35 +61,43 @@ function FundsPage() {
         </div>
       </Glass>
       {loading ? <EmptyNote>正在读取排行…</EmptyNote> : null}
-      {!loading && !rows.length ? <EmptyNote>排行数据源暂不可用（周末接口可能暂停）</EmptyNote> : null}
-      {rows.map((r, i) => (
-        <article key={r.code} className="glass-tight mb-2 flex items-center gap-3 p-3">
-          <div className="w-6 text-xs font-semibold text-subtle">{i + 1}</div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold">{r.name}</div>
-            <div className="text-[11px] text-muted">
-              {r.code} · 净值 {fmtPrice(r.nav, 4)}
+      {!loading && !rows.length ? <EmptyNote>暂无可靠排行数据，请稍后刷新</EmptyNote> : null}
+      {rows.map((r, i) => {
+        const addable = r.nav != null && Number.isFinite(r.nav) && r.nav > 0;
+        const displayValue = tab === "z" ? r.week : tab === "1n" ? r.ytd : tab === "6y" ? r.month : r.day;
+        return (
+          <article key={r.code} className="glass-tight mb-2 flex items-center gap-3 p-3">
+            <div className="w-6 text-xs font-semibold text-subtle">{i + 1}</div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold">{r.name}</div>
+              <div className="text-[11px] text-muted">
+                {r.code} · 净值 {fmtPrice(r.nav, 4)}
+              </div>
             </div>
-          </div>
-          <Tone v={r.day} className="text-sm font-semibold">
-            {fmtPctShort(tab === "z" ? r.week : tab === "1n" ? r.ytd : tab === "6y" ? r.month : r.day)}
-          </Tone>
-          <button
-            type="button"
-            onClick={() => toggleWatch(r.code)}
-            className={`rounded-full px-2 py-1 text-[10px] font-semibold ${watchlist.includes(r.code) ? "bg-accent text-accent-fg" : "bg-bg-elevated text-muted"}`}
-          >
-            {watchlist.includes(r.code) ? "已关注" : "关注"}
-          </button>
-          <button
-            type="button"
-            className="text-[10px] font-semibold text-accent"
-            onClick={() => addHolding({ code: r.code, name: r.name, shares: 100, cost: r.nav || 1 })}
-          >
-            加入
-          </button>
-        </article>
-      ))}
+            <Tone v={displayValue} className="text-sm font-semibold">
+              {fmtPctShort(displayValue)}
+            </Tone>
+            <button
+              type="button"
+              onClick={() => toggleWatch(r.code)}
+              className={`rounded-full px-2 py-1 text-[10px] font-semibold ${watchlist.includes(r.code) ? "bg-accent text-accent-fg" : "bg-bg-elevated text-muted"}`}
+            >
+              {watchlist.includes(r.code) ? "已关注" : "关注"}
+            </button>
+            <button
+              type="button"
+              disabled={!addable}
+              className="text-[10px] font-semibold text-accent disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => {
+                if (!addable) return;
+                addHolding({ code: r.code, name: r.name, shares: 100, cost: r.nav as number });
+              }}
+            >
+              {addable ? "加入" : "无可靠净值"}
+            </button>
+          </article>
+        );
+      })}
     </div>
   );
 }
