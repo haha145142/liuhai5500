@@ -52,6 +52,15 @@ body { background:
   .home-page .glass-tight, .market-page .glass-tight { border-radius: 18px; }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .glass, .glass-tight, .fund-sector-liquid, .fund-sector-card { transition: none !important; }
+  .glass:hover, .glass-tight:hover, .fund-sector-card:hover { transform: none !important; }
+}
+
+@supports not ((backdrop-filter: blur(1px))) {
+  .app-header-card, .glass, .glass-tight, .fund-sector-liquid, .fund-sector-card, .app-refresh-button { background: rgba(247,251,255,.96) !important; }
+}
+
 @media (prefers-color-scheme: dark) {
   html, body { background: #edf3f9 !important; color: #0f172a !important; }
   .app-shell { background: transparent !important; }
