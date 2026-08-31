@@ -23,6 +23,19 @@ function positiveNumber(value: string | number) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function sameChinaDate(dateText: string | null | undefined, now = new Date()) {
+  if (!dateText) return false;
+  const [y, m, d] = dateText.split(/[-/]/).map(Number);
+  if (![y, m, d].every(Number.isFinite)) return false;
+  const china = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" })
+    .formatToParts(now)
+    .reduce<Record<string, string>>((acc, part) => {
+      if (part.type !== "literal") acc[part.type] = part.value;
+      return acc;
+    }, {});
+  return y === Number(china.year) && m === Number(china.month) && d === Number(china.day);
+}
+
 /**
  * Add-holding preview is deliberately pure and synchronous.
  * It never invents a price: without a usable quote, market value/P&L remain null.
@@ -75,7 +88,7 @@ export function quoteFromFundState(input: {
   }
 
   if (input.nav != null && Number.isFinite(input.nav) && input.nav > 0) {
-    const officialToday = input.officialNavPublished === true;
+    const officialToday = input.officialNavPublished === true && sameChinaDate(input.navDate);
     return {
       price: input.nav,
       pct: input.dayPct ?? null,
