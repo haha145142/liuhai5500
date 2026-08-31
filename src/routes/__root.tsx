@@ -9,6 +9,7 @@ import liquidGlassCss from "../liquid-glass-v4.css?url";
 import finalPolishCss from "../final-polish.css?url";
 import homeLayoutCss from "../home-layout-v5.css?url";
 import lightThemeCss from "../light-theme-v2.css?url";
+import mobilePerformanceCss from "../mobile-performance-v6.css?url";
 
 const APP_NAME = "Fund AI Pro";
 
@@ -32,6 +33,7 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: finalPolishCss },
       { rel: "stylesheet", href: homeLayoutCss },
       { rel: "stylesheet", href: lightThemeCss },
+      { rel: "stylesheet", href: mobilePerformanceCss },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
