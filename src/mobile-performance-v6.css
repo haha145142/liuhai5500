@@ -1,0 +1,38 @@
+/* Fund AI Pro V6: light premium UI without excessive mobile blur cost. */
+@media (max-width: 699px) {
+  .app-header-card,
+  .home-hero,
+  .home-market-strip,
+  .glass,
+  .fund-sector-liquid { backdrop-filter: blur(18px) saturate(155%) !important; -webkit-backdrop-filter: blur(18px) saturate(155%) !important; }
+
+  .glass-tight,
+  .fund-sector-card,
+  .home-index-card,
+  .app-refresh-button { backdrop-filter: blur(12px) saturate(145%) !important; -webkit-backdrop-filter: blur(12px) saturate(145%) !important; }
+
+  .tabbar { backdrop-filter: blur(16px) saturate(155%) !important; -webkit-backdrop-filter: blur(16px) saturate(155%) !important; }
+
+  .glass,
+  .glass-tight,
+  .fund-sector-liquid,
+  .fund-sector-card,
+  .home-index-card { contain: layout paint style; }
+
+  .glass:hover,
+  .glass-tight:hover,
+  .fund-sector-card:hover { transform: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-header-card,
+  .home-hero,
+  .home-market-strip,
+  .glass,
+  .glass-tight,
+  .fund-sector-liquid,
+  .fund-sector-card,
+  .home-index-card,
+  .app-refresh-button,
+  .tabbar { transition: none !important; }
+}
