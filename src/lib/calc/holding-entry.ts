@@ -18,6 +18,20 @@ export type HoldingEntryPreview = {
   quoteMode: HoldingEntryQuote["mode"];
 };
 
+/** Backward-compatible input shape used by older portfolio components. */
+export type HoldingEntryInput = {
+  code: string;
+  shares: number;
+  cost: number;
+};
+
+/** Backward-compatible market quote shape used by older portfolio components. */
+export type HoldingEntryMarket = {
+  price: number | null;
+  pct: number | null;
+  source: "live_estimate" | "official_today" | "latest_official" | "none";
+};
+
 function positiveNumber(value: string | number) {
   const n = typeof value === "number" ? value : Number(value.trim());
   return Number.isFinite(n) && n > 0 ? n : null;
@@ -36,10 +50,6 @@ function sameChinaDate(dateText: string | null | undefined, now = new Date()) {
   return y === Number(china.year) && m === Number(china.month) && d === Number(china.day);
 }
 
-/**
- * Add-holding preview is deliberately pure and synchronous.
- * It never invents a price: without a usable quote, market value/P&L remain null.
- */
 export function previewHoldingEntry(
   sharesInput: string | number,
   costInput: string | number,
@@ -66,6 +76,23 @@ export function previewHoldingEntry(
     quoteLabel: quote?.label ?? (price == null ? "等待可靠净值/估值" : "当前行情"),
     quoteMode: quote?.mode ?? "none",
   };
+}
+
+/** Backward-compatible adapter for the legacy calculation API. */
+export function calculateHoldingEntry(input: HoldingEntryInput, market: HoldingEntryMarket): HoldingEntryPreview {
+  const quote: HoldingEntryQuote = {
+    price: market.price,
+    pct: market.pct,
+    label: market.source === "live_estimate"
+      ? "盘中自算估值"
+      : market.source === "official_today"
+        ? "今日官方净值"
+        : market.source === "latest_official"
+          ? "最近官方净值"
+          : "暂无可靠行情",
+    mode: market.source,
+  };
+  return previewHoldingEntry(input.shares, input.cost, quote);
 }
 
 export function quoteFromFundState(input: {
