@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { FundCard } from "@/components/portfolio/FundCard";
 import { PortfolioInsight } from "@/components/portfolio/PortfolioInsight";
 import { QuickAddFund } from "@/components/portfolio/QuickAddFund";
-import { EmptyNote, Glass, SectionTitle, Tone } from "@/components/ui/Glass";
+import { EmptyNote, Glass, Tone } from "@/components/ui/Glass";
 import { matchFundSector } from "@/lib/data/sectors";
 import { fmtMoney, fmtPctShort } from "@/lib/format";
 import { useApp } from "@/lib/store";
@@ -45,6 +45,7 @@ function PortfolioPage() {
   const week = useMemo(() => calcPortfolioPeriodReturn("week", portfolio, funds), [funds, portfolio]);
   const month = useMemo(() => calcPortfolioPeriodReturn("month", portfolio, funds), [funds, portfolio]);
   const year = useMemo(() => calcPortfolioPeriodReturn("year", portfolio, funds), [funds, portfolio]);
+  const downCount = portfolio.filter((h) => (funds[h.code]?.dayPct ?? 0) < 0).length;
   const selectedSummary = useMemo(() => {
     if (summaryTab === "week") return { label: "本周收益", amount: week.amount, pct: week.pct };
     if (summaryTab === "month") return { label: "本月收益", amount: month.amount, pct: month.pct };
@@ -63,28 +64,36 @@ function PortfolioPage() {
 
   return (
     <div>
-      <Glass className="mb-3 overflow-hidden rounded-[28px] border border-white/75 bg-white/50 p-4 shadow-[0_18px_48px_rgba(38,78,112,.07),inset_0_1px_0_rgba(255,255,255,.95)] backdrop-blur-[20px] saturate-150">
-        <div className="flex items-center justify-between gap-3"><SectionTitle title="💼 我的持仓" hint="盘中估值 · 收盘以官方净值为准" /><span className="shrink-0 rounded-full bg-blue-100/75 px-3 py-1.5 text-xs font-semibold text-blue-600">{portfolio.length}只</span></div>
-        <div className="mt-2 flex items-end justify-between gap-3"><div className="min-w-0"><div className="text-sm text-muted">{selectedSummary.label}</div><Tone v={selectedSummary.amount} className="mt-1 block text-[38px] font-bold leading-none tracking-tight">{selectedSummary.amount == null ? "—" : fmtMoney(selectedSummary.amount)}</Tone><Tone v={selectedSummary.pct} className="mt-2 block text-xl font-semibold">{selectedSummary.pct == null ? "—" : fmtPctShort(selectedSummary.pct)}</Tone></div><div className="shrink-0 text-right text-xs text-muted"><div>{summary.totalCount}张 总持仓</div><div className="mt-1">成本 {fmtMoney(summary.costValue)}</div><div className="mt-1">持仓市值 {fmtMoney(summary.marketValue)}</div></div></div>
-        <div className="mt-4 grid grid-cols-5 gap-1.5 rounded-2xl bg-white/48 p-1 ring-1 ring-white/75">{(["today","week","month","year","since"] as const).map((tab) => { const label = tab === "today" ? "今天" : tab === "week" ? "本周" : tab === "month" ? "本月" : tab === "year" ? "今年" : "买入以来"; return <button key={tab} type="button" onClick={() => setSummaryTab(tab)} className={`rounded-2xl px-2 py-2.5 text-sm font-medium transition ${summaryTab === tab ? "bg-blue-500 text-white shadow-[0_5px_14px_rgba(59,130,246,.22)]" : "bg-white/65 text-muted"}`}>{label}</button>; })}</div>
-        <div className="mt-3 rounded-2xl bg-white/58 px-3 py-3 ring-1 ring-white/70"><div className="flex items-center justify-between gap-3"><span className="text-sm text-muted">今日收益</span><Tone v={summary.todayPnl} className="text-2xl font-bold">{summary.todayPnl == null ? "—" : fmtMoney(summary.todayPnl)}</Tone></div></div>
-        {summary.totalCount > summary.pricedCount ? <div className="mt-2 rounded-xl bg-amber-50/75 px-3 py-2 text-[10px] text-muted">还有 {summary.totalCount - summary.pricedCount} 只基金暂未取得可靠行情；无法确认的数字不猜。</div> : null}
+      <Glass className="mb-3 overflow-hidden rounded-[30px] border border-white/75 bg-white/48 p-4 shadow-[0_18px_48px_rgba(38,78,112,.07),inset_0_1px_0_rgba(255,255,255,.95)] backdrop-blur-[20px] saturate-150">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0"><div className="text-[19px] font-bold tracking-tight text-fg">💼 我的持仓 <span className="ml-1 text-xs font-normal text-muted">盘中估值 · 收盘以官方净值为准</span></div></div>
+          <span className="shrink-0 rounded-full bg-blue-100/75 px-3 py-1.5 text-xs font-semibold text-blue-600">{portfolio.length}只</span>
+        </div>
+
+        <div className="mt-3 flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-sm text-muted">整体盈亏</div><Tone v={selectedSummary.amount} className="mt-1 block text-[39px] font-bold leading-none tracking-tight">{selectedSummary.amount == null ? "—" : fmtMoney(selectedSummary.amount)}</Tone><Tone v={selectedSummary.pct} className="mt-2 block text-[20px] font-semibold">{selectedSummary.pct == null ? "—" : fmtPctShort(selectedSummary.pct)}</Tone></div><div className="shrink-0 pt-5 text-right text-xs leading-relaxed text-muted"><div>{portfolio.length}张 {portfolio.length === 1 ? `${downCount}跌` : "总持仓"}</div><div>成本 {fmtMoney(summary.costValue)}</div><div>持仓市值 {fmtMoney(summary.marketValue)}</div></div></div>
+
+        <div className="mt-4 grid grid-cols-5 gap-1.5 rounded-2xl bg-white/48 p-1 ring-1 ring-white/75">{(["today","week","month","year","since"] as const).map((tab) => { const label = tab === "today" ? "今天" : tab === "week" ? "本周" : tab === "month" ? "本月" : tab === "year" ? "今年" : "买入以来"; return <button key={tab} type="button" onClick={() => setSummaryTab(tab)} className={`rounded-2xl px-1.5 py-2.5 text-[13px] font-medium transition ${summaryTab === tab ? "bg-blue-500 text-white shadow-[0_5px_14px_rgba(59,130,246,.22)]" : "bg-white/66 text-muted"}`}>{label}</button>; })}</div>
+        <div className="mt-3 rounded-2xl bg-white/54 px-3 py-2.5 ring-1 ring-white/70"><div className="flex items-center justify-between gap-3"><span className="text-sm text-muted">{selectedSummary.label}</span><Tone v={selectedSummary.amount} className="text-[22px] font-bold">{selectedSummary.amount == null ? "—" : fmtMoney(selectedSummary.amount)}</Tone></div></div>
+        {summary.totalCount > summary.pricedCount ? <div className="mt-2 rounded-xl bg-amber-50/70 px-3 py-2 text-[10px] text-muted">还有 {summary.totalCount - summary.pricedCount} 只基金暂未取得可靠行情；无法确认的数字不猜。</div> : null}
+
+        <div className="mt-3 space-y-3">
+          {portfolio.length ? portfolio.map((h) => { const fname = funds[h.code]?.name || h.name; const rule = matchFundSector(fname); const sector = rule ? snapshot?.sectors.find((s) => s.id === rule.id) : undefined; return <FundCard key={h.code} holding={h} fund={funds[h.code]} sector={sector} benchPct={bench} totalMarketValue={summary.marketValue} onUpdate={(patch) => updateHolding(h.code, patch)} onRemove={() => removeHolding(h.code)} />; }) : <EmptyNote>还没有持仓。添加基金后会自动拉取官方净值、盘中估值和历史指标。</EmptyNote>}
+        </div>
+
+        <QuickAddFund />
       </Glass>
 
-      {portfolio.length ? portfolio.map((h) => { const fname = funds[h.code]?.name || h.name; const rule = matchFundSector(fname); const sector = rule ? snapshot?.sectors.find((s) => s.id === rule.id) : undefined; return <FundCard key={h.code} holding={h} fund={funds[h.code]} sector={sector} benchPct={bench} onUpdate={(patch) => updateHolding(h.code, patch)} onRemove={() => removeHolding(h.code)} />; }) : <Glass><EmptyNote>还没有持仓。添加基金后会自动拉取官方净值、盘中估值和历史指标。</EmptyNote></Glass>}
-
-      <QuickAddFund />
       <PortfolioInsight holdings={portfolio} funds={Object.values(funds)} sectors={snapshot?.sectors || []} />
 
       <Glass>
-        <SectionTitle title="收益日历" hint={`${calendarCursor.getFullYear()}/${String(calendarCursor.getMonth() + 1).padStart(2, "0")}`} />
+        <div className="mb-3 flex items-center justify-between"><div className="text-base font-semibold text-fg">收益日历</div><span className="text-xs text-muted">{calendarCursor.getFullYear()}/{String(calendarCursor.getMonth() + 1).padStart(2, "0")}</span></div>
         <div className="flex items-center justify-between rounded-2xl bg-bg-elevated px-3 py-2"><button type="button" onClick={() => setCalendarCursor(new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1))} className="size-9 rounded-full bg-white/70 text-lg">‹</button><b>{calendarCursor.getFullYear()}年{calendarCursor.getMonth() + 1}月</b><button type="button" onClick={() => setCalendarCursor(new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 1))} className="size-9 rounded-full bg-white/70 text-lg">›</button></div>
         <div className="mt-2 grid grid-cols-7 gap-1 text-center text-[10px] text-muted">{["日","一","二","三","四","五","六"].map((d) => <div key={d} className="py-1">{d}</div>)}{calendar.map((c) => <CalendarCell key={c.key} date={c.date} inMonth={c.inMonth} portfolio={portfolio} funds={funds} />)}</div>
         <p className="mt-2 text-[10px] text-muted">历史日期只使用官方净值回算。</p>
       </Glass>
 
       <Glass>
-        <SectionTitle title="止盈 / 止损提醒" hint="本地阈值 · 触发不离场" />
+        <div className="mb-3 flex items-center justify-between"><div className="text-base font-semibold text-fg">止盈 / 止损提醒</div><span className="text-xs text-muted">本地阈值 · 触发不离场</span></div>
         <div className="grid grid-cols-3 gap-2"><input value={alertCode} onChange={(e) => setAlertCode(e.target.value)} placeholder="基金代码" inputMode="numeric" className="h-11 rounded-2xl bg-bg-elevated px-3 text-sm ring-1 ring-border" /><select value={alertKind} onChange={(e) => setAlertKind(e.target.value as AlertRule["kind"])} className="h-11 rounded-2xl bg-bg-elevated px-3 text-sm ring-1 ring-border"><option>止盈</option><option>止损</option></select><input value={alertPct} onChange={(e) => setAlertPct(e.target.value)} placeholder="收益率 %" inputMode="decimal" className="h-11 rounded-2xl bg-bg-elevated px-3 text-sm ring-1 ring-border" /></div>
         <button type="button" onClick={addAlert} className="mt-2 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-fg">添加提醒</button>
         {alerts.length ? <div className="mt-3 space-y-2">{alerts.map((a) => { const h = portfolio.find((x) => x.code === a.code); const f = funds[a.code]; const ret = h ? calcHoldingReturn(h, f) : null; const gain = ret?.holdingPnlPct ?? null; const triggered = gain != null && (a.kind === "止盈" ? gain >= a.targetPct : gain <= -a.targetPct); return <div key={`${a.code}-${a.kind}`} className="flex items-center justify-between rounded-2xl bg-bg-elevated p-3 text-xs"><span>{a.code} · {a.kind} {a.targetPct}%</span><span className={triggered ? "font-semibold text-up" : "text-muted"}>{gain == null ? "等待净值" : triggered ? "已触发" : `当前 ${fmtPctShort(gain)}`}</span></div>; })}</div> : <EmptyNote>暂无提醒。</EmptyNote>}
