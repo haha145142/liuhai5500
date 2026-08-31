@@ -1,4 +1,3 @@
-import { createServerFn } from "@tanstack/react-start";
 import { getCalculatedFund } from "./live-valuation";
 import { FUND_SECTORS, DEFAULT_FUND_SECTOR_IDS } from "./fund-sectors";
 import { fetchText, n, parseMaybeJsonp } from "./fetch-util";
@@ -11,7 +10,6 @@ const TT="https://fundcomapi.tiantianfunds.com/mm/newCore/FundValuationLast";
 const FIELDS="FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE";
 const CACHE_TTL=20_000;
 let cache:{key:string;ts:number;data:FundSectorQuote[]}|null=null;
-function isClosed(){return isExchangeClosed();}
 function chunk<T>(arr:T[],size:number){const out:T[][]=[];for(let i=0;i<arr.length;i+=size)out.push(arr.slice(i,i+size));return out;}
 function pct(v:unknown){const x=n(v);return x!=null&&Number.isFinite(x)&&Math.abs(x)<=30?x:null;}
 function parseRows(payload:unknown){const j=parseMaybeJsonp(String(payload??"")) as any;const rows=j?.Data||j?.data||j?.Datas||j?.data?.list||[];return Array.isArray(rows)?rows:rows&&typeof rows==="object"?Object.values(rows) as Record<string,unknown>[]:[];}
@@ -31,10 +29,10 @@ function mergeQuote(primary:ReturnType<typeof pick>|null,secondary:ReturnType<ty
 }
 async function getOwnQuotes(codes:string[]){const out=new Map<string,Awaited<ReturnType<typeof getCalculatedFund>>>();const queue=codes.slice();const workers=Array.from({length:Math.min(4,Math.max(1,queue.length))},async()=>{while(queue.length){const code=queue.shift();if(!code)return;try{out.set(code,await getCalculatedFund({data:{code}}));}catch{out.set(code,null as any);}}});await Promise.all(workers);return out;}
 export const getFundSectorQuotes=createServerFn({method:"POST"}).validator((input:{ids?:string[]})=>input).handler(async({data}):Promise<{rows:FundSectorQuote[];fetchedAt:number;weekend:boolean}>=>{
- const ids=(data.ids?.length?data.ids:DEFAULT_FUND_SECTOR_IDS).filter(id=>FUND_SECTORS.some(s=>s.id===id));const key=ids.join(",");const weekend=isClosed();const ttl=weekend?24*60*60*1000:CACHE_TTL;if(cache&&cache.key===key&&Date.now()-cache.ts<ttl)return{rows:cache.data,fetchedAt:cache.ts,weekend};
+ const ids=(data.ids?.length?data.ids:DEFAULT_FUND_SECTOR_IDS).filter(id=>FUND_SECTORS.some(s=>s.id===id));const key=ids.join(",");const closed=isExchangeClosed();const ttl=closed?24*60*60*1000:CACHE_TTL;if(cache&&cache.key===key&&Date.now()-cache.ts<ttl)return{rows:cache.data,fetchedAt:cache.ts,weekend:closed};
  const sectors=FUND_SECTORS.filter(s=>ids.includes(s.id));const unique=new Map<string,{code:string;name:string}>();for(const sector of sectors)for(const fund of sector.funds)unique.set(fund.code,fund);const codes=[...unique.keys()];
  const [ownMap,providerPairs]=await Promise.all([getOwnQuotes(codes),Promise.all(chunk(codes,40).map(async batch=>({east:await fetchProvider(EM,batch),tt:await fetchProvider(TT,batch)})))]);
  const eastMap=new Map<string,ReturnType<typeof pick>>();const ttMap=new Map<string,ReturnType<typeof pick>>();for(const pair of providerPairs){for(const row of pair.east){const q=pick(row);if(q.code)eastMap.set(q.code,q);}for(const row of pair.tt){const q=pick(row);if(q.code)ttMap.set(q.code,q);}}
  const rows=sectors.map((sector):FundSectorQuote=>{const funds=sector.funds.map(f=>mergeQuote(eastMap.get(f.code)??null,ttMap.get(f.code)??null,ownMap.get(f.code)??null,f.code,f.name));const valid=funds.filter(f=>f.pct!=null);const up=valid.filter(f=>(f.pct as number)>0).length;const down=valid.filter(f=>(f.pct as number)<0).length;const flat=valid.length-up-down;const avg=valid.length?valid.reduce((sum,f)=>sum+(f.pct as number),0)/valid.length:null;const sorted=valid.slice().sort((a,b)=>(b.pct as number)-(a.pct as number));const cross=valid.filter(f=>f.validation==="cross_checked").length;const validation:FundSectorQuote["validation"]=!valid.length?"unavailable":cross>=Math.max(1,Math.ceil(valid.length*0.6))?"cross_checked":"single_source";const dates=valid.map(f=>f.date).filter((v):v is string=>!!v);return{id:sector.id,name:sector.name,icon:sector.icon,pct:avg,up,down,flat,validCount:valid.length,totalCount:sector.funds.length,leader:sorted[0]??null,weakest:sorted.at(-1)??null,funds,marketDate:dates.sort().at(-1)??null,validation,source:validation==="cross_checked"?"自算估值 + 多源交叉验证":validation==="single_source"?"当前/最近有效数据":"暂无可靠数据"};});
- if(rows.some(r=>r.validCount>0))cache={key,ts:Date.now(),data:rows};return{rows,fetchedAt:Date.now(),weekend};
+ if(rows.some(r=>r.validCount>0))cache={key,ts:Date.now(),data:rows};return{rows,fetchedAt:Date.now(),weekend:closed};
 });
