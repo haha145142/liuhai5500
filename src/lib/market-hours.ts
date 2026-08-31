@@ -4,8 +4,7 @@ import { isAshareTradingDay } from "./data/trading-day";
 export type MarketPhase = "preopen" | "morning" | "lunch" | "afternoon" | "postclose" | "weekend";
 
 export function isWeekend(d = new Date()): boolean {
-  const day = cnTime(d).getUTCDay();
-  return day === 0 || day === 6;
+  return !isAshareTradingDay(d);
 }
 
 /**
