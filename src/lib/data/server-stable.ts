@@ -75,10 +75,7 @@ async function fetchFlow(): Promise<{ flow: MarketOrder | null; source: DataSour
     const validated = internalDelta <= tolerance;
     const balanced = balanceDelta <= balanceTolerance;
     const validation = validated && balanced ? "fully_consistent" : (validated || balanced ? "partially_consistent" : "unreliable");
-    return {
-      flow: { main, super: superFlow, large, mid, small, count: arr.length, validation, internalDelta, balanceDelta, note: validation === "fully_consistent" ? "主力=超大单+大单，且分项余额一致" : validation === "partially_consistent" ? "资金分项存在轻微偏差，保留并标记" : "资金分项内部校验未通过，属于低可信数据" },
-      source: source("资金", validation !== "unreliable", `东方财富全A ${arr.length} 只；内部校验：${validation}`)
-    };
+    return { flow: { main, super: superFlow, large, mid, small, count: arr.length, validation, internalDelta, balanceDelta, note: validation === "fully_consistent" ? "主力=超大单+大单，且分项余额一致" : validation === "partially_consistent" ? "资金分项存在轻微偏差，保留并标记" : "资金分项内部校验未通过，属于低可信数据" }, source: source("资金", validation !== "unreliable", `东方财富全A ${arr.length} 只；内部校验：${validation}`) };
   } catch { return { flow: null, source: source("资金", false, "数据源暂不可用") }; }
 }
 
@@ -92,11 +89,16 @@ async function fetchGlobal(): Promise<{ list: GlobalQuote[]; source: DataSource 
 }
 
 export const getSnapshot = createServerFn({ method: "GET" }).handler(async (): Promise<Snapshot> => {
-  const weekend = isWeekend(); const ttl = weekend ? 7 * 86400000 : 20000; const hit = cache<Snapshot>("snap", ttl, null); if (hit) return hit;
+  const weekend = isWeekend();
+  const cacheDate = weekend ? tradingDateLabel() : chinaTodayLabel();
+  const cacheKey = `snap:${weekend ? "closed" : "trade"}:${cacheDate}`;
+  const ttl = weekend ? 7 * 86400000 : 20000;
+  const hit = cache<Snapshot>(cacheKey, ttl, null);
+  if (hit) return hit;
   const [idx, bk, fl, gl] = await Promise.all([fetchIndices(), fetchBoards(), fetchFlow(), fetchGlobal()]);
   const usable = idx.list.some(x => x.pct != null) || bk.sectors.some(x => x.change != null) || !!fl.flow;
-  const marketDate = weekend ? tradingDateLabel() : chinaTodayLabel();
-  return cache("snap", ttl, { indices: idx.list, sectors: bk.sectors, boards: bk.boards.slice(0, 40), flow: fl.flow, global: gl.list, sources: [idx.source, bk.source, fl.source, gl.source], fetchedAt: Date.now(), marketDate, validation: weekend ? "cached_latest_trading_day" : (idx.validation || (usable ? "single_source" : "cached_latest_trading_day")) })!;
+  const marketDate = cacheDate;
+  return cache(cacheKey, ttl, { indices: idx.list, sectors: bk.sectors, boards: bk.boards.slice(0, 40), flow: fl.flow, global: gl.list, sources: [idx.source, bk.source, fl.source, gl.source], fetchedAt: Date.now(), marketDate, validation: weekend ? "cached_latest_trading_day" : (idx.validation || (usable ? "single_source" : "cached_latest_trading_day")) })!;
 });
 
 function makeId(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return String(h); }
