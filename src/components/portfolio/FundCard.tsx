@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { SwingPlan } from "@/components/portfolio/SwingPlan";
 import { ValuationTrustRow } from "@/components/valuation/ValuationTrustRow";
 import { DataStatus, Tone } from "@/components/ui/Glass";
 import { calcSixFactor } from "@/lib/calc/six-factor";
+import { calcHoldingReturn } from "@/lib/calc/portfolio-returns";
 import { calcSwingTrade } from "@/lib/calc/indicators";
 import { synthesizeSwing } from "@/lib/calc/swing-synthesis";
 import { matchFundSector } from "@/lib/data/sectors";
@@ -15,12 +16,6 @@ function safeFixed(value: number | null | undefined, digits: number, suffix = ""
   return value == null || !Number.isFinite(value) ? "—" : `${value.toFixed(digits)}${suffix}`;
 }
 
-function periodReturn(fund: FundQuote | undefined, tradingDays: number, current: number | null) {
-  if (!fund || current == null || fund.history.length <= tradingDays) return null;
-  const base = fund.history[fund.history.length - 1 - tradingDays];
-  return base ? ((current - base) / base) * 100 : null;
-}
-
 export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }: {
   holding: Holding; fund?: FundQuote; sector?: SectorQuote; benchPct: number | null; onRemove: () => void; onUpdate: (patch: Partial<Holding>) => void;
 }) {
@@ -29,18 +24,18 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
   const [shares, setShares] = useState(String(holding.shares));
   const [cost, setCost] = useState(String(holding.cost));
   const quote = selectFundDisplayQuote(fund);
-  const px = quote.price;
-  const day = quote.pct;
-  const value = px != null ? px * holding.shares : null;
-  const costVal = holding.cost * holding.shares;
-  const pnl = value != null ? value - costVal : null;
-  const pnlPct = value != null && costVal ? (pnl! / costVal) * 100 : null;
+  const returnData = calcHoldingReturn(holding, fund);
+  const px = returnData.price;
+  const day = fund?.dayPct ?? null;
+  const value = returnData.marketValue;
+  const costVal = returnData.costValue;
+  const pnl = returnData.holdingPnl;
+  const pnlPct = returnData.holdingPnlPct;
   const mapped = matchFundSector(fund?.name || holding.name || holding.code);
   const six = sector && sector.available ? calcSixFactor(sector, benchPct) : null;
   const swing = calcSwingTrade(fund?.metrics ?? null, holding.cost, px);
   const synthesis = synthesizeSwing(fund?.metrics ?? null, sector ?? null);
   const estimateGap = fund?.estimate != null && fund.nav ? ((fund.estimate - fund.nav) / fund.nav) * 100 : null;
-  const periods = useMemo(() => [["1周", 5], ["1月", 20], ["3月", 60], ["6月", 120], ["1年", 250]] as const, []);
   const saveEdit = () => { const s = Number(shares); const c = Number(cost); if (s > 0 && c > 0) { onUpdate({ shares: s, cost: c }); setEditing(false); } };
   const quoteStatusMode = quote.mode === "live_estimate" ? "live" : quote.mode === "official_today" ? "official" : quote.mode === "latest_official" ? "latest" : "unavailable";
   const quoteStatusDetail = quote.mode === "live_estimate" ? quote.label : quote.mode === "official_today" ? quote.dataDate || undefined : quote.mode === "latest_official" ? quote.dataDate || undefined : quote.reason;
@@ -69,40 +64,18 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
 
       <div className="mt-3 rounded-[20px] border border-white/55 bg-white/45 p-3 shadow-sm backdrop-blur-[6px]">
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <div className="text-[10px] text-muted">持有份额</div>
-            <div className="mt-1 text-[20px] font-bold tabular-nums">{holding.shares}</div>
-          </div>
-          <div className="text-right">
-            <div className="text-[10px] text-muted">持仓成本</div>
-            <div className="mt-1 text-[20px] font-bold tabular-nums">{fmtMoney(costVal)}</div>
-          </div>
+          <div><div className="text-[10px] text-muted">持有份额</div><div className="mt-1 text-[20px] font-bold tabular-nums">{holding.shares}</div></div>
+          <div className="text-right"><div className="text-[10px] text-muted">持仓成本</div><div className="mt-1 text-[20px] font-bold tabular-nums">{fmtMoney(costVal)}</div></div>
         </div>
-
         <div className="mt-3 grid grid-cols-2 gap-2">
           <Metric label="成本价" value={fmtPrice(holding.cost, 4)} />
           <Metric label={quote.mode === "live_estimate" ? "盘中估值" : quote.mode === "official_today" ? "今日官方净值" : quote.mode === "latest_official" ? "最近官方净值" : "当前价格"} value={fmtPrice(px, 4)} />
           <Metric label="当前市值" value={fmtMoney(value)} />
           <Metric label="真实持有收益" value={fmtMoney(pnl)} tone={pnl} />
         </div>
-
-        <div className="mt-2 rounded-xl bg-bg-elevated/75 px-2.5 py-2 text-[10px] text-muted">
-          {fund?.nav != null ? `官方 ${fmtPrice(fund.nav, 4)} · ${fund.navDate || "日期未知"}` : "官方净值暂无"}
-          {fund?.estimate != null ? ` · 自算 ${fmtPrice(fund.estimate, 4)}${fund.estimateTime ? ` · ${fund.estimateTime}` : ""}` : ""}
-        </div>
-
+        <div className="mt-2 rounded-xl bg-bg-elevated/75 px-2.5 py-2 text-[10px] text-muted">{fund?.nav != null ? `官方 ${fmtPrice(fund.nav, 4)} · ${fund.navDate || "日期未知"}` : "官方净值暂无"}{fund?.estimate != null ? ` · 自算 ${fmtPrice(fund.estimate, 4)}${fund.estimateTime ? ` · ${fund.estimateTime}` : ""}` : ""}</div>
         {!fund?.nav && !fund?.estimate ? <div className="mt-2 rounded-xl border border-dashed border-white/70 bg-white/35 px-2.5 py-2 text-[10px] leading-relaxed text-muted">本地持仓数据已保存：{holding.shares} 份 × {fmtPrice(holding.cost, 4)} = {fmtMoney(costVal)}。当前净值/估值尚未取得，所以不虚构“赚了多少”；联网恢复后自动补齐市值、盈亏和波段状态。</div> : null}
-
-        {valuationSummary ? (
-          <div className="mt-2">
-            <ValuationTrustRow summary={{
-              modeLabel: valuationSummary.mode,
-              coverageLabel: valuationSummary.coverage,
-              validationLabel: valuationSummary.validation,
-              historyLabel: valuationSummary.history,
-            }} />
-          </div>
-        ) : null}
+        {valuationSummary ? <div className="mt-2"><ValuationTrustRow summary={{ modeLabel: valuationSummary.mode, coverageLabel: valuationSummary.coverage, validationLabel: valuationSummary.validation, historyLabel: valuationSummary.history }} /></div> : null}
         {estimateAudit ? <div className="mt-2 text-[10px] text-subtle">估值审计 · {estimateAudit}</div> : null}
         {estimateGap != null ? <div className="mt-1 text-[10px] text-subtle">估值相对最近官方净值 <Tone v={estimateGap}>{fmtPctShort(estimateGap)}</Tone></div> : null}
       </div>
@@ -110,75 +83,21 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
       <div className="mt-3 grid grid-cols-3 gap-2">
         <Metric label="持有收益" value={fmtMoney(pnl)} tone={pnl} />
         <Metric label="收益率" value={fmtPctShort(pnlPct)} tone={pnlPct} />
-        <Metric label="今日" value={fmtMoney(value != null && day != null ? value * day / 100 : null)} tone={day} />
+        <Metric label="今日" value={fmtMoney(returnData.todayPnl)} tone={returnData.todayPnl} />
       </div>
 
-      {synthesis ? (
-        <div className="mt-3 rounded-[20px] bg-bg-elevated p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[10px] text-subtle">综合波段</div>
-              <div className="mt-0.5 flex items-baseline gap-2"><b className="text-[20px]">{synthesis.score}</b><span className="text-xs font-semibold text-fg">{synthesis.level}</span></div>
-            </div>
-            <div className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${signalTone === "up" ? "bg-red-500/10 text-up" : signalTone === "down" ? "bg-emerald-500/10 text-down" : "bg-slate-500/10 text-muted"}`}>{synthesis.confidence}置信</div>
-          </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200/80"><div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${Math.max(0, Math.min(100, synthesis.score))}%` }} /></div>
-          <div className="mt-2 grid grid-cols-3 gap-2 text-center text-[10px] text-muted">
-            <Metric label="方向" value={`${synthesis.level} · ${synthesis.trend}`} />
-            <Metric label="位置" value={synthesis.position} />
-            <Metric label="主题" value={sector?.change != null ? fmtPctShort(sector.change) : "未验证"} />
-          </div>
-        </div>
-      ) : (
-        <div className="mt-3 rounded-[20px] border border-dashed border-white/70 bg-white/35 p-3">
-          <div className="text-[10px] text-subtle">最近波段状态</div>
-          <div className="mt-1 text-sm font-semibold text-fg">等待可靠行情数据</div>
-          <div className="mt-1 text-[10px] text-muted">没有历史行情或技术指标时，不把“强 / 弱”猜出来。</div>
-        </div>
-      )}
+      {synthesis ? <div className="mt-3 rounded-[20px] bg-bg-elevated p-3"><div className="flex items-center justify-between gap-3"><div><div className="text-[10px] text-subtle">综合波段</div><div className="mt-0.5 flex items-baseline gap-2"><b className="text-[20px]">{synthesis.score}</b><span className="text-xs font-semibold text-fg">{synthesis.level}</span></div></div><div className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${signalTone === "up" ? "bg-red-500/10 text-up" : signalTone === "down" ? "bg-emerald-500/10 text-down" : "bg-slate-500/10 text-muted"}`}>{synthesis.confidence}置信</div></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200/80"><div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${Math.max(0, Math.min(100, synthesis.score))}%` }} /></div><div className="mt-2 grid grid-cols-3 gap-2 text-center text-[10px] text-muted"><Metric label="方向" value={`${synthesis.level} · ${synthesis.trend}`} /><Metric label="位置" value={synthesis.position} /><Metric label="主题" value={sector?.change != null ? fmtPctShort(sector.change) : "未验证"} /></div></div> : <div className="mt-3 rounded-[20px] border border-dashed border-white/70 bg-white/35 p-3"><div className="text-[10px] text-subtle">最近波段状态</div><div className="mt-1 text-sm font-semibold text-fg">等待可靠行情数据</div><div className="mt-1 text-[10px] text-muted">没有历史行情或技术指标时，不把“强 / 弱”猜出来。</div></div>}
 
-      {fund?.metrics ? (
-        <div className="mt-3 flex items-center justify-between rounded-2xl bg-bg-elevated px-3 py-2.5">
-          <div><div className="text-[10px] text-subtle">技术状态</div><div className="mt-0.5 text-sm font-semibold">{fund.metrics.band} · {fund.metrics.trend}</div></div>
-          <div className="text-right"><div className="text-[10px] text-subtle">RSI</div><div className="text-sm font-semibold tabular-nums">{safeFixed(fund.metrics.rsi, 1)}</div></div>
-          <div className="text-right"><div className="text-[10px] text-subtle">波段</div><div className="text-sm font-semibold tabular-nums text-accent">{fund.metrics.bandScore == null || !Number.isFinite(fund.metrics.bandScore) ? "—" : fund.metrics.bandScore}</div></div>
-        </div>
-      ) : null}
+      {fund?.metrics ? <div className="mt-3 flex items-center justify-between rounded-2xl bg-bg-elevated px-3 py-2.5"><div><div className="text-[10px] text-subtle">技术状态</div><div className="mt-0.5 text-sm font-semibold">{fund.metrics.band} · {fund.metrics.trend}</div></div><div className="text-right"><div className="text-[10px] text-subtle">RSI</div><div className="text-sm font-semibold tabular-nums">{safeFixed(fund.metrics.rsi, 1)}</div></div><div className="text-right"><div className="text-[10px] text-subtle">波段</div><div className="text-sm font-semibold tabular-nums text-accent">{fund.metrics.bandScore == null || !Number.isFinite(fund.metrics.bandScore) ? "—" : fund.metrics.bandScore}</div></div></div> : null}
 
-      <button type="button" className="mt-3 flex w-full items-center justify-between rounded-2xl bg-bg-elevated px-3 py-2.5 text-left text-xs font-semibold text-fg" onClick={() => setOpen((v) => !v)}>
-        <span>{open ? "收起详细依据" : "查看详细依据"}</span>
-        <span className="text-subtle">{open ? "收起" : "展开"}</span>
-      </button>
+      <button type="button" className="mt-3 flex w-full items-center justify-between rounded-2xl bg-bg-elevated px-3 py-2.5 text-left text-xs font-semibold text-fg" onClick={() => setOpen((v) => !v)}><span>{open ? "收起详细依据" : "查看详细依据"}</span><span className="text-subtle">{open ? "收起" : "展开"}</span></button>
 
-      {open ? (
-        <div className="mt-2 space-y-2 rounded-2xl bg-white/40 p-3 text-[11px] leading-relaxed text-muted">
-          <p><b className="text-fg">综合判断：</b>{fund?.metrics?.combo || "暂无可靠波段结论"}</p>
-          {swing ? <p><b className="text-fg">波段建议：</b>{swing.reason} · 环境 {swing.envLevel}</p> : null}
-          {fund?.metrics ? <p>MACD {safeFixed(fund.metrics.macd, 4)} · BIAS {safeFixed(fund.metrics.bias, 2, "%")} · DIF {safeFixed(fund.metrics.dif, 4)} · DEA {safeFixed(fund.metrics.dea, 4)}</p> : null}
-          {fund?.metrics?.sigConds.length ? <p>触发条件：{fund.metrics.sigConds.join(" · ")}</p> : null}
-          {synthesis?.support.length ? <p><b className="text-fg">支持：</b>{synthesis.support.join(" · ")}</p> : null}
-          {synthesis?.risks.length ? <p><b className="text-fg">风险：</b>{synthesis.risks.join(" · ")}</p> : null}
-          <div className="text-[10px] text-subtle">{synthesis?.basis || six?.basis || "暂无额外验证依据"}</div>
-        </div>
-      ) : null}
+      {open ? <div className="mt-2 space-y-2 rounded-2xl bg-white/40 p-3 text-[11px] leading-relaxed text-muted"><p><b className="text-fg">综合判断：</b>{fund?.metrics?.combo || "暂无可靠波段结论"}</p>{swing ? <p><b className="text-fg">波段建议：</b>{swing.reason} · 环境 {swing.envLevel}</p> : null}{fund?.metrics ? <p>MACD {safeFixed(fund.metrics.macd, 4)} · BIAS {safeFixed(fund.metrics.bias, 2, "%")} · DIF {safeFixed(fund.metrics.dif, 4)} · DEA {safeFixed(fund.metrics.dea, 4)}</p> : null}{fund?.metrics?.sigConds.length ? <p>触发条件：{fund.metrics.sigConds.join(" · ")}</p> : null}{synthesis?.support.length ? <p><b className="text-fg">支持：</b>{synthesis.support.join(" · ")}</p> : null}{synthesis?.risks.length ? <p><b className="text-fg">风险：</b>{synthesis.risks.join(" · ")}</p> : null}<div className="text-[10px] text-subtle">{synthesis?.basis || six?.basis || "暂无额外验证依据"}</div></div> : null}
 
       <SwingPlan holding={holding} fund={fund} price={px} officialToday={quote.mode === "official_today"} />
-
       {mapped ? <div className="mt-3 rounded-2xl bg-accent/8 p-3 text-[11px] text-muted"><b className="text-fg">映射板块：{mapped.name}</b>{sector?.change != null ? <span> · 今日 <Tone v={sector.change}>{fmtPctShort(sector.change)}</Tone></span> : " · 板块行情暂无"}{six ? <div className="mt-1">组合判断：{six.advice} · 置信 {six.confidence}% · {six.basis}</div> : null}</div> : null}
 
-      {editing ? (
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <input value={shares} onChange={(e) => setShares(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-bg-elevated px-3 text-sm ring-1 ring-border" placeholder="份额" />
-          <input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-bg-elevated px-3 text-sm ring-1 ring-border" placeholder="成本价" />
-          <button type="button" onClick={saveEdit} className="rounded-xl bg-accent py-2 text-sm font-semibold text-accent-fg">保存修改</button>
-          <button type="button" onClick={() => setEditing(false)} className="rounded-xl bg-bg-elevated py-2 text-sm font-semibold">取消</button>
-        </div>
-      ) : (
-        <div className="mt-3 flex gap-2">
-          <button type="button" onClick={() => setEditing(true)} className="flex-1 rounded-xl bg-bg-elevated py-2 text-sm">编辑持仓</button>
-          <button type="button" onClick={onRemove} className="flex-1 rounded-xl bg-bg-elevated py-2 text-sm text-up">删除</button>
-        </div>
-      )}
+      {editing ? <div className="mt-3 grid grid-cols-2 gap-2"><input value={shares} onChange={(e) => setShares(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-bg-elevated px-3 text-sm ring-1 ring-border" placeholder="份额" /><input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-bg-elevated px-3 text-sm ring-1 ring-border" placeholder="成本价" /><button type="button" onClick={saveEdit} className="rounded-xl bg-accent py-2 text-sm font-semibold text-accent-fg">保存修改</button><button type="button" onClick={() => setEditing(false)} className="rounded-xl bg-bg-elevated py-2 text-sm font-semibold">取消</button></div> : <div className="mt-3 flex gap-2"><button type="button" onClick={() => setEditing(true)} className="flex-1 rounded-xl bg-bg-elevated py-2 text-sm">编辑持仓</button><button type="button" onClick={onRemove} className="flex-1 rounded-xl bg-bg-elevated py-2 text-sm text-up">删除</button></div>}
     </article>
   );
 }
