@@ -4,7 +4,7 @@ import { getMultiSourceQuote, type MultiSourceQuote } from "./multi-source-quote
 import { tradingDateLabel } from "./trading-day";
 import type { FundQuote } from "../types";
 
-type LiveHolding = NonNullable<Awaited<ReturnType<typeof getCalculatedFund>>>["liveHoldings"] extends Array<infer T> ? T : never;
+type LiveHolding = { code: string; name: string; weight: number; price?: number | null; pct?: number | null; source?: string; quoteStatus?: string };
 type AuditStats = { three:number; two:number; single:number; disputed:number; unavailable:number; usableWeight:number; weightedHealth:number; weightedAgreement:number };
 function canUse(q:MultiSourceQuote){return q.pct!=null&&["three_source","two_source","single_source"].includes(q.agreement);}
 function healthScore(q:MultiSourceQuote){return q.health.length?q.health.reduce((s,h)=>s+h.score,0)/q.health.length:0;}
@@ -18,7 +18,7 @@ export const getValidatedFund=createServerFn({method:"POST"}).validator((input:{
   const normalizedBase: FundQuote = isCurrentOfficial
     ? { ...base, officialNavPublished: true, valuationStatus: "official_nav", estimate: null, estimatePct: null, estimateTime: null, estimateConfidence: "high" }
     : { ...base, officialNavPublished: false, valuationStatus: base.estimate != null ? base.valuationStatus : (base.nav != null ? "waiting_official_nav" : "unavailable") };
-  const holdings=(normalizedBase as FundQuote&{liveHoldings?:LiveHolding[]}).liveHoldings||[];
+  const holdings: LiveHolding[] = ((normalizedBase as FundQuote & { liveHoldings?: LiveHolding[] }).liveHoldings || []);
   if(isCurrentOfficial||!holdings.length||normalizedBase.nav==null)return normalizedBase;
   const validated=await Promise.all(holdings.map(async holding=>({holding,quote:await getMultiSourceQuote(holding.code)})));
   const usable=validated.filter(x=>x.holding.weight>0&&canUse(x.quote));
