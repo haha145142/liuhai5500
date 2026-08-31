@@ -116,7 +116,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (phase === "preopen" || phase === "weekend") {
       const latest = tradingDateLabel();
       const cacheKey = `${phase}:${latest}`;
-      if (cached?.marketDate === latest && usableIndices(cached.indices) > 0) {
+      if (cached?.marketDate === latest && usableIndices(cached.indices) > 0 && usableSectors(cached.sectors) > 0) {
         set({ snapshot: { ...cached, validation: "cached_latest_trading_day" as const }, loading: false, lastError: null });
         return;
       }
@@ -127,18 +127,30 @@ export const useApp = create<AppState>((set, get) => ({
       set({ loading: true, lastError: null });
       try {
         lastWeekendSnapshotKey = cacheKey;
-        const fallback = await getLatestTradingMarketData();
+        const [fallback, recent] = await Promise.allSettled([
+          getLatestTradingMarketData(),
+          getSnapshot(),
+        ]);
+        const fallbackData = fallback.status === "fulfilled" ? fallback.value : null;
+        const recentSnapshot = recent.status === "fulfilled" ? recent.value : null;
         const base = cached || { indices: [], sectors: [], boards: [], flow: null, global: [], sources: [], fetchedAt: Date.now() };
-        const snapshot: Snapshot = {
+        const historical: Snapshot = {
           ...base,
-          indices: fallback.indices.length ? fallback.indices : base.indices,
-          sectors: fallback.sectors.length ? fallback.sectors : base.sectors,
-          marketDate: fallback.marketDate || latest,
+          indices: fallbackData?.indices?.length ? fallbackData.indices : base.indices,
+          sectors: fallbackData?.sectors?.length ? fallbackData.sectors : base.sectors,
+          marketDate: fallbackData?.marketDate || latest,
           validation: "cached_latest_trading_day",
           fetchedAt: Date.now(),
-          sources: [...base.sources.filter((s) => s.name !== "最近交易日历史行情"), { name: "最近交易日历史行情", status: fallback.marketDate ? "ok" : "warn", note: fallback.note }],
+          sources: [...base.sources.filter((s) => s.name !== "最近交易日历史行情"), { name: "最近交易日历史行情", status: fallbackData?.marketDate ? "ok" : "warn", note: fallbackData?.note || "最近交易日历史行情暂不可用" }],
         };
-        if (usableIndices(snapshot.indices) || usableSectors(snapshot.sectors)) saveCachedSnapshot(snapshot);
+        const merged = mergeSnapshot(historical, recentSnapshot ? { ...recentSnapshot, marketDate: latest, validation: "cached_latest_trading_day" as const } : historical);
+        const snapshot: Snapshot = {
+          ...merged,
+          marketDate: latest,
+          validation: "cached_latest_trading_day",
+          fetchedAt: Date.now(),
+        };
+        if (usableIndices(snapshot.indices) || usableSectors(snapshot.sectors) || !!snapshot.flow || usableGlobal(snapshot.global)) saveCachedSnapshot(snapshot);
         set({ snapshot, loading: false, lastError: null });
       } catch {
         if (cached) set({ snapshot: { ...cached, validation: "cached_latest_trading_day" as const, marketDate: cached.marketDate || latest }, loading: false, lastError: "最近交易日历史源暂不可用 · 已保留本地数据" });
