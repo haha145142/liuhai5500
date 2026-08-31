@@ -2,6 +2,6 @@
 
 Trigger a production deployment from the current `main` revision. No application behavior is changed by this file.
 
-Batch includes valuation calibration, coverage policy, shared valuation status, source health, and data confidence layers.
+Current batch includes DeepSeek connection test, local-key AI analysis, mobile side drawer navigation, compact home layout, and paired index cards.
 
-Last deployment trigger check: 2026-08-31 11:41 +08:00
+Last deployment trigger check: 2026-08-31 12:41 +08:00
