@@ -1,6 +1,11 @@
-import type { ValuationStatusSummary } from "../../lib/data/valuation-status-summary";
+export type ValuationTrustSummary = {
+  modeLabel?: string;
+  coverageLabel?: string;
+  validationLabel?: string;
+  historyLabel?: string;
+};
 
-export function ValuationTrustRow({ summary }: { summary: ValuationStatusSummary }) {
+export function ValuationTrustRow({ summary }: { summary: ValuationTrustSummary }) {
   const items = [summary.modeLabel, summary.coverageLabel, summary.validationLabel, summary.historyLabel].filter(Boolean);
   if (!items.length) return null;
   return (
