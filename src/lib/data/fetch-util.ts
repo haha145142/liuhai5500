@@ -3,13 +3,14 @@ export async function fetchText(
   timeout = 5000,
   headers: Record<string, string> = {},
 ): Promise<string> {
+  const safeTimeout = Math.min(Math.max(1000, timeout), 5000);
   const delays = [0, 250, 700];
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < delays.length; attempt += 1) {
     if (delays[attempt] > 0) await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), timeout);
+    const t = setTimeout(() => ctrl.abort(), safeTimeout);
     try {
       const r = await fetch(url, {
         signal: ctrl.signal,
@@ -31,7 +32,7 @@ export async function fetchText(
     } catch (error) {
       lastError = error;
       if (error instanceof Error && error.name === "AbortError") {
-        lastError = new Error(`请求超时（${Math.ceil(timeout / 1000)}秒）`);
+        lastError = new Error(`请求超时（${Math.ceil(safeTimeout / 1000)}秒）`);
       }
       if (attempt === delays.length - 1) break;
     } finally {
