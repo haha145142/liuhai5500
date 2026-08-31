@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Launcher } from "@/components/home/Launcher";
 import { Cockpit } from "@/components/market/Cockpit";
 import { IndexGrid } from "@/components/market/IndexGrid";
 import { PortfolioInsight } from "@/components/portfolio/PortfolioInsight";
@@ -34,8 +33,6 @@ function Home() {
 
   return (
     <div className="home-page">
-      <Launcher />
-
       {analysis ? (
         <Glass tight className="home-hero mb-3">
           <div className="flex items-start justify-between gap-3">
