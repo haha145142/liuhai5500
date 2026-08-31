@@ -9,6 +9,10 @@ import { buildValuationDisplaySummary } from "@/lib/data/valuation-display";
 import type { FundQuote } from "@/lib/types";
 import "./QuickAddFund.css";
 
+function safeFixed(value: number | null | undefined, digits: number) {
+  return value != null && Number.isFinite(value) ? value.toFixed(digits) : "—";
+}
+
 export function QuickAddFund() {
   const addHolding = useApp((s) => s.addHolding);
   const funds = useApp((s) => s.funds);
@@ -31,6 +35,7 @@ export function QuickAddFund() {
     dayPct: quote?.dayPct,
     navDate: quote?.navDate,
     estimateTime: quote?.estimateTime,
+    officialNavPublished: quote?.officialNavPublished,
     tradeTime: current.mode === "live_estimate",
   });
   const previewResult = previewHoldingEntry(shares, cost, entryQuote);
@@ -45,12 +50,12 @@ export function QuickAddFund() {
     estimateConfidence: quote?.estimateConfidence,
     estimateCoverage: quote?.estimateCoverage,
     estimateValidation: quote?.estimateValidation,
-    historyMae20: undefined,
-    historySample20: undefined,
+    historyMae20: quote?.historyMae20,
+    historySample20: quote?.historySample20,
   });
   const auditLine = quote
     ? ownEstimate
-      ? `自有穿透估值 · 覆盖 ${quote.estimateCoverage?.toFixed(1) ?? "—"}% · ${quote.estimateValidation || "待验证"}${quote.estimateDeviation != null ? ` · 偏差 ${quote.estimateDeviation.toFixed(2)} 个百分点` : ""}`
+      ? `自有穿透估值 · 覆盖 ${safeFixed(quote.estimateCoverage, 1)}% · ${quote.estimateValidation || "待验证"}${quote.estimateDeviation != null ? ` · 偏差 ${safeFixed(quote.estimateDeviation, 2)} 个百分点` : ""}`
       : "估值引擎正在等待可靠持仓数据"
     : "输入基金代码后自动启动穿透估值";
 
@@ -62,6 +67,7 @@ export function QuickAddFund() {
     }
     let active = true;
     setQuoteLoading(true);
+    setMessage("");
     void getFund({ data: { code } })
       .then((fresh) => {
         if (active && fresh?.code === code) setRemoteQuote(fresh);
@@ -92,7 +98,7 @@ export function QuickAddFund() {
       setMessage("请输入 6 位基金代码、有效份额和成本价");
       return;
     }
-    addHolding({ code, name: quote?.name || code, shares: shareValue, cost: costValue });
+    addHolding({ code, name: quote?.name || code, shares: shareValue, cost: costValue }, quote);
     setMessage(`已保存 · ${previewResult.quoteLabel}会自动随交易时段切换`);
     setCode(""); setShares(""); setCost(""); setRemoteQuote(undefined);
   };
