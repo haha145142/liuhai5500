@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getValidatedFund } from "./validated-fund";
 import { getDirectFundFallback } from "./fund-direct-fallback";
+import { withEstimateSafety } from "./estimate-safety";
 import type { FundQuote } from "../types";
 
 function hasUsableFundData(quote: FundQuote | null | undefined) {
@@ -33,9 +34,9 @@ async function loadFund(code: string): Promise<FundQuote> {
   });
 
   try {
-    return await Promise.any([direct, validated]);
+    return await Promise.any([direct, validated]).then(withEstimateSafety);
   } catch {
-    return {
+    return withEstimateSafety({
       code,
       name: code,
       type: "基金",
@@ -59,7 +60,7 @@ async function loadFund(code: string): Promise<FundQuote> {
       historyMaxError: null,
       historyP95Error: null,
       historyMae5: null,
-    };
+    });
   }
 }
 
