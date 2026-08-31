@@ -36,3 +36,17 @@ export function settleValuationDay(
     status: "settled",
   };
 }
+
+export function summarizeValuationSettlements(items: ValuationSettlement[]) {
+  const settled = items.filter((x) => x.status === "settled" && x.absoluteErrorPctPoints != null);
+  if (!settled.length) {
+    return { samples: 0, maePctPoints: null, maxErrorPctPoints: null, highCoverageMaePctPoints: null };
+  }
+  const errors = settled.map((x) => x.absoluteErrorPctPoints as number);
+  return {
+    samples: settled.length,
+    maePctPoints: errors.reduce((sum, x) => sum + x, 0) / errors.length,
+    maxErrorPctPoints: Math.max(...errors),
+    highCoverageMaePctPoints: null,
+  };
+}
