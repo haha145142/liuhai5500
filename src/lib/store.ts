@@ -127,7 +127,6 @@ export const useApp = create<AppState>((set, get) => ({
       if (phase === "weekend" && lastWeekendSnapshotKey === cacheKey) { if (cached) set({ snapshot: { ...cached, validation: "cached_latest_trading_day" as const }, loading: false, lastError: null }); return; }
       set({ loading: true, lastError: null });
       try {
-        lastWeekendSnapshotKey = cacheKey;
         const [fallback, recent] = await Promise.allSettled([getLatestTradingMarketData(), getSnapshot()]);
         const fallbackData = fallback.status === "fulfilled" ? fallback.value : null;
         const recentSnapshot = recent.status === "fulfilled" ? recent.value : null;
@@ -135,8 +134,10 @@ export const useApp = create<AppState>((set, get) => ({
         const historical: Snapshot = { ...base, indices: fallbackData?.indices?.length ? fallbackData.indices : base.indices, sectors: fallbackData?.sectors?.length ? fallbackData.sectors : base.sectors, marketDate: fallbackData?.marketDate || latest, validation: "cached_latest_trading_day", fetchedAt: Date.now(), sources: [...base.sources.filter((s) => s.name !== "最近交易日历史行情"), { name: "最近交易日历史行情", status: fallbackData?.marketDate ? "ok" : "warn", note: fallbackData?.note || "最近交易日历史行情暂不可用" }] };
         const merged = mergeSnapshot(historical, recentSnapshot ? { ...recentSnapshot, marketDate: latest, validation: "cached_latest_trading_day" as const } : historical);
         const snapshot: Snapshot = { ...merged, marketDate: latest, validation: "cached_latest_trading_day", fetchedAt: Date.now() };
-        if (usableIndices(snapshot.indices) || usableSectors(snapshot.sectors) || !!snapshot.flow || usableGlobal(snapshot.global)) saveCachedSnapshot(snapshot);
+        const hasUsableData = usableIndices(snapshot.indices) > 0 || usableSectors(snapshot.sectors) > 0 || !!snapshot.flow || usableGlobal(snapshot.global) > 0;
+        if (hasUsableData) saveCachedSnapshot(snapshot);
         set({ snapshot, loading: false, lastError: null });
+        if (hasUsableData) lastWeekendSnapshotKey = cacheKey;
       } catch {
         if (cached) set({ snapshot: { ...cached, validation: "cached_latest_trading_day" as const, marketDate: cached.marketDate || latest }, loading: false, lastError: "最近交易日历史源暂不可用 · 已保留本地数据" });
         else set({ loading: false, lastError: "暂无最近交易日行情数据" });
@@ -183,7 +184,6 @@ export const useApp = create<AppState>((set, get) => ({
     if (phase === "weekend" || phase === "preopen") {
       const routineKey = `${phase}:${referenceDate}:${codes.join(",")}`;
       if (lastFundRoutineKey === routineKey) return;
-      lastFundRoutineKey = routineKey;
     }
     if (phase === "postclose") {
       const allOfficial = codes.every((code) => { const q = currentFunds[code]; return q?.nav != null && q.navDate === referenceDate && q.officialNavPublished === true; });
@@ -199,15 +199,17 @@ export const useApp = create<AppState>((set, get) => ({
         catch { const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(raw) : raw; return [code, quote] as const; }
       }));
       const funds = { ...get().funds };
-      for (const result of entries) { if (result.status !== "fulfilled") continue; const [code, quote] = result.value; const hasUsableValue = quote.nav != null || quote.estimate != null || quote.history.length > 0; if (hasUsableValue) funds[code] = quote; }
-      if (Object.keys(funds).length) saveCachedFunds(funds);
+      let updatedCount = 0;
+      for (const result of entries) { if (result.status !== "fulfilled") continue; const [code, quote] = result.value; const hasUsableValue = quote.nav != null || quote.estimate != null || quote.history.length > 0; if (hasUsableValue) { funds[code] = quote; updatedCount += 1; } }
+      if (updatedCount > 0) saveCachedFunds(funds);
       set({ funds });
+      if ((phase === "weekend" || phase === "preopen") && updatedCount > 0) lastFundRoutineKey = `${phase}:${referenceDate}:${codes.join(",")}`;
     } finally { set({ fundsLoading: false }); }
   },
   addHolding: (h) => { const list = get().portfolio.slice(); const i = list.findIndex((x) => x.code === h.code); if (i >= 0) list[i] = { ...list[i], ...h }; else list.push(h); savePortfolio(list); set({ portfolio: list }); void get().refreshFunds(); },
   updateHolding: (code, patch) => { const list = get().portfolio.map((x) => (x.code === code ? { ...x, ...patch } : x)); savePortfolio(list); set({ portfolio: list }); },
   removeHolding: (code) => { const list = get().portfolio.filter((x) => x.code !== code); savePortfolio(list); set({ portfolio: list }); },
   setSectors: (ids) => { saveSelectedSectors(ids); set({ selectedSectors: ids }); },
-  toggleWatch: (code) => { const cur = get().watchlist; const next = cur.includes(code) ? cur.filter((c) => c !== code) : [...cur, code]; saveWatchlist(next); set({ watchlist: next }); },
+  toggleWatch: (code) => { const cur = get().watchlist; const next = cur.includes(code) ? cur.filter((c) => c !== code) : [...cur.filter((c) => c !== code), code]; saveWatchlist(next); set({ watchlist: next }); },
   setSettings: (s) => { const next = { ...get().settings, ...s }; saveSettings(next); set({ settings: next }); },
 }));
