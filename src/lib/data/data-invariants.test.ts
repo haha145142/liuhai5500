@@ -17,10 +17,11 @@ test("official NAV publication truth comes only from historical NAV", () => {
   assert.doesNotMatch(validation, /officialNavPublished:\s*q\.navDate\s*!=\s*null\s*&&/);
 });
 
-test("live fund validation never accepts single-source stock quotes", () => {
+test("live fund validation can use complete single-source quotes at low confidence", () => {
   const validated = read("validated-fund.ts");
-  assert.match(validated, /\[\"three_source\",\"two_source\"\]/);
-  assert.doesNotMatch(validated, /agreement===\"single_source\"\)\s*;/);
+  assert.match(validated, /three_source.*two_source.*single_source/);
+  assert.match(validated, /agreement===\"single_source\"/);
+  assert.match(validated, /estimateConfidence/);
 });
 
 test("multi-source validation requires explicit cross-check status", () => {
