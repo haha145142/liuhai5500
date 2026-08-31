@@ -62,3 +62,26 @@
   .fund-sector-card,
   .launcher-card { transition: none !important; }
 }
+
+/* Fund AI Pro is intentionally a light-first product. Do not auto-switch to a dark UI when the device is in dark mode. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #eef3f9;
+    --color-bg-elevated: #f7fafc;
+    --color-card: #ffffff;
+    --color-fg: #0f172a;
+    --color-muted: #64748b;
+    --color-subtle: #94a3b8;
+    --color-border: rgb(15 23 42 / 0.08);
+    --shadow-glass: 0 10px 28px rgb(20 60 110 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.88);
+  }
+
+  body { background: #eef3f9 !important; color: #0f172a !important; }
+  .glass { background: linear-gradient(180deg, rgb(255 255 255 / 0.88), rgb(255 255 255 / 0.76)) !important; border-color: rgb(255 255 255 / 0.62) !important; box-shadow: var(--shadow-glass) !important; }
+  .glass-tight { background: rgb(255 255 255 / 0.80) !important; border-color: rgb(255 255 255 / 0.52) !important; box-shadow: 0 5px 16px rgb(20 60 110 / 0.045) !important; }
+  .app-shell { background: radial-gradient(circle at 12% -8%, rgb(10 132 255 / 0.11), transparent 38%), radial-gradient(circle at 92% 8%, rgb(26 155 106 / 0.06), transparent 32%), linear-gradient(180deg, #f8fbff 0%, #eef3f9 55%, #f5f7fb 100%) !important; }
+  .app-header-card, .launcher-card { background: linear-gradient(145deg, rgb(255 255 255 / 0.84), rgb(244 249 255 / 0.70)) !important; border-color: rgb(255 255 255 / 0.68) !important; box-shadow: 0 13px 30px rgb(29 78 121 / 0.07), inset 0 1px 0 rgb(255 255 255 / 0.92) !important; }
+  .app-refresh-button { background: linear-gradient(180deg, rgb(255 255 255 / 0.90), rgb(250 252 255 / 0.76)) !important; border-color: rgb(15 23 42 / 0.10) !important; color: #0f172a !important; }
+  .tabbar { background: linear-gradient(180deg, rgb(255 255 255 / 0.56), rgb(255 255 255 / 0.40)) !important; border-color: rgb(255 255 255 / 0.58) !important; box-shadow: 0 8px 18px rgb(15 23 42 / 0.075), inset 0 1px 0 rgb(255 255 255 / 0.70) !important; }
+  .tabbar > a[aria-current="page"] { background: rgb(255 255 255 / 0.30) !important; }
+}
