@@ -28,14 +28,16 @@ export function QuickAddFund() {
   const shareValue = Number(shares);
   const costValue = Number(cost);
   const current = selectFundDisplayQuote(quote);
+  const historyPoints = quote?.historyPoints ?? [];
   const entryQuote = quoteFromFundState({
     estimate: quote?.estimate,
     estimatePct: quote?.estimatePct,
     nav: quote?.nav,
-    dayPct: quote?.dayPct,
+    dayPct: quote?.dayPct ?? current.pct,
     navDate: quote?.navDate,
     estimateTime: quote?.estimateTime,
     officialNavPublished: quote?.officialNavPublished,
+    historyPoints,
     tradeTime: current.mode === "live_estimate",
   });
   const previewResult = previewHoldingEntry(shares, cost, entryQuote);
