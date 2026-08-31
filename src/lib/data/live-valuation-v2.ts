@@ -172,15 +172,19 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
       const weekPct = latest && weekBase?.nav ? (latest.nav / weekBase.nav - 1) * 100 : null;
       const monthPct = latest && monthBase?.nav ? (latest.nav / monthBase.nav - 1) * 100 : null;
       const metrics: FundMetrics | null = calcIndicators(history);
-      const officialToday = navDate === today();
-      const dayPct = officialToday ? latest?.changePct ?? valuation?.pct ?? null : result.pct ?? valuation?.pct ?? null;
+      // A date in the valuation endpoint is not enough to prove publication.
+      // The official historical-NAV endpoint must explicitly contain today's NAV.
+      const officialToday = latest?.date === today() && latest.nav > 0;
+      const officialNav = officialToday ? latest.nav : nav;
+      const officialNavDate = officialToday ? latest.date : navDate;
+      const dayPct = officialToday ? latest?.changePct ?? null : result.pct ?? valuation?.pct ?? null;
       const quote: FundQuote & ValuationAudit & { liveHoldings?: CrossCheckedHolding[] } = {
         code,
         name: fundName,
         type: fundType,
-        nav,
-        navDate,
-        estimate: officialToday ? nav : result.estimate,
+        nav: officialNav,
+        navDate: officialNavDate,
+        estimate: officialToday ? officialNav : result.estimate,
         estimatePct: officialToday ? null : result.pct,
         estimateTime: result.estimate != null && !officialToday ? new Date().toISOString() : null,
         dayPct,
@@ -190,12 +194,10 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
         historyPoints,
         metrics,
         source: officialToday
-          ? "今日官方净值"
+          ? "今日官方净值 · 历史净值已发布"
           : result.estimate != null
             ? `自算盘中估值 · 前十大重仓×双源行情 · ${result.validation}`
-            : valuation?.estimate != null
-              ? "基金估值接口可用 · 自算穿透暂不可用"
-              : "暂无可靠盘中估值 · 已保留最近官方净值",
+            : "暂无可靠盘中估值 · 已保留最近官方净值",
         officialNavPublished: officialToday,
         valuationStatus: officialToday ? "official_nav" : result.estimate != null ? "estimate" : nav != null ? "waiting_official_nav" : "unavailable",
         estimateConfidence: result.confidence,
