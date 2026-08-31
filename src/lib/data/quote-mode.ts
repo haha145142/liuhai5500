@@ -37,6 +37,13 @@ function hasTodayEstimate(fund: FundQuote, now: Date) {
   );
 }
 
+function resolveNavPct(fund: FundQuote, navDate: string | null | undefined) {
+  if (fund.dayPct != null && Number.isFinite(fund.dayPct)) return fund.dayPct;
+  if (!navDate) return null;
+  const match = fund.historyPoints.find((point) => point.date === navDate);
+  return match?.changePct != null && Number.isFinite(match.changePct) ? match.changePct : null;
+}
+
 export function selectFundDisplayQuote(fund: FundQuote | undefined, now = new Date()): FundDisplayQuote {
   if (!fund) {
     return { mode: "unavailable", price: null, pct: null, label: "暂无可靠行情", dataDate: null, confidence: "none", reason: "尚未取得基金数据" };
@@ -48,7 +55,7 @@ export function selectFundDisplayQuote(fund: FundQuote | undefined, now = new Da
     return {
       mode: "official_today",
       price: fund.nav,
-      pct: fund.dayPct,
+      pct: resolveNavPct(fund, fund.navDate),
       label: "今日官方净值",
       dataDate: fund.navDate,
       confidence: "high",
@@ -85,7 +92,7 @@ export function selectFundDisplayQuote(fund: FundQuote | undefined, now = new Da
     return {
       mode: "latest_official",
       price: fund.nav,
-      pct: fund.dayPct,
+      pct: resolveNavPct(fund, fund.navDate),
       label: `最近官方净值 · ${fund.navDate}`,
       dataDate: fund.navDate,
       confidence: "high",
