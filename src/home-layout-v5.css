@@ -1,0 +1,94 @@
+/* Fund AI Pro V5: light-first information hierarchy */
+.home-v5 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.home-priority,
+.home-block {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.home-primary-card {
+  background: linear-gradient(145deg, rgb(255 255 255 / 0.94), rgb(245 250 255 / 0.82));
+  box-shadow: 0 14px 32px rgb(42 82 125 / 0.075), inset 0 1px 0 rgb(255 255 255 / 0.96);
+}
+
+.home-section-heading-compact { margin-top: 2px; margin-bottom: 1px; }
+
+.home-market-strip {
+  background: rgb(255 255 255 / 0.72);
+  box-shadow: 0 7px 19px rgb(42 82 125 / 0.055), inset 0 1px 0 rgb(255 255 255 / 0.94);
+}
+
+.home-index-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.home-index-card {
+  min-width: 0;
+  padding: 12px 12px 11px;
+  border: 1px solid rgb(255 255 255 / 0.78);
+  border-radius: 17px;
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.91), rgb(248 251 255 / 0.73));
+  box-shadow: 0 6px 18px rgb(42 82 125 / 0.055), inset 0 1px 0 rgb(255 255 255 / 0.94);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+}
+
+.home-index-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.home-index-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgb(10 132 255 / 0.28);
+  box-shadow: 0 0 0 4px rgb(10 132 255 / 0.055);
+}
+
+@media (min-width: 700px) {
+  .app-shell { max-width: 1180px; }
+  .app-main { padding: 0 28px; }
+  .app-header { padding-left: 28px; padding-right: 28px; }
+  .home-v5 { gap: 14px; }
+  .home-priority { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; }
+  .home-primary-card { grid-column: 1; }
+  .home-market-strip { grid-column: 1; }
+  .home-index-block { grid-column: 2; grid-row: 1 / span 2; }
+  .home-index-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-block { gap: 10px; }
+}
+
+/* Keep the default experience light. Dark appearance should be an explicit app choice. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #eef3f9;
+    --color-bg-elevated: #f7fafc;
+    --color-card: #ffffff;
+    --color-fg: #0f172a;
+    --color-muted: #64748b;
+    --color-subtle: #94a3b8;
+    --color-accent: #0a84ff;
+    --color-accent-fg: #ffffff;
+    --color-border: rgb(15 23 42 / 0.08);
+    --color-up: #d94a4a;
+    --color-down: #1a9b6a;
+    --color-warn: #c2410c;
+    --shadow-glass: 0 10px 28px rgb(20 60 110 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.88);
+  }
+  body { background: var(--color-bg); color: var(--color-fg); }
+  .app-shell { background: radial-gradient(circle at 12% -8%, rgb(10 132 255 / 0.11), transparent 38%), radial-gradient(circle at 92% 8%, rgb(26 155 106 / 0.06), transparent 32%), linear-gradient(180deg, #f8fbff 0%, #eef3f9 55%, #f5f7fb 100%); }
+  .glass { background: linear-gradient(180deg, rgb(255 255 255 / 0.88), rgb(255 255 255 / 0.76)); border-color: rgb(255 255 255 / 0.62); box-shadow: var(--shadow-glass); }
+  .glass-tight { background: rgb(255 255 255 / 0.80); border-color: rgb(255 255 255 / 0.52); box-shadow: 0 5px 16px rgb(20 60 110 / 0.045); }
+}
