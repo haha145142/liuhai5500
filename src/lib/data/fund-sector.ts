@@ -4,15 +4,8 @@ import { FUND_SECTORS, DEFAULT_FUND_SECTOR_IDS } from "./fund-sectors";
 import { fetchText, n, parseMaybeJsonp } from "./fetch-util";
 
 export type FundSectorFundQuote = {
-  code: string;
-  name: string;
-  pct: number | null;
-  nav: number | null;
-  estimate: number | null;
-  time: string | null;
-  date: string | null;
-  validation: "cross_checked" | "single_source" | "unavailable";
-  source: string;
+  code: string; name: string; pct: number | null; nav: number | null; estimate: number | null; time: string | null; date: string | null;
+  validation: "cross_checked" | "single_source" | "unavailable"; source: string;
 };
 export type FundSectorQuote = { id:string; name:string; icon:string; pct:number|null; up:number; down:number; flat:number; validCount:number; totalCount:number; leader:FundSectorFundQuote|null; weakest:FundSectorFundQuote|null; funds:FundSectorFundQuote[]; marketDate:string|null; source:string; validation:"cross_checked"|"single_source"|"cached_latest_trading_day"|"unavailable" };
 const EM="https://fundcomapi.eastmoney.com/mm/newCore/FundValuationLast";
@@ -33,7 +26,9 @@ function mergeQuote(primary:ReturnType<typeof pick>|null,secondary:ReturnType<ty
  const p=primary??secondary;return p?{code,name:p.name||fallbackName,pct:p.pct,nav:p.nav,estimate:p.estimate,time:p.time,date:p.date,validation:"single_source",source:"实时估值源"}:{code,name:fallbackName,pct:null,nav:null,estimate:null,time:null,date:null,validation:"unavailable",source:"暂无可靠数据"};
 }
 async function getOwnQuotes(codes:string[]){const out=new Map<string,Awaited<ReturnType<typeof getCalculatedFund>>>();const queue=codes.slice();const workers=Array.from({length:Math.min(4,Math.max(1,queue.length))},async()=>{while(queue.length){const code=queue.shift();if(!code)return;try{out.set(code,await getCalculatedFund({data:{code}}));}catch{out.set(code,null as any);}}});await Promise.all(workers);return out;}
-export const getFundSectorQuotes=createServerFn({method:"POST"]).validator((input:{ids?:string[]})=>input).handler(async({data}):Promise<{rows:FundSectorQuote[];fetchedAt:number;weekend:boolean}>=>{
+export const getFundSectorQuotes=createServerFn({method:"POST"})
+ .validator((input:{ids?:string[]})=>input)
+ .handler(async({data}):Promise<{rows:FundSectorQuote[];fetchedAt:number;weekend:boolean}>=>{
  const ids=(data.ids?.length?data.ids:DEFAULT_FUND_SECTOR_IDS).filter(id=>FUND_SECTORS.some(s=>s.id===id));const key=ids.join(",");const weekend=isWeekend();const ttl=weekend?24*60*60*1000:CACHE_TTL;if(cache&&cache.key===key&&Date.now()-cache.ts<ttl)return{rows:cache.data,fetchedAt:cache.ts,weekend};
  const sectors=FUND_SECTORS.filter(s=>ids.includes(s.id));const unique=new Map<string,{code:string;name:string}>();for(const sector of sectors)for(const fund of sector.funds)unique.set(fund.code,fund);const codes=[...unique.keys()];
  const [ownMap,providerPairs]=await Promise.all([getOwnQuotes(codes),Promise.all(chunk(codes,40).map(async batch=>({east:await fetchProvider(EM,batch),tt:await fetchProvider(TT,batch)})))]);
