@@ -5,6 +5,7 @@ import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppShell } from "@/components/layout/AppShell";
 import appCss from "../styles.css?url";
 import uiPerformanceCss from "../ui-performance.css?url";
+import liquidGlassCss from "../liquid-glass-v4.css?url";
 
 const APP_NAME = "Fund AI Pro";
 
@@ -23,22 +24,19 @@ export const Route = createRootRoute({
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "stylesheet", href: appCss },
       { rel: "stylesheet", href: uiPerformanceCss },
+      { rel: "stylesheet", href: liquidGlassCss },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
   component: () => (
     <html lang="zh-CN" className="antialiased" suppressHydrationWarning>
-      <head>
-        <HeadContent />
-      </head>
+      <head><HeadContent /></head>
       <body>
         <PreviewHostBridge />
         <AuthProvider>
           <AppErrorBoundary>
-            <AppShell>
-              <Outlet />
-            </AppShell>
+            <AppShell><Outlet /></AppShell>
           </AppErrorBoundary>
         </AuthProvider>
         <Scripts />
