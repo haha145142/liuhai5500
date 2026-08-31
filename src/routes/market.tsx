@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { IndexGrid } from "@/components/market/IndexGrid";
-import { FundSectorWatch } from "@/components/market/FundSectorWatch";
+import { FundSectorWatchV2 } from "@/components/fund-sector/FundSectorWatchV2";
 import { EmptyNote, Glass, SectionTitle, Tone } from "@/components/ui/Glass";
 import { fmtPctShort, fmtYi } from "@/lib/format";
 import { useApp } from "@/lib/store";
@@ -13,7 +13,7 @@ function MarketPage() {
 
   return (
     <div className="market-page">
-      <FundSectorWatch />
+      <FundSectorWatchV2 />
 
       {snapshot ? <IndexGrid indices={snapshot.indices} /> : <EmptyNote>指数后台更新中，先看你关注的基金板块。</EmptyNote>}
 
