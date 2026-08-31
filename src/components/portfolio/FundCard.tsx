@@ -2,65 +2,84 @@ import { useMemo, useState } from "react";
 import { Tone } from "@/components/ui/Glass";
 import { calcSixFactor } from "@/lib/calc/six-factor";
 import { calcSwingTrade } from "@/lib/calc/indicators";
+import { calcHoldingReturn } from "@/lib/calc/portfolio-returns";
 import { matchFundSector } from "@/lib/data/sectors";
-import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
+import { fmtMoney, fmtPctShort, fmtPrice, cnTime } from "@/lib/format";
 import { isTradeTime } from "@/lib/market-hours";
 import type { FundQuote, Holding, SectorQuote } from "@/lib/types";
 
-function periodReturn(fund: FundQuote | undefined, tradingDays: number, current: number | null) {
-  if (!fund || current == null || fund.history.length <= tradingDays) return null;
-  const base = fund.history[fund.history.length - 1 - tradingDays];
-  return base ? ((current - base) / base) * 100 : null;
+type Period = "week" | "month" | "quarter" | "half" | "year";
+
+function points(fund?: FundQuote) {
+  return [...(fund?.historyPoints || [])]
+    .filter((p) => Number.isFinite(p.nav) && p.nav > 0 && p.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function periodReturn(fund: FundQuote | undefined, period: Period, current: number | null, shares: number) {
+  if (!fund || current == null) return { amount: null as number | null, pct: null as number | null };
+  const list = points(fund);
+  const days = period === "week" ? 5 : period === "month" ? 20 : period === "quarter" ? 60 : period === "half" ? 120 : 250;
+  if (list.length <= days) return { amount: null, pct: null };
+  const base = list[list.length - 1 - days]?.nav ?? null;
+  if (base == null || base <= 0) return { amount: null, pct: null };
+  return { amount: (current - base) * shares, pct: ((current - base) / base) * 100 };
+}
+
+function isOfficialToday(fund?: FundQuote) {
+  if (!fund?.navDate) return false;
+  if (fund.officialNavPublished === true) return true;
+  const now = cnTime();
+  const [y, m, d] = fund.navDate.split(/[-/]/).map(Number);
+  return y === now.getUTCFullYear() && m === now.getUTCMonth() + 1 && d === now.getUTCDate();
 }
 
 export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }: { holding: Holding; fund?: FundQuote; sector?: SectorQuote; benchPct: number | null; onRemove: () => void; onUpdate: (patch: Partial<Holding>) => void }) {
-  const [open, setOpen] = useState(true);
+  const [period, setPeriod] = useState<Period>("week");
+  const [whyOpen, setWhyOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [shares, setShares] = useState(String(holding.shares));
   const [cost, setCost] = useState(String(holding.cost));
   const name = fund?.name || holding.name || holding.code;
   const live = isTradeTime();
-  const px = live ? (fund?.estimate ?? fund?.nav ?? null) : (fund?.nav ?? fund?.estimate ?? null);
-  const day = live ? (fund?.estimatePct ?? fund?.dayPct ?? null) : (fund?.dayPct ?? fund?.estimatePct ?? null);
-  const value = px != null ? px * holding.shares : null;
-  const costVal = holding.cost * holding.shares;
-  const pnl = value != null ? value - costVal : null;
-  const pnlPct = value != null && costVal ? (pnl! / costVal) * 100 : null;
+  const officialToday = isOfficialToday(fund);
+  const useEstimate = !officialToday && live && fund?.estimate != null;
+  const px = useEstimate ? fund.estimate! : (fund?.nav ?? null);
+  const day = useEstimate ? (fund?.estimatePct ?? null) : (fund?.dayPct ?? null);
+  const ret = calcHoldingReturn(holding, fund);
   const mapped = matchFundSector(name);
   const six = sector && sector.available ? calcSixFactor(sector, benchPct) : null;
   const swing = calcSwingTrade(fund?.metrics ?? null, holding.cost, px || 0);
-  const estimateGap = fund?.estimate != null && fund.nav ? ((fund.estimate - fund.nav) / fund.nav) * 100 : null;
-  const periods = useMemo(() => [["1周",5],["1月",20],["3月",60],["6月",120],["1年",250]] as const, []);
-  const saveEdit = () => { const s=Number(shares); const c=Number(cost); if(s>0&&c>0){onUpdate({shares:s,cost:c});setEditing(false);} };
+  const selected = useMemo(() => periodReturn(fund, period, px, holding.shares), [fund, period, px, holding.shares]);
+  const selectedLabel = period === "week" ? "近1周收益" : period === "month" ? "近1月收益" : period === "quarter" ? "近3月收益" : period === "half" ? "近6月收益" : "近1年收益";
+
+  const saveEdit = () => {
+    const s = Number(shares);
+    const c = Number(cost);
+    if (s > 0 && c > 0) { onUpdate({ shares: s, cost: c }); setEditing(false); }
+  };
 
   return (
-    <article className="glass mb-3 overflow-hidden p-4">
+    <article className="mb-3 overflow-hidden rounded-[28px] border border-white/75 bg-white/50 p-4 shadow-[0_18px_48px_rgba(38,78,112,.07),inset_0_1px_0_rgba(255,255,255,.95)] backdrop-blur-[20px] saturate-150">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0"><div className="text-lg font-semibold text-fg">{name} <span className="text-xs font-normal text-muted">{holding.code}</span></div><div className="mt-1 text-xs text-muted">{live ? "盘中实时估值" : "收盘后官方净值"} · {fund?.source || "等待数据"}</div></div>
-        <div className="text-right"><Tone v={day} className="text-2xl font-semibold">{fmtPctShort(day)}</Tone><div className="text-[10px] text-muted">{live ? "今日估值涨跌" : "最近交易日涨跌"}</div></div>
+        <div className="min-w-0"><div className="text-[17px] font-semibold tracking-tight text-fg">{name}</div><div className="mt-0.5 text-xs text-muted">{holding.code}</div><div className="mt-1 rounded-lg bg-blue-50/75 px-2 py-1 text-[10px] text-blue-500">{useEstimate ? "盘中估值" : "收盘官方净值"}{fund?.estimateTime ? ` · ${fund.estimateTime}` : ""}</div></div>
+        <div className="text-right"><Tone v={day} className="text-[27px] font-bold leading-none">{fmtPctShort(day)}</Tone><div className="mt-1 text-[9px] text-muted">{useEstimate ? "估值涨跌" : "官方净值涨跌"}</div></div>
       </div>
 
-      <div className="mt-4 rounded-[24px] border border-white/70 bg-white/62 p-3 shadow-[0_10px_28px_rgba(30,76,125,.05),inset_0_1px_0_rgba(255,255,255,.96)] backdrop-blur-[14px]">
-        <div className="grid grid-cols-2 gap-3"><div><div className="text-xs text-muted">当前净值/估值</div><div className="mt-1 text-xl font-semibold tabular-nums">{fmtPrice(px,4)}</div></div><div className="text-right"><div className="text-xs text-muted">持仓市值</div><div className="mt-1 text-xl font-semibold tabular-nums">{fmtMoney(value)}</div></div></div>
-        <div className="mt-2 text-[11px] text-muted">{fund?.nav != null ? `官方净值 ${fmtPrice(fund.nav,4)} · ${fund.navDate || "日期未知"}` : "官方净值暂无"}{fund?.estimate != null ? ` · 盘中估值 ${fmtPrice(fund.estimate,4)}${fund.estimateTime ? ` · ${fund.estimateTime}` : ""}` : ""}</div>
-        {estimateGap != null ? <div className="mt-1 text-[11px] text-muted">估值校验：相对最近官方净值 <Tone v={estimateGap}>{fmtPctShort(estimateGap)}</Tone></div> : null}
+      <div className="mt-3 border-b border-black/[.05] pb-3"><div className="grid grid-cols-4 gap-2 text-[11px] text-muted"><span>持仓金额</span><span>持有收益</span><span>今日收益</span><span>昨日收益</span></div><div className="mt-1 grid grid-cols-4 gap-2"><b className="text-sm tabular-nums">{fmtMoney(ret.marketValue)}</b><Tone v={ret.holdingPnl} className="text-sm font-semibold tabular-nums">{fmtMoney(ret.holdingPnl)}</Tone><Tone v={ret.todayPnl} className="text-sm font-semibold tabular-nums">{ret.todayPnl == null ? "—" : fmtMoney(ret.todayPnl)}</Tone><Tone v={ret.previousOfficialNav != null && px != null ? (px - ret.previousOfficialNav) * holding.shares : null} className="text-sm font-semibold tabular-nums">{ret.previousOfficialNav != null && px != null ? fmtMoney((px - ret.previousOfficialNav) * holding.shares) : "—"}</Tone></div></div>
+      <div className="mt-2 rounded-2xl bg-white/48 px-3 py-2.5"><div className="flex items-center justify-between"><span className="text-[10px] text-muted">持仓成本 {fmtMoney(ret.costValue)}</span><b className="text-[20px] tabular-nums">{fmtMoney(ret.marketValue)}</b></div><div className="mt-1 text-[10px] text-muted">持有收益率 <Tone v={ret.holdingPnlPct}>{fmtPctShort(ret.holdingPnlPct)}</Tone></div></div>
+
+      <div className="mt-3 grid grid-cols-5 gap-1.5 rounded-2xl bg-white/42 p-1 ring-1 ring-white/70">
+        {([['week','1周'],['month','1月'],['quarter','3月'],['half','6月'],['year','1年']] as const).map(([id,label]) => <button key={id} type="button" onClick={() => setPeriod(id)} className={`rounded-2xl px-1.5 py-2.5 text-sm font-medium ${period === id ? "bg-blue-500 text-white shadow-[0_5px_14px_rgba(59,130,246,.22)]" : "bg-white/66 text-muted"}`}>{label}</button>)}
       </div>
 
-      <div className="mt-3 grid grid-cols-4 gap-2 text-[11px] text-muted"><Metric label="持仓金额" value={fmtMoney(value)} /><Metric label="持有收益" value={fmtMoney(pnl)} tone={pnl} /><Metric label="收益率" value={fmtPctShort(pnlPct)} tone={pnlPct} /><Metric label="成本" value={fmtPrice(holding.cost,4)} /></div>
+      <div className="mt-2 rounded-[20px] bg-white/50 px-3 py-3"><div className="flex items-end justify-between"><div><div className="text-[11px] text-muted">{selectedLabel}</div><Tone v={selected.amount} className="mt-1 block text-[25px] font-bold">{selected.amount == null ? "—" : fmtMoney(selected.amount)}</Tone></div><Tone v={selected.pct} className="text-base font-semibold">{selected.pct == null ? "—" : fmtPctShort(selected.pct)}</Tone></div><div className="mt-2 text-xs leading-relaxed text-muted">{fund?.metrics?.trend ? `趋势${fund.metrics.trend}` : "趋势待确认"} · {fund?.metrics?.combo || swing?.reason || "暂无可靠波段结论"}</div></div>
 
-      <div className="mt-3 rounded-[24px] bg-bg-elevated/72 p-3 ring-1 ring-white/65"><div className="flex items-center justify-between"><b className="text-sm">最近收益</b><span className="text-[10px] text-muted">按当前持仓份额回算</span></div><div className="mt-2 grid grid-cols-5 gap-1.5">{periods.map(([label,days])=>{const r=periodReturn(fund,days,fund?.nav??fund?.estimate??null);return <div key={label} className="rounded-xl bg-white/60 px-1 py-2 text-center"><div className="text-[10px] text-muted">{label}</div><Tone v={r} className="mt-0.5 block text-xs font-semibold">{fmtPctShort(r)}</Tone></div>;})}</div>{fund?.history.length?<div className="mt-2 text-[11px] text-muted">最近一周 <Tone v={periodReturn(fund,5,fund.nav??fund.estimate)}>{fmtPctShort(periodReturn(fund,5,fund.nav??fund.estimate))}</Tone> · 最近一月 <Tone v={periodReturn(fund,20,fund.nav??fund.estimate)}>{fmtPctShort(periodReturn(fund,20,fund.nav??fund.estimate))}</Tone></div>:null}</div>
+      <button type="button" className="mt-2 flex w-full items-center justify-between rounded-[18px] bg-white/58 px-3 py-2.5 text-left text-sm font-medium text-fg" onClick={() => setWhyOpen((v) => !v)}><span>📊 为什么涨？</span><span className="text-[10px] text-muted">{whyOpen ? "收起" : "展开"}</span></button>
+      {whyOpen ? <div className="mt-2 rounded-[18px] bg-white/48 p-3 text-[11px] leading-relaxed text-muted"><b className="text-fg">指标：</b>{fund?.metrics ? `RSI ${fmtPrice(fund.metrics.rsi,1)} · BIAS ${fmtPctShort(fund.metrics.bias)} · MACD ${fmtPrice(fund.metrics.macd,4)} · MA20 ${fmtPrice(fund.metrics.ma20,4)} · MA60 ${fmtPrice(fund.metrics.ma60,4)}` : "暂无可靠指标数据"}{mapped ? <div className="mt-1"><b className="text-fg">关联板块：</b>{mapped.name}{sector?.change != null ? ` · 今日 ${fmtPctShort(sector.change)}` : ""}</div> : null}{six ? <div className="mt-1">组合判断：{six.advice} · 置信 {six.confidence}%</div> : null}</div> : null}
 
-      {fund?.metrics ? <div className="mt-3 rounded-[24px] bg-white/55 p-3 ring-1 ring-white/65"><div className="flex items-center justify-between"><b className="text-sm">波段信号 · {fund.metrics.band}</b><span className="text-xs font-semibold text-accent">{fund.metrics.bandScore}/100</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-accent" style={{width:`${fund.metrics.bandScore}%`}} /></div><div className="mt-2 grid grid-cols-3 gap-2 text-center text-[11px]"><Metric label="趋势" value={`${fund.metrics.trend} ${fund.metrics.trendScore}`} /><Metric label="RSI" value={fund.metrics.rsi.toFixed(1)} /><Metric label="信号强度" value={`${fund.metrics.sigStrength}`} /></div><div className="mt-2 flex flex-wrap gap-1.5"><Tag>{fund.metrics.band}</Tag><Tag>{fund.metrics.trend}</Tag><Tag>{`RSI ${fund.metrics.rsi.toFixed(0)}`}</Tag><Tag>{`BOLL ${fmtPrice(fund.metrics.lower,4)} / ${fmtPrice(fund.metrics.upper,4)}`}</Tag>{swing?<Tag>{swing.action}</Tag>:null}</div></div> : <p className="mt-3 text-xs text-muted">净值历史不足 35 个交易日，暂不生成可靠波段信号。</p>}
-
-      {mapped ? <div className="mt-3 rounded-[24px] bg-accent/8 p-3 text-xs text-muted"><b className="text-fg">映射板块：{mapped.name}</b>{sector?.change!=null?<span> · 今日 <Tone v={sector.change}>{fmtPctShort(sector.change)}</Tone></span>:" · 暂无板块行情"}{six?<div className="mt-1">组合判断：{six.advice} · 置信 {six.confidence}% · {six.basis}</div>:null}</div>:null}
-
-      <button type="button" className="mt-3 w-full rounded-2xl bg-bg-elevated py-2 text-sm font-semibold text-fg" onClick={()=>setOpen(v=>!v)}>{open?"收起原因与指标":"为什么涨跌 / 波段建议"}</button>
-      {open?<div className="mt-3 space-y-2 rounded-2xl bg-white/55 p-3 text-xs leading-relaxed text-muted"><p><b className="text-fg">综合判断：</b>{fund?.metrics?.combo||"暂无可靠波段结论"}</p>{swing?<p><b className="text-fg">波段建议：</b>{swing.reason} · 环境 {swing.envLevel}</p>:null}{fund?.metrics?<p>MACD {fund.metrics.macd.toFixed(4)} · BIAS {fund.metrics.bias.toFixed(2)}% · DIF {fund.metrics.dif.toFixed(4)} · DEA {fund.metrics.dea.toFixed(4)}</p>:null}{fund?.metrics?.sigConds.length?<p>触发条件：{fund.metrics.sigConds.join(" · ")}</p>:null}</div>:null}
-
-      <div className="mt-3 flex gap-2"><button type="button" onClick={()=>setEditing(true)} className="flex-1 rounded-xl bg-bg-elevated py-2 text-sm">{editing?"编辑中":"编辑"}</button><button type="button" onClick={onRemove} className="flex-1 rounded-xl bg-bg-elevated py-2 text-sm text-up">删除</button></div>
-      {editing?<div className="mt-2 grid grid-cols-2 gap-2"><input value={shares} onChange={e=>setShares(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-bg-elevated px-3 text-sm ring-1 ring-border" placeholder="份额" /><input value={cost} onChange={e=>setCost(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-bg-elevated px-3 text-sm ring-1 ring-border" placeholder="成本价" /><button type="button" onClick={saveEdit} className="rounded-xl bg-accent py-2 text-sm font-semibold text-accent-fg">保存修改</button><button type="button" onClick={()=>setEditing(false)} className="rounded-xl bg-bg-elevated py-2 text-sm font-semibold">取消</button></div>:null}
+      <div className="mt-2 flex gap-2"><button type="button" onClick={() => setEditing(true)} className="flex-1 rounded-full bg-white/66 py-2 text-sm text-muted ring-1 ring-white/70">编辑</button><button type="button" onClick={onRemove} className="rounded-full bg-white/66 px-4 py-2 text-sm text-red-500 ring-1 ring-red-200/60">删除</button></div>
+      {editing ? <div className="mt-2 grid grid-cols-2 gap-2"><input value={shares} onChange={(e) => setShares(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-white/70 px-3 text-sm ring-1 ring-white/70" placeholder="份额"/><input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-white/70 px-3 text-sm ring-1 ring-white/70" placeholder="成本价"/><button type="button" onClick={saveEdit} className="rounded-xl bg-blue-500 py-2 text-sm font-semibold text-white">保存</button><button type="button" onClick={() => setEditing(false)} className="rounded-xl bg-white/70 py-2 text-sm">取消</button></div> : null}
     </article>
   );
 }
-function Metric({label,value,tone}:{label:string;value:string;tone?:number|null}){return <div className="rounded-xl bg-white/55 px-1.5 py-2 text-center"><div className="text-[10px] text-subtle">{label}</div>{tone===undefined?<div className="mt-0.5 text-xs font-semibold text-fg tabular-nums">{value}</div>:<Tone v={tone} className="mt-0.5 block text-xs font-semibold">{value}</Tone>}</div>}
-function Tag({children}:{children:string}){return <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-fg ring-1 ring-white/70">{children}</span>}
