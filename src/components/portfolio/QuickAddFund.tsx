@@ -5,6 +5,7 @@ import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
 import { getFund } from "@/lib/data/server";
 import { selectFundDisplayQuote } from "@/lib/data/quote-mode";
 import { previewHoldingEntry, quoteFromFundState } from "@/lib/calc/holding-entry";
+import { buildValuationDisplaySummary } from "@/lib/data/valuation-display";
 import type { FundQuote } from "@/lib/types";
 import "./QuickAddFund.css";
 
@@ -38,10 +39,18 @@ export function QuickAddFund() {
   const pnl = previewResult.pnl;
   const pnlPct = previewResult.pnlPct;
   const canSave = /^\d{6}$/.test(code) && shareValue > 0 && costValue > 0;
-  const ownEstimate = quote?.estimateMethod?.startsWith("前十大重仓") || quote?.source?.startsWith("自有穿透估值");
+  const ownEstimate = quote?.estimateMethod?.includes("穿透估值") || quote?.source?.startsWith("自有穿透估值");
+  const displaySummary = buildValuationDisplaySummary({
+    valuationStatus: quote?.valuationStatus,
+    estimateConfidence: quote?.estimateConfidence,
+    estimateCoverage: quote?.estimateCoverage,
+    estimateValidation: quote?.estimateValidation,
+    historyMae20: undefined,
+    historySample20: undefined,
+  });
   const auditLine = quote
     ? ownEstimate
-      ? `自有穿透估值 · 覆盖 ${quote.estimateCoverage?.toFixed(1) ?? "—"}% · 参考源差 ${quote.estimateDeviation?.toFixed(2) ?? "—"} 个百分点 · ${quote.estimateValidation || "待验证"}`
+      ? `自有穿透估值 · 覆盖 ${quote.estimateCoverage?.toFixed(1) ?? "—"}% · ${quote.estimateValidation || "待验证"}${quote.estimateDeviation != null ? ` · 偏差 ${quote.estimateDeviation.toFixed(2)} 个百分点` : ""}`
       : "估值引擎正在等待可靠持仓数据"
     : "输入基金代码后自动启动穿透估值";
 
@@ -111,6 +120,14 @@ export function QuickAddFund() {
           <Metric label="收益率" value={pnlPct == null ? "—" : fmtPctShort(pnlPct)} tone={pnlPct} />
         </div>
         <div className="quick-quote-row">{marketPrice != null ? `价格 ${fmtPrice(marketPrice, 4)}` : "价格暂无"}{entryQuote.pct != null ? ` · 当日 ${fmtPctShort(entryQuote.pct)}` : ""}{quote?.navDate ? ` · 数据日 ${quote.navDate}` : ""}</div>
+        {quote ? (
+          <div className="quick-trust-row">
+            <span>{displaySummary.mode}</span>
+            <span>{displaySummary.coverage}</span>
+            <span>{displaySummary.validation}</span>
+            <span>{displaySummary.history}</span>
+          </div>
+        ) : null}
         <div className="quick-preview-note">{preview}</div>
         <div className="quick-preview-note">{auditLine}</div>
       </div>
