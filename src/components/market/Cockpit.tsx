@@ -12,9 +12,9 @@ export function Cockpit({ snap, news }: { snap: Snapshot; news: NewsItem[] }) {
   const avg = snap.indices.length && snap.indices.every((i) => i.pct != null)
     ? snap.indices.reduce((s, i) => s + (i.pct || 0), 0) / snap.indices.length
     : null;
-  const boards = snap.boards.filter((b) => b.change != null);
+  const boards = snap.boards.filter((b) => b.change != null).slice().sort((a, b) => (b.change || 0) - (a.change || 0));
   const strongest = boards[0];
-  const weakest = boards[boards.length - 1];
+  const weakest = boards.at(-1);
   const up = snap.indices.filter((i) => (i.pct || 0) > 0).length;
   const dn = snap.indices.filter((i) => (i.pct || 0) < 0).length;
   const flow = snap.flow;
@@ -48,68 +48,64 @@ export function Cockpit({ snap, news }: { snap: Snapshot; news: NewsItem[] }) {
   };
 
   return (
-    <>
-      <Glass>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-xs font-medium text-muted">今日投资结论</div>
-            <h3 className="mt-1 text-lg font-semibold tracking-tight">{ev.verdict}</h3>
-            <p className="mt-1 text-sm leading-relaxed text-muted">{ev.summary}</p>
-          </div>
-          <div className="text-right">
-            <div className={`text-2xl font-semibold tabular-nums ${ev.score >= 60 ? "tone-up" : ev.score <= 40 ? "tone-down" : "text-fg"}`}>{ev.score}</div>
-            <div className="text-[10px] text-subtle">规则评分</div>
-          </div>
+    <Glass className="market-cockpit">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-medium text-muted">今日投资结论</div>
+          <h3 className="mt-1 text-lg font-semibold tracking-tight">{ev.verdict}</h3>
+          <p className="mt-1 text-sm leading-relaxed text-muted">{ev.summary}</p>
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <Mini label="市场情绪" value={ev.verdict} />
-          <Mini label="上涨 / 下跌" value={`${up} / ${dn}`} tone={avg} />
-          <Mini label="风险" value={ev.risk} />
+        <div className="shrink-0 text-right">
+          <div className={`text-2xl font-semibold tabular-nums ${ev.score >= 60 ? "tone-up" : ev.score <= 40 ? "tone-down" : "text-fg"}`}>{ev.score}</div>
+          <div className="text-[10px] text-subtle">规则评分</div>
         </div>
-        <p className="mt-3 text-sm text-fg">{ev.steps[6]?.body}</p>
-        <button type="button" onClick={() => void deep()} disabled={busy} className="mt-3 w-full rounded-2xl bg-accent py-2.5 text-sm font-semibold text-accent-fg transition-transform active:scale-[0.98] disabled:opacity-60">{busy ? "DeepSeek 分析中…" : "深度分析"}</button>
-        {aiText ? <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-muted">{aiText}</p> : null}
-        <p className="mt-2 text-[10px] text-subtle">规则引擎基于已校验证据；深度分析按需调用。未配置 Key 时请先前往 <Link to="/settings" className="text-accent">DeepSeek 设置</Link> 测试。</p>
-      </Glass>
+      </div>
 
-      <Glass>
-        <SectionTitle title="市场温度计" hint="情绪" />
-        <div className="flex items-end justify-between">
-          <div>
-            <Tone v={avg} className="text-xl font-semibold">{avg == null ? "暂无可靠数据" : avg > 1 ? "偏热" : avg > 0 ? "温和" : avg < -1 ? "偏冷" : "中性"}</Tone>
-            <div className="text-xs text-muted">{fmtPctShort(avg)}</div>
-          </div>
-          <div className="text-xs text-muted"><b className="tone-up">{up} 涨</b> / <b className="tone-down">{dn} 跌</b></div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <Mini label="市场情绪" value={ev.verdict} />
+        <Mini label="上涨 / 下跌" value={`${up} / ${dn}`} tone={avg} />
+        <Mini label="风险" value={ev.risk} />
+      </div>
+
+      <div className="mt-3 rounded-2xl bg-bg-elevated/70 p-3">
+        <div className="flex items-center justify-between text-[10px] text-subtle"><span>市场温度</span><span>{fmtPctShort(avg)}</span></div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-border"><i className="block h-full rounded-full bg-accent transition-[width]" style={{ width: `${Math.min(100, Math.max(0, 50 + (avg || 0) * 10))}%` }} /></div>
+        <div className="mt-2 flex items-center justify-between text-xs"><Tone v={avg} className="font-semibold">{avg == null ? "暂无可靠数据" : avg > 1 ? "偏热" : avg > 0 ? "温和" : avg < -1 ? "偏冷" : "中性"}</Tone><span className="text-muted"><b className="tone-up">{up} 涨</b> / <b className="tone-down">{dn} 跌</b></span></div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-2xl bg-bg-elevated/70 p-3">
+          <div className="text-[10px] text-subtle">最强板块</div>
+          <div className="mt-1 truncate text-sm font-semibold">{strongest ? strongest.name : "暂无可靠数据"}</div>
+          <Tone v={strongest?.change} className="mt-0.5 block text-xs font-semibold">{fmtPctShort(strongest?.change)}</Tone>
         </div>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border"><i className="block h-full rounded-full bg-accent" style={{ width: `${Math.min(100, Math.max(0, 50 + (avg || 0) * 10))}%` }} /></div>
-      </Glass>
+        <div className="rounded-2xl bg-bg-elevated/70 p-3">
+          <div className="text-[10px] text-subtle">最弱板块</div>
+          <div className="mt-1 truncate text-sm font-semibold">{weakest ? weakest.name : "暂无可靠数据"}</div>
+          <Tone v={weakest?.change} className="mt-0.5 block text-xs font-semibold">{fmtPctShort(weakest?.change)}</Tone>
+        </div>
+      </div>
 
-      <Glass>
-        <SectionTitle title="市场扫描" hint="最强 / 最弱" />
-        {strongest && weakest ? (
-          <div className="space-y-2 text-sm">
-            <Row k="最强" v={`${strongest.name} ${fmtPctShort(strongest.change)}`} tone={strongest.change} />
-            <Row k="最弱" v={`${weakest.name} ${fmtPctShort(weakest.change)}`} tone={weakest.change} />
-            <Row k="资金" v={flow ? `主力 ${fmtYi(flow.main)}` : "暂无可靠数据"} tone={flow?.main} />
-          </div>
-        ) : <p className="text-sm text-muted">暂无可靠数据</p>}
-      </Glass>
-
-      <Glass>
-        <SectionTitle title="资金验证" hint="订单规模" />
+      <div className="mt-3 rounded-2xl bg-bg-elevated/70 p-3">
+        <div className="flex items-center justify-between gap-2"><SectionTitle title="资金验证" hint="订单规模" /></div>
         {flow ? (
-          <div className="space-y-2 text-sm">
+          <div className="grid grid-cols-2 gap-1.5 text-xs">
             <Row k="主力净流入" v={fmtYi(flow.main)} tone={flow.main} />
             <Row k="超大单" v={fmtYi(flow.super)} tone={flow.super} />
             <Row k="大单" v={fmtYi(flow.large)} tone={flow.large} />
             <Row k="中单" v={fmtYi(flow.mid)} tone={flow.mid} />
             <Row k="小单" v={fmtYi(flow.small)} tone={flow.small} />
-            <div className="pt-1 text-[10px] text-subtle">{flowConsistency === true ? "主力≈超大单+大单，内部口径一致" : flowConsistency === false ? "主力与超大单+大单存在明显偏差，谨慎解读" : "暂无足够资金数据完成一致性校验"}</div>
-            <div className="text-[10px] text-subtle">小单仅代表订单规模分类，不等同于“散户买入/卖出”。</div>
+            <div className="flex items-center rounded-2xl bg-bg-elevated px-3 py-2 text-[10px] text-subtle">{flowConsistency === true ? "主力≈超大单+大单，口径一致" : flowConsistency === false ? "主力与超大单+大单有偏差" : "暂无足够数据校验"}</div>
           </div>
         ) : <p className="text-sm text-muted">暂无可靠资金数据</p>}
-      </Glass>
-    </>
+        <div className="mt-2 text-[10px] leading-relaxed text-subtle">小单只是订单规模分类，不等同于散户买入/卖出。</div>
+      </div>
+
+      <p className="mt-3 text-sm text-fg">{ev.steps[6]?.body}</p>
+      <button type="button" onClick={() => void deep()} disabled={busy} className="mt-3 w-full rounded-2xl bg-accent py-2.5 text-sm font-semibold text-accent-fg transition-transform active:scale-[0.98] disabled:opacity-60">{busy ? "DeepSeek 分析中…" : "深度分析"}</button>
+      {aiText ? <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-muted">{aiText}</p> : null}
+      <p className="mt-2 text-[10px] text-subtle">规则引擎基于已校验证据；深度分析按需调用。未配置 Key 时请先前往 <Link to="/settings" className="text-accent">DeepSeek 设置</Link> 测试。</p>
+    </Glass>
   );
 }
 
