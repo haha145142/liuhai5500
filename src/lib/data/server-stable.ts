@@ -6,6 +6,7 @@ import type { BoardQuote, DataSource, FundQuote, GlobalQuote, IndexQuote, Market
 import { safeText } from "../format";
 import { isWeekend, tradingDateLabel } from "./trading-day";
 import { cnTime } from "../format";
+import { validateMoneyFlow } from "../calc/money-flow-validation";
 
 const EM_UT = "fa5fd1943c7b386f172d6893dbfba10b";
 type Entry<T> = { ts: number; data: T };
@@ -66,16 +67,26 @@ async function fetchFlow(): Promise<{ flow: MarketOrder | null; source: DataSour
   try {
     const j = await em(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=400&po=1&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent("m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23")}&fields=f62,f66,f69,f72,f75&ut=${EM_UT}&_=${Date.now()}`, 10000) as any;
     const arr = asArr(j?.data?.diff); if (!arr.length) throw new Error("empty");
-    const sum = (k: string) => arr.reduce((s, x) => s + (safeMoney(n(x[k])) || 0), 0);
-    const main = sum("f62"); const superFlow = sum("f66"); const large = sum("f69"); const mid = sum("f72"); const small = sum("f75");
-    const internalDelta = Math.abs(main - (superFlow + large));
-    const balanceDelta = Math.abs(main - (superFlow + large + mid + small));
-    const tolerance = Math.max(1, Math.abs(main) * 0.02);
-    const balanceTolerance = Math.max(1, Math.abs(main) * 0.05);
-    const validated = internalDelta <= tolerance;
-    const balanced = balanceDelta <= balanceTolerance;
-    const validation = validated && balanced ? "fully_consistent" : (validated || balanced ? "partially_consistent" : "unreliable");
-    return { flow: { main, super: superFlow, large, mid, small, count: arr.length, validation, internalDelta, balanceDelta, note: validation === "fully_consistent" ? "主力=超大单+大单，且分项余额一致" : validation === "partially_consistent" ? "资金分项存在轻微偏差，保留并标记" : "资金分项内部校验未通过，属于低可信数据" }, source: source("资金", validation !== "unreliable", `东方财富全A ${arr.length} 只；内部校验：${validation}`) };
+    const sumNullable = (key: string) => {
+      let total = 0;
+      for (const row of arr) {
+        const value = safeMoney(n(row[key]));
+        if (value == null) return null;
+        total += value;
+      }
+      return safeMoney(total);
+    };
+    const main = sumNullable("f62");
+    const superFlow = sumNullable("f66");
+    const large = sumNullable("f69");
+    const mid = sumNullable("f72");
+    const small = sumNullable("f75");
+    if ([main, superFlow, large, mid, small].some(v => v == null)) {
+      return { flow: null, source: source("资金", false, "资金分项字段不完整，已保留上一可靠值") };
+    }
+    const flow: MarketOrder = { main, super: superFlow, large, mid, small, count: arr.length, validation: "unreliable", internalDelta: 0, balanceDelta: 0, note: "" };
+    const checked = validateMoneyFlow(flow);
+    return { flow: { ...flow, validation: checked.validation, internalDelta: checked.internalDelta, balanceDelta: checked.balanceDelta, note: checked.reason }, source: source("资金", checked.usableForDirection, `东方财富全A ${arr.length} 只；字段完整；内部校验：${checked.validation}`) };
   } catch { return { flow: null, source: source("资金", false, "数据源暂不可用") }; }
 }
 
