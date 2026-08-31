@@ -14,17 +14,22 @@ const FUNDS_CACHE_KEY = "fund_ai_pro_funds_cache_v1";
 export type AppSettings = { autoRefreshMs: number; newsRefreshMs: number };
 type CacheEnvelope<T> = { savedAt: number; data: T };
 const DEFAULT_SETTINGS: AppSettings = { autoRefreshMs: 30_000, newsRefreshMs: 3 * 60_000 };
+const RELIABLE_MARKET_CACHE_MAX_AGE = 14 * 24 * 60 * 60_000;
+const NEWS_CACHE_MAX_AGE = 48 * 60 * 60_000;
 
 function readJson<T>(key: string, fallback: T): T { if (typeof window === "undefined") return fallback; try { const raw = localStorage.getItem(key); if (!raw) return fallback; return JSON.parse(raw) as T; } catch { return fallback; } }
 function saveJson(key: string, value: unknown) { if (typeof window === "undefined") return; try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
 function loadCache<T>(key: string, maxAge: number): T | null { if (typeof window === "undefined") return null; try { const item = JSON.parse(localStorage.getItem(key) || "null") as CacheEnvelope<T> | null; if (!item || typeof item.savedAt !== "number" || Date.now() - item.savedAt > maxAge) return null; return item.data ?? null; } catch { return null; } }
 function saveCache<T>(key: string, data: T) { saveJson(key, { savedAt: Date.now(), data } satisfies CacheEnvelope<T>); }
 
-export function loadCachedSnapshot(maxAge = 24 * 60 * 60_000): Snapshot | null { return loadCache<Snapshot>(SNAPSHOT_CACHE_KEY, maxAge); }
+/** Keep the latest reliable market/fund snapshot long enough to cover weekends and long holidays.
+ * The stored marketDate/navDate remains authoritative, so a longer TTL never turns old data into "today".
+ */
+export function loadCachedSnapshot(maxAge = RELIABLE_MARKET_CACHE_MAX_AGE): Snapshot | null { return loadCache<Snapshot>(SNAPSHOT_CACHE_KEY, maxAge); }
 export function saveCachedSnapshot(data: Snapshot) { saveCache(SNAPSHOT_CACHE_KEY, data); }
-export function loadCachedNews(maxAge = 48 * 60 * 60_000): NewsFeed | null { return loadCache<NewsFeed>(NEWS_CACHE_KEY, maxAge); }
+export function loadCachedNews(maxAge = NEWS_CACHE_MAX_AGE): NewsFeed | null { return loadCache<NewsFeed>(NEWS_CACHE_KEY, maxAge); }
 export function saveCachedNews(data: NewsFeed) { saveCache(NEWS_CACHE_KEY, data); }
-export function loadCachedFunds(maxAge = 48 * 60 * 60_000): Record<string, FundQuote> { return loadCache<Record<string, FundQuote>>(FUNDS_CACHE_KEY, maxAge) || {}; }
+export function loadCachedFunds(maxAge = RELIABLE_MARKET_CACHE_MAX_AGE): Record<string, FundQuote> { return loadCache<Record<string, FundQuote>>(FUNDS_CACHE_KEY, maxAge) || {}; }
 export function saveCachedFunds(data: Record<string, FundQuote>) { saveCache(FUNDS_CACHE_KEY, data); }
 
 export function sanitizePortfolio(value: unknown): Holding[] {
