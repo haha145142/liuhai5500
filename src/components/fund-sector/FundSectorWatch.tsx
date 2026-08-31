@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, GripVertical, Pin, Plus, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react";
 import { getFundSectorQuotes, type FundSectorQuote } from "@/lib/data/server";
 import { FUND_SECTORS, DEFAULT_FUND_SECTOR_IDS } from "@/lib/data/fund-sectors";
 import { enrichFundSectorMembers, quoteForEnrichedHolding } from "@/lib/data/fund-sector-membership";
@@ -7,216 +7,100 @@ import { fmtPctShort } from "@/lib/format";
 import type { FundQuote, Holding } from "@/lib/types";
 
 const KEY = "fund_ai_pro_fund_sector_watch_v2";
-const LEGACY_KEY = "fund_ai_pro_fund_sector_watch_v1";
-
 type StoredPrefs = { ids: string[]; pinned: string[] };
 
 function readPrefs(): StoredPrefs {
   if (typeof window === "undefined") return { ids: DEFAULT_FUND_SECTOR_IDS, pinned: [] };
   try {
-    const rawV2 = JSON.parse(localStorage.getItem(KEY) || "null") as Partial<StoredPrefs> | null;
-    if (Array.isArray(rawV2?.ids)) {
-      const ids = rawV2.ids.filter((x): x is string => typeof x === "string");
-      const pinned = Array.isArray(rawV2?.pinned) ? rawV2.pinned.filter((x): x is string => typeof x === "string" && ids.includes(x)) : [];
-      return { ids, pinned };
-    }
-    const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || "null");
-    if (Array.isArray(legacy) && legacy.every((x) => typeof x === "string")) return { ids: legacy, pinned: [] };
-    return { ids: DEFAULT_FUND_SECTOR_IDS, pinned: [] };
-  } catch {
-    return { ids: DEFAULT_FUND_SECTOR_IDS, pinned: [] };
-  }
+    const raw = JSON.parse(localStorage.getItem(KEY) || "null") as Partial<StoredPrefs> | null;
+    if (Array.isArray(raw?.ids)) return { ids: raw.ids.filter((x): x is string => typeof x === "string"), pinned: Array.isArray(raw.pinned) ? raw.pinned.filter((x): x is string => typeof x === "string") : [] };
+  } catch {}
+  return { ids: DEFAULT_FUND_SECTOR_IDS, pinned: [] };
 }
-
-function toneClass(pct: number | null) {
-  if (pct == null) return "text-subtle";
-  return pct > 0 ? "text-up" : pct < 0 ? "text-down" : "text-muted";
-}
+function tone(pct: number | null) { return pct == null ? "text-subtle" : pct > 0 ? "text-up" : pct < 0 ? "text-down" : "text-muted"; }
 
 export function FundSectorWatch({ portfolio = [], funds = {} }: { portfolio?: Holding[]; funds?: Record<string, FundQuote> }) {
   const [{ ids, pinned }, setPrefs] = useState<StoredPrefs>(readPrefs);
   const [rows, setRows] = useState<FundSectorQuote[]>([]);
+  const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const pageSize = 2;
 
   const available = useMemo(() => {
     const q = query.trim().toLowerCase();
     return FUND_SECTORS.filter((s) => !ids.includes(s.id) && (!q || `${s.name} ${s.id}`.toLowerCase().includes(q)));
   }, [ids, query]);
 
-  const heldCodes = useMemo(() => new Set(portfolio.map((h) => h.code)), [portfolio]);
-
-  const orderedRows = useMemo(() => {
-    const rank = new Map(pinned.map((id, i) => [id, i]));
-    return rows.slice().sort((a, b) => {
-      const ap = rank.get(a.id);
-      const bp = rank.get(b.id);
-      if (ap != null || bp != null) return (ap ?? Number.MAX_SAFE_INTEGER) - (bp ?? Number.MAX_SAFE_INTEGER);
-      return ids.indexOf(a.id) - ids.indexOf(b.id);
-    });
-  }, [ids, pinned, rows]);
-
   useEffect(() => {
-    try { localStorage.setItem(KEY, JSON.stringify({ ids, pinned } satisfies StoredPrefs)); } catch { /* local only */ }
+    try { localStorage.setItem(KEY, JSON.stringify({ ids, pinned } satisfies StoredPrefs)); } catch {}
   }, [ids, pinned]);
 
+  const orderedIds = useMemo(() => {
+    const rest = ids.filter((id) => !pinned.includes(id));
+    return [...pinned.filter((id) => ids.includes(id)), ...rest];
+  }, [ids, pinned]);
+  const pageIds = orderedIds.slice(page * pageSize, page * pageSize + pageSize);
+  const pageCount = Math.max(1, Math.ceil(orderedIds.length / pageSize));
+
   useEffect(() => {
+    if (page >= pageCount) setPage(Math.max(0, pageCount - 1));
+  }, [page, pageCount]);
+
+  useEffect(() => {
+    if (!pageIds.length) { setRows([]); setLoading(false); return; }
     let alive = true;
     setLoading(true);
-    void getFundSectorQuotes({ data: { ids } })
-      .then((res) => {
-        if (!alive) return;
-        setRows(res.rows);
-        setMessage(res.weekend ? "周末休市 · 沿用最近交易日数据" : "");
-      })
-      .catch(() => { if (alive) setMessage("板块数据暂不可用 · 已保留上一轮结果"); })
+    void getFundSectorQuotes({ data: { ids: pageIds } })
+      .then((res) => { if (alive) { setRows(res.rows); setMessage(res.weekend ? "周末休市 · 沿用最近交易日数据" : ""); } })
+      .catch(() => { if (alive) setMessage("实时行情暂不可用 · 请稍后重试"); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [ids.join(",")]);
+  }, [pageIds.join(",")]);
 
-  const addSector = (id: string) => {
-    setPrefs((cur) => ({ ...cur, ids: cur.ids.includes(id) ? cur.ids : [...cur.ids, id] }));
-    setAdding(false);
-    setQuery("");
-  };
-
-  const removeSector = (id: string) => {
-    setPrefs((cur) => ({ ids: cur.ids.filter((x) => x !== id), pinned: cur.pinned.filter((x) => x !== id) }));
-    setOpenId((cur) => cur === id ? null : cur);
-  };
-
-  const togglePin = (id: string) => {
-    setPrefs((cur) => cur.pinned.includes(id)
-      ? { ...cur, pinned: cur.pinned.filter((x) => x !== id) }
-      : { ...cur, pinned: [id, ...cur.pinned.filter((x) => x !== id)] });
-  };
-
-  const moveSector = (id: string, direction: -1 | 1) => {
-    setPrefs((cur) => {
-      const next = cur.ids.slice();
-      const idx = next.indexOf(id);
-      const target = idx + direction;
-      if (idx < 0 || target < 0 || target >= next.length) return cur;
-      [next[idx], next[target]] = [next[target], next[idx]];
-      return { ...cur, ids: next };
-    });
-  };
+  const addSector = (id: string) => { setPrefs((cur) => ({ ...cur, ids: cur.ids.includes(id) ? cur.ids : [...cur.ids, id] })); setAdding(false); setQuery(""); };
+  const removeSector = (id: string) => { setPrefs((cur) => ({ ids: cur.ids.filter((x) => x !== id), pinned: cur.pinned.filter((x) => x !== id) })); setOpenId(null); };
+  const togglePin = (id: string) => { setPrefs((cur) => cur.pinned.includes(id) ? { ...cur, pinned: cur.pinned.filter((x) => x !== id) } : { ...cur, pinned: [id, ...cur.pinned.filter((x) => x !== id)] }); setPage(0); };
 
   return (
-    <section className="mb-3 rounded-[26px] border border-white/70 bg-white/50 p-3 shadow-[0_14px_40px_rgba(30,76,125,.08)] backdrop-blur-[14px]">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-base font-semibold tracking-tight text-fg">我的基金板块</div>
-          <div className="text-[10px] text-subtle">只显示你关注的基金主题 · 点开看包含基金</div>
+    <section className="mb-4 rounded-[28px] border border-white/80 bg-white/[.46] p-3 shadow-[0_18px_60px_rgba(66,93,122,.09)] backdrop-blur-[26px]">
+      <div className="flex items-center justify-between gap-3 px-1">
+        <div><div className="text-[15px] font-semibold tracking-tight text-fg">自选板块</div><div className="mt-0.5 text-[10px] text-subtle">每次只看 2 个主题 · 数据不足明确显示</div></div>
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} aria-label="上一页" className="flex size-8 items-center justify-center rounded-full border border-white/80 bg-white/55 text-slate-500 disabled:opacity-30"><ChevronLeft size={16} /></button>
+          <button type="button" onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} disabled={page >= pageCount - 1} aria-label="下一页" className="flex size-8 items-center justify-center rounded-full border border-white/80 bg-white/55 text-slate-500 disabled:opacity-30"><ChevronRight size={16} /></button>
+          <button type="button" onClick={() => setAdding((v) => !v)} aria-label="管理板块" className="flex size-8 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm"><Plus size={16} /></button>
         </div>
-        <button type="button" onClick={() => setAdding((v) => !v)} className="flex size-9 items-center justify-center rounded-full bg-fg text-bg" aria-label="管理基金板块">
-          <Plus size={17} />
-        </button>
       </div>
 
-      {adding ? (
-        <div className="mt-2 rounded-2xl bg-bg-elevated p-2">
-          <div className="mb-2 flex items-center gap-2 rounded-xl bg-white/70 px-2.5 py-2 ring-1 ring-border">
-            <Search size={14} className="text-subtle" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索基金板块" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
-          </div>
-          <div className="flex max-h-48 flex-wrap gap-1.5 overflow-y-auto">
-            {available.slice(0, 40).map((sector) => (
-              <button key={sector.id} type="button" onClick={() => addSector(sector.id)} className="rounded-full bg-white/70 px-2.5 py-1.5 text-[10px] font-medium ring-1 ring-border hover:bg-white">
-                {sector.icon} {sector.name}
-              </button>
-            ))}
-          </div>
-          {!available.length ? <div className="text-[10px] text-subtle">没有匹配的板块</div> : null}
-        </div>
-      ) : null}
+      {adding ? <div className="mt-2 rounded-[20px] border border-white/80 bg-white/55 p-2.5 backdrop-blur-xl"><div className="mb-2 flex items-center gap-2 rounded-xl border border-white/80 bg-white/70 px-2.5 py-2"><Search size={14} className="text-subtle"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索板块" className="min-w-0 flex-1 bg-transparent text-xs outline-none"/></div><div className="flex max-h-44 flex-wrap gap-1.5 overflow-auto">{available.slice(0, 40).map((s) => <button key={s.id} type="button" onClick={() => addSector(s.id)} className="rounded-full border border-white/80 bg-white/75 px-2.5 py-1.5 text-[10px] font-medium text-slate-700">{s.icon} {s.name}</button>)}</div></div> : null}
 
-      <div className="mt-2.5 space-y-2">
-        {loading && !rows.length ? <div className="rounded-2xl bg-bg-elevated px-3 py-4 text-center text-[10px] text-subtle">正在读取基金板块…</div> : null}
-        {orderedRows.map((row) => {
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {loading && !rows.length ? <div className="min-h-[138px] rounded-[24px] border border-white/80 bg-white/48 p-4 shadow-[0_10px_30px_rgba(66,93,122,.06)] backdrop-blur-xl"><div className="h-4 w-28 animate-pulse rounded bg-slate-200/70"/><div className="mt-5 h-8 w-20 animate-pulse rounded bg-slate-200/70"/></div> : null}
+        {rows.map((row) => {
           const open = openId === row.id;
-          const sectorDef = FUND_SECTORS.find((s) => s.id === row.id);
-          const heldFunds = row.funds.filter((fund) => heldCodes.has(fund.code));
-          const dynamicMembers = sectorDef ? enrichFundSectorMembers(sectorDef, row.funds, portfolio) : [];
-          const dynamicHeld = dynamicMembers.map((m) => {
-            const holding = portfolio.find((h) => h.code === m.code);
-            if (!holding) return null;
-            const quote = quoteForEnrichedHolding(holding, funds);
-            return {
-              ...quote,
-              validation: quote.pct != null ? "single_source" as const : "unavailable" as const,
-              source: quote.pct != null ? "持仓基金本地行情" : "暂无可靠行情",
-            };
-          }).filter((v): v is NonNullable<typeof v> => v !== null);
-          const mergedFunds = [...row.funds, ...dynamicHeld.filter((fund) => !row.funds.some((x) => x.code === fund.code))];
-          const heldMerged = mergedFunds.filter((fund) => heldCodes.has(fund.code));
-          const otherFunds = mergedFunds.filter((fund) => !heldCodes.has(fund.code));
-          const orderedFunds = [...heldMerged, ...otherFunds];
-          const isPinned = pinned.includes(row.id);
-          return (
-            <div key={row.id} className="overflow-hidden rounded-2xl bg-bg-elevated/75 ring-1 ring-white/70">
-              <button type="button" onClick={() => setOpenId((cur) => cur === row.id ? null : row.id)} className="flex w-full items-center gap-2 px-3 py-2.5 text-left">
-                <GripVertical size={14} className="shrink-0 text-subtle/70" aria-hidden />
-                <span className="text-base">{row.icon}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate text-xs font-semibold text-fg">{row.name}</span>
-                    {isPinned ? <Pin size={11} className="shrink-0 text-accent" fill="currentColor" /> : null}
-                  </span>
-                  <span className="mt-0.5 block text-[9px] text-subtle">{row.validCount}/{row.totalCount} 只基金有可靠行情 · {row.up} 涨 {row.down} 跌{heldMerged.length ? ` · 你持有 ${heldMerged.length} 只` : ""}</span>
-                </span>
-                <span className={`text-sm font-bold tabular-nums ${toneClass(row.pct)}`}>{row.pct == null ? "—" : fmtPctShort(row.pct)}</span>
-                <ChevronDown size={15} className={`text-subtle transition-transform ${open ? "rotate-180" : ""}`} />
-              </button>
-
-              {open ? (
-                <div className="border-t border-white/60 px-3 pb-3 pt-2">
-                  <div className="mb-2 flex items-center justify-between text-[9px] text-subtle">
-                    <span>板块内基金 · 持仓优先</span>
-                    <span>{dynamicHeld.length ? `自动识别 ${dynamicHeld.length} 只` : ""} {row.validation === "cross_checked" ? "· 双源核验" : row.validation === "single_source" ? "· 部分可用" : "· 暂无可靠数据"}</span>
-                  </div>
-                  <div className="space-y-1">
-                    {orderedFunds.map((fund) => {
-                      const held = heldCodes.has(fund.code);
-                      const auto = dynamicHeld.some((x) => x.code === fund.code);
-                      const appFund = funds[fund.code];
-                      return (
-                        <div key={fund.code} className={`flex items-center gap-2 rounded-xl px-2.5 py-2 ${held ? "bg-accent/10 ring-1 ring-accent/15" : "bg-white/45"}`}>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <div className="truncate text-[10px] font-medium text-fg">{fund.name}</div>
-                              {held ? <span className="shrink-0 rounded-full bg-accent/12 px-1.5 py-0.5 text-[8px] font-semibold text-accent">持仓</span> : null}
-                              {auto ? <span className="shrink-0 rounded-full bg-black/5 px-1.5 py-0.5 text-[8px] text-subtle">自动识别</span> : null}
-                            </div>
-                            <div className="text-[9px] text-subtle">{fund.code}{appFund?.nav != null ? ` · 净值 ${appFund.nav.toFixed(4)}` : ""}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className={`text-[11px] font-semibold tabular-nums ${toneClass(fund.pct)}`}>{fund.pct == null ? "—" : fmtPctShort(fund.pct)}</div>
-                            {held ? <div className="text-[8px] text-accent">重点关注</div> : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[9px] text-subtle">数据日 {row.marketDate || "暂无"}</span>
-                    <div className="flex items-center gap-1">
-                      <button type="button" onClick={(e) => { e.stopPropagation(); togglePin(row.id); }} className="rounded-full px-2 py-1 text-[9px] text-subtle hover:bg-white/60">{isPinned ? "取消置顶" : "置顶"}</button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); moveSector(row.id, -1); }} className="rounded-full px-2 py-1 text-[9px] text-subtle hover:bg-white/60">上移</button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); moveSector(row.id, 1); }} className="rounded-full px-2 py-1 text-[9px] text-subtle hover:bg-white/60">下移</button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); removeSector(row.id); }} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] text-subtle hover:bg-white/60"><X size={11} /> 移除</button>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          );
+          const def = FUND_SECTORS.find((s) => s.id === row.id);
+          const heldCodes = new Set(portfolio.map((h) => h.code));
+          const held = row.funds.filter((f) => heldCodes.has(f.code));
+          const dynamic = def ? enrichFundSectorMembers(def, row.funds, portfolio).map((m) => { const h = portfolio.find((x) => x.code === m.code); return h ? { ...quoteForEnrichedHolding(h, funds), validation: "single_source" as const, source: "持仓基金行情" } : null; }).filter((x): x is NonNullable<typeof x> => !!x) : [];
+          const merged = [...row.funds, ...dynamic.filter((f) => !row.funds.some((x) => x.code === f.code))];
+          const visibleFunds = open ? merged.slice(0, 6) : [];
+          return <article key={row.id} className="overflow-hidden rounded-[24px] border border-white/85 bg-white/[.58] shadow-[0_14px_40px_rgba(66,93,122,.09)] backdrop-blur-[24px]">
+            <button type="button" onClick={() => setOpenId((cur) => cur === row.id ? null : row.id)} className="w-full px-4 py-4 text-left active:scale-[.995]">
+              <div className="flex items-start gap-3"><div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/90 bg-white/72 text-xl shadow-sm">{row.icon}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="truncate text-[14px] font-semibold text-slate-900">{row.name}</span><span className="text-[9px] text-slate-400">{row.validCount}/{row.totalCount}</span></div><div className="mt-1 text-[10px] text-slate-500">{row.up} 涨 · {row.down} 跌{held.length ? ` · 持有 ${held.length}` : ""}</div></div><div className={`text-lg font-bold tabular-nums ${tone(row.pct)}`}>{row.pct == null ? "—" : fmtPctShort(row.pct)}</div></div>
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-200/70"><div className="h-full rounded-full bg-slate-400/35" style={{ width: `${Math.min(100, Math.max(0, row.validCount / Math.max(1, row.totalCount) * 100))}%` }}/></div>
+              <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-slate-400"><span>{row.source}</span><span>{row.marketDate || "暂无数据日"}</span></div>
+            </button>
+            {open ? <div className="border-t border-white/75 px-4 pb-4 pt-3"><div className="space-y-1.5">{visibleFunds.map((fund) => <div key={fund.code} className="flex items-center gap-2 rounded-xl border border-white/70 bg-white/48 px-2.5 py-2"><div className="min-w-0 flex-1"><div className="truncate text-[10px] font-medium text-slate-700">{fund.name}</div><div className="text-[9px] text-slate-400">{fund.code}</div></div><span className={`text-[11px] font-semibold tabular-nums ${tone(fund.pct)}`}>{fund.pct == null ? "—" : fmtPctShort(fund.pct)}</span></div>)}</div><div className="mt-3 flex items-center justify-between"><span className="text-[9px] text-slate-400">{held.length ? `持仓 ${held.length} 只优先展示` : "点击卡片收起"}</span><button type="button" onClick={(e) => { e.stopPropagation(); removeSector(row.id); }} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] text-slate-400"><X size={12}/>移除</button></div></div> : null}
+          </article>;
         })}
       </div>
-      {message ? <div className="mt-2 text-[9px] text-subtle">{message}</div> : null}
+
+      {orderedIds.length > pageSize ? <div className="mt-3 flex items-center justify-center gap-1.5">{Array.from({ length: pageCount }).map((_, i) => <button key={i} type="button" aria-label={`第 ${i + 1} 页`} onClick={() => setPage(i)} className={`h-1.5 rounded-full transition-all ${i === page ? "w-5 bg-slate-700" : "w-1.5 bg-slate-300"}`}/>)}</div> : null}
+      {message ? <div className="mt-2 px-1 text-[9px] text-slate-400">{message}</div> : null}
     </section>
   );
 }
