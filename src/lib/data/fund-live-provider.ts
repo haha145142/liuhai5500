@@ -7,6 +7,10 @@ export type LiveFundQuote = {
   nav: number | null;
   estimate: number | null;
   pct: number | null;
+  vgszzl?: number | null;
+  zsgzzl?: number | null;
+  jzzzl?: number | null;
+  rzzl?: number | null;
   time: string | null;
   date: string | null;
   source: string;
@@ -34,8 +38,26 @@ function scan(value: unknown, code: string, depth = 0): LiveFundQuote | null {
   const nav = n(o.NAV ?? o.nav ?? o.DWJZ ?? o.dwjz);
   const time = o.GZTIME ?? o.gztime ?? o.Gtime ?? o.time;
   const date = o.PDATE ?? o.jzrq ?? o.FSRQ ?? o.date;
+  const vgszzl = n(o.VGSZZL ?? o.vgszzl);
+  const zsgzzl = n(o.ZSGZZL ?? o.zsgzzl);
+  const jzzzl = n(o.JZZZL ?? o.jzzzl);
+  const rzzl = n(o.RZZL ?? o.rzzl);
   if ((foundCode === code || !foundCode) && (estimate != null || pct != null) && (foundCode === code || depth >= 2)) {
-    return { code, name: String(o.SHORTNAME ?? o.name ?? "").trim(), type: String(o.FTYPE ?? o.fundtype ?? o.type ?? "").trim(), nav, estimate, pct, time: time == null ? null : String(time), date: date == null ? null : String(date), source: "实时基金估值" };
+    return {
+      code,
+      name: String(o.SHORTNAME ?? o.name ?? "").trim(),
+      type: String(o.FTYPE ?? o.fundtype ?? o.type ?? "").trim(),
+      nav,
+      estimate,
+      pct,
+      vgszzl,
+      zsgzzl,
+      jzzzl,
+      rzzl,
+      time: time == null ? null : String(time),
+      date: date == null ? null : String(date),
+      source: "实时基金估值",
+    };
   }
   for (const item of Object.values(o)) {
     const hit = scan(item, code, depth + 1);
