@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Sparkles, WifiOff } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
-import { getFund } from "@/lib/data/server";
+import { requestFund } from "@/lib/data/fund-request-cache";
 import { selectFundDisplayQuote } from "@/lib/data/quote-mode";
 import { previewHoldingEntry, quoteFromFundState } from "@/lib/calc/holding-entry";
 import { buildValuationDisplaySummary } from "@/lib/data/valuation-display";
@@ -68,7 +68,7 @@ export function QuickAddFund() {
     let active = true;
     setQuoteLoading(true);
     setMessage("");
-    void getFund({ data: { code } })
+    void requestFund(code)
       .then((fresh) => {
         if (active && fresh?.code === code) setRemoteQuote(fresh);
       })
