@@ -27,8 +27,8 @@ function BandPage() {
       {portfolio.map((h) => {
         const f = funds[h.code];
         const m = f?.metrics;
-        const px = f?.estimate ?? f?.nav ?? 0;
-        const swing = calcSwingTrade(m ?? null, h.cost, px);
+        const px = f?.estimate ?? f?.nav ?? null;
+        const swing = calcSwingTrade(m ?? null, h.cost, px ?? 0);
         return (
           <Glass key={h.code}>
             <div className="flex items-start justify-between">
@@ -42,12 +42,12 @@ function BandPage() {
             </div>
             {m ? (
               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                <Stat k="RSI" v={m.rsi.toFixed(1)} />
-                <Stat k="BIAS" v={`${m.bias.toFixed(2)}%`} />
-                <Stat k="MACD" v={m.macd.toFixed(3)} />
-                <Stat k="波段" v={`${m.band} ${m.bandScore}`} />
-                <Stat k="趋势" v={`${m.trend} ${m.trendScore}`} />
-                <Stat k="信号" v={`${m.sigStrength}`} />
+                <Stat k="RSI" v={fmtPrice(m.rsi, 1)} />
+                <Stat k="BIAS" v={`${fmtPrice(m.bias, 2)}%`} />
+                <Stat k="MACD" v={fmtPrice(m.macd, 3)} />
+                <Stat k="波段" v={`${m.band ?? "—"} ${m.bandScore ?? "—"}`} />
+                <Stat k="趋势" v={`${m.trend ?? "—"} ${m.trendScore ?? "—"}`} />
+                <Stat k="信号" v={m.sigStrength == null ? "—" : String(m.sigStrength)} />
               </div>
             ) : (
               <p className="mt-3 text-sm text-muted">净值历史不足，指标暂无可靠数据</p>
@@ -58,7 +58,7 @@ function BandPage() {
                 <p className="mt-1 text-xs leading-relaxed text-muted">{swing.reason}</p>
                 <p className="mt-1 text-xs text-subtle">
                   做 T 环境 {swing.envLevel}（{swing.env}）
-                  {swing.allowT && swing.buyGrid && swing.sellGrid
+                  {swing.allowT && swing.buyGrid != null && swing.sellGrid != null
                     ? ` · 低吸 ${fmtPrice(swing.buyGrid, 4)} / 高抛 ${fmtPrice(swing.sellGrid, 4)}`
                     : ""}
                 </p>
