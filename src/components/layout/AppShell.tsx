@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { Menu, RefreshCw } from "lucide-react";
 import { useApp } from "@/lib/store";
@@ -12,6 +12,7 @@ import { SideDrawer } from "./SideDrawer";
 const NEWS_REFRESH_MS = 3 * 60_000;
 const BOOT_DELAY_MS = 80;
 const NEWS_BOOT_DELAY_MS = 450;
+const RESUME_DEBOUNCE_MS = 2_000;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const hydrate = useApp((s) => s.hydrate);
@@ -24,29 +25,38 @@ export function AppShell({ children }: { children: ReactNode }) {
   const lastError = useApp((s) => s.lastError);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const lastResumeAtRef = useRef(0);
   const wantsNews = pathname === "/" || pathname.startsWith("/news");
+
+  const refreshCore = useCallback(() => {
+    if (document.hidden) return;
+    void refreshSnapshot();
+    void refreshFunds();
+  }, [refreshSnapshot, refreshFunds]);
+
+  const refreshAllVisible = useCallback(() => {
+    if (document.hidden) return;
+    const now = Date.now();
+    if (now - lastResumeAtRef.current < RESUME_DEBOUNCE_MS) return;
+    lastResumeAtRef.current = now;
+    refreshCore();
+    if (wantsNews) void refreshNews();
+  }, [refreshCore, refreshNews, wantsNews]);
 
   useEffect(() => {
     hydrate();
-    const coreId = window.setTimeout(() => {
-      void refreshSnapshot();
-      void refreshFunds();
-    }, BOOT_DELAY_MS);
+    const coreId = window.setTimeout(refreshCore, BOOT_DELAY_MS);
     const newsId = wantsNews ? window.setTimeout(() => void refreshNews(), NEWS_BOOT_DELAY_MS) : undefined;
     return () => {
       window.clearTimeout(coreId);
       if (newsId !== undefined) window.clearTimeout(newsId);
     };
-  }, [hydrate, refreshSnapshot, refreshFunds, refreshNews, wantsNews]);
+  }, [hydrate, refreshCore, refreshNews, wantsNews]);
 
   useEffect(() => {
-    const id = window.setInterval(() => {
-      if (document.hidden) return;
-      void refreshSnapshot();
-      void refreshFunds();
-    }, Math.max(30_000, settings.autoRefreshMs));
+    const id = window.setInterval(refreshCore, Math.max(30_000, settings.autoRefreshMs));
     return () => window.clearInterval(id);
-  }, [refreshSnapshot, refreshFunds, settings.autoRefreshMs]);
+  }, [refreshCore, settings.autoRefreshMs]);
 
   useEffect(() => {
     if (!wantsNews) return;
@@ -58,26 +68,22 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [wantsNews, refreshNews, settings.newsRefreshMs]);
 
   useEffect(() => {
-    const refreshOnResume = () => {
-      if (document.hidden) return;
-      void refreshSnapshot();
-      void refreshFunds();
-      if (wantsNews) void refreshNews();
+    const onVisibilityChange = () => {
+      if (!document.hidden) refreshAllVisible();
     };
-    const refreshOnOnline = () => refreshOnResume();
-    document.addEventListener("visibilitychange", refreshOnResume);
-    window.addEventListener("online", refreshOnOnline);
+    const onOnline = () => refreshAllVisible();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("online", onOnline);
     return () => {
-      document.removeEventListener("visibilitychange", refreshOnResume);
-      window.removeEventListener("online", refreshOnOnline);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("online", onOnline);
     };
-  }, [refreshSnapshot, refreshFunds, refreshNews, wantsNews]);
+  }, [refreshAllVisible]);
 
   useEffect(() => { setDrawerOpen(false); }, [pathname]);
 
   const onRefresh = () => {
-    void refreshSnapshot();
-    void refreshFunds();
+    refreshCore();
     if (wantsNews) void refreshNews();
   };
   const failedSources = snapshot?.sources.filter((s) => s.status === "err").map((s) => s.name) || [];
