@@ -1,14 +1,13 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouterState } from "@tanstack/react-router";
-import { RefreshCw } from "lucide-react";
-import { TabBar } from "./TabBar";
-import "./BottomNavFix.css";
+import { Menu, RefreshCw } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { clockStr } from "@/lib/format";
 import { isTradeTime, isWeekend, sessionLabel } from "@/lib/market-hours";
 import { tradingDateLabel } from "@/lib/data/trading-day";
 import { cn } from "@/lib/cn";
 import { QuickAddFund } from "@/components/portfolio/QuickAddFund";
+import { SideDrawer } from "./SideDrawer";
 
 const NEWS_REFRESH_MS = 3 * 60_000;
 const BOOT_DELAY_MS = 80;
@@ -23,6 +22,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const settings = useApp((s) => s.settings);
   const lastError = useApp((s) => s.lastError);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     hydrate();
@@ -52,6 +52,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.clearInterval(id);
   }, [pathname, refreshNews, settings.newsRefreshMs]);
 
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
   const onRefresh = () => {
     void refreshSnapshot();
     if (isTradeTime()) void refreshFunds();
@@ -77,12 +81,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const header = (
     <header className="app-header">
       <div className="app-header-card">
-        <div>
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="打开侧边菜单"
+          className="app-menu-button"
+        >
+          <Menu className="size-6" strokeWidth={2} />
+        </button>
+        <div className="min-w-0 flex-1">
           <h1 className="app-header-title">Fund AI Pro</h1>
           <p className="app-header-meta">{sessionLabel()} · {statusText}</p>
         </div>
         <button type="button" onClick={onRefresh} aria-label="刷新" className="app-refresh-button">
-          <RefreshCw className={cn("size-7", loading && "animate-spin")} />
+          <RefreshCw className={cn("size-6", loading && "animate-spin")} />
         </button>
       </div>
     </header>
@@ -103,7 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <main className="app-main">{mainContent}</main>
         </>
       )}
-      <TabBar />
+      <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   );
 }
