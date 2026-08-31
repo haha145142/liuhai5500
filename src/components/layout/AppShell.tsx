@@ -11,6 +11,7 @@ import { SideDrawer } from "./SideDrawer";
 
 const NEWS_REFRESH_MS = 3 * 60_000;
 const BOOT_DELAY_MS = 80;
+const NEWS_BOOT_DELAY_MS = 450;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const hydrate = useApp((s) => s.hydrate);
@@ -23,43 +24,61 @@ export function AppShell({ children }: { children: ReactNode }) {
   const lastError = useApp((s) => s.lastError);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const wantsNews = pathname === "/" || pathname.startsWith("/news");
 
   useEffect(() => {
     hydrate();
-    const id = window.setTimeout(() => {
+    const coreId = window.setTimeout(() => {
       void refreshSnapshot();
-      void refreshNews();
       void refreshFunds();
     }, BOOT_DELAY_MS);
-    return () => window.clearTimeout(id);
-  }, [hydrate, refreshSnapshot, refreshNews, refreshFunds]);
+    const newsId = wantsNews ? window.setTimeout(() => void refreshNews(), NEWS_BOOT_DELAY_MS) : undefined;
+    return () => {
+      window.clearTimeout(coreId);
+      if (newsId !== undefined) window.clearTimeout(newsId);
+    };
+  }, [hydrate, refreshSnapshot, refreshFunds, refreshNews, wantsNews]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
       if (document.hidden) return;
       void refreshSnapshot();
-      // The store decides whether this is a live-refresh, lunch freeze,
-      // post-close official-NAV poll, or latest-trading-day fallback.
       void refreshFunds();
     }, Math.max(30_000, settings.autoRefreshMs));
     return () => window.clearInterval(id);
   }, [refreshSnapshot, refreshFunds, settings.autoRefreshMs]);
 
   useEffect(() => {
-    if (pathname !== "/" && !pathname.startsWith("/news")) return;
+    if (!wantsNews) return;
     const id = window.setInterval(() => {
       if (document.hidden) return;
       void refreshNews();
     }, Math.max(60_000, settings.newsRefreshMs || NEWS_REFRESH_MS));
     return () => window.clearInterval(id);
-  }, [pathname, refreshNews, settings.newsRefreshMs]);
+  }, [wantsNews, refreshNews, settings.newsRefreshMs]);
+
+  useEffect(() => {
+    const refreshOnResume = () => {
+      if (document.hidden) return;
+      void refreshSnapshot();
+      void refreshFunds();
+      if (wantsNews) void refreshNews();
+    };
+    const refreshOnOnline = () => refreshOnResume();
+    document.addEventListener("visibilitychange", refreshOnResume);
+    window.addEventListener("online", refreshOnOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshOnResume);
+      window.removeEventListener("online", refreshOnOnline);
+    };
+  }, [refreshSnapshot, refreshFunds, refreshNews, wantsNews]);
 
   useEffect(() => { setDrawerOpen(false); }, [pathname]);
 
   const onRefresh = () => {
     void refreshSnapshot();
     void refreshFunds();
-    if (pathname.startsWith("/news") || pathname === "/") void refreshNews();
+    if (wantsNews) void refreshNews();
   };
   const failedSources = snapshot?.sources.filter((s) => s.status === "err").map((s) => s.name) || [];
   const validationLabel = snapshot?.validation === "cross_checked" ? "双源核验" : snapshot?.validation === "cached_latest_trading_day" ? "最近交易日缓存" : snapshot?.validation === "single_source" ? "单源可用" : "数据状态待确认";
