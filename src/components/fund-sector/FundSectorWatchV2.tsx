@@ -7,6 +7,7 @@ import type { FundQuote, Holding } from "@/lib/types";
 
 const KEY = "fund_ai_pro_fund_sector_watch_v3";
 const DATA_KEY = "fund_ai_pro_fund_sector_data_v1";
+const REQUEST_TIMEOUT_MS = 8_000;
 type Prefs = { ids: string[] };
 
 function readPrefs(): Prefs {
@@ -81,14 +82,29 @@ export function FundSectorWatchV2({ portfolio = [], funds = {} }: { portfolio?: 
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
 
     const run = async () => {
       attempt += 1;
       setLoading((current) => current && rows.length === 0);
       try {
-        const result = await getFundSectorQuotes({ data: { ids } });
+        const request = getFundSectorQuotes({ data: { ids } });
+        const timeout = new Promise<"timeout">((resolve) => {
+          timer = setTimeout(() => resolve("timeout"), REQUEST_TIMEOUT_MS);
+        });
+        const result = await Promise.race([request, timeout]);
         if (!alive) return;
+        if (result === "timeout") {
+          setLoading(false);
+          if (attempt < 3) {
+            setMessage(`行情源响应较慢 · 第 ${attempt}/3 次重试`);
+            retryTimer = setTimeout(run, attempt * 1000);
+          } else {
+            setMessage(rows.length ? "实时刷新暂时受阻 · 已继续显示上次真实数据" : "行情源响应超时 · 已停止转圈，等待下一次自动刷新");
+          }
+          return;
+        }
         setRows(result.rows);
         saveCachedRows(ids, result.rows);
         setMessage(
@@ -103,11 +119,16 @@ export function FundSectorWatchV2({ portfolio = [], funds = {} }: { portfolio?: 
         if (!alive) return;
         if (attempt < 3) {
           setMessage(`行情源连接波动 · 第 ${attempt}/3 次重试`);
-          timer = setTimeout(run, attempt * 1200);
+          retryTimer = setTimeout(run, attempt * 1200);
           return;
         }
         setLoading(false);
-        setMessage(rows.length ? "实时刷新暂时受阻 · 已继续显示上次真实数据" : "行情源暂时波动 · 正在等待下一次自动刷新");
+        setMessage(rows.length ? "实时刷新暂时受阻 · 已继续显示上次真实数据" : "行情源暂时波动 · 已停止转圈，等待下一次自动刷新");
+      } finally {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
       }
     };
 
@@ -116,6 +137,7 @@ export function FundSectorWatchV2({ portfolio = [], funds = {} }: { portfolio?: 
     return () => {
       alive = false;
       if (timer) clearTimeout(timer);
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [ids.join(",")]);
 
