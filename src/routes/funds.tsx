@@ -14,33 +14,64 @@ const TABS = [
   { id: "6y", label: "近6月" },
   { id: "1n", label: "近1年" },
 ] as const;
+const RANK_CACHE_PREFIX = "fund_ai_pro_rank_cache_v2_";
+
+type RankCache = { savedAt: number; rows: RankRow[]; source: string };
+
+function readRankCache(tab: string): RankCache | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = JSON.parse(localStorage.getItem(`${RANK_CACHE_PREFIX}${tab}`) || "null") as RankCache | null;
+    return raw && Array.isArray(raw.rows) && raw.rows.length ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeRankCache(tab: string, value: RankCache) {
+  try { localStorage.setItem(`${RANK_CACHE_PREFIX}${tab}`, JSON.stringify(value)); } catch {}
+}
 
 function FundsPage() {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("r");
-  const [rows, setRows] = useState<RankRow[]>([]);
-  const [source, setSource] = useState("—");
+  const [rows, setRows] = useState<RankRow[]>(() => readRankCache("r")?.rows || []);
+  const [source, setSource] = useState(() => readRankCache("r")?.source || "—");
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const watchlist = useApp((s) => s.watchlist);
   const toggleWatch = useApp((s) => s.toggleWatch);
   const addHolding = useApp((s) => s.addHolding);
 
   useEffect(() => {
     let live = true;
-    setLoading(true);
+    const cached = readRankCache(tab);
+    setRows(cached?.rows || []);
+    setSource(cached?.source ? `${cached.source} · 本地缓存` : "数据源连接中");
+    setLoading(!cached?.rows?.length);
+    setRefreshing(!!cached?.rows?.length);
+
     void getFundRank({ data: { sort: tab } }).then((r) => {
       if (!live) return;
-      setRows(r.rows);
-      setSource(r.source);
-      setLoading(false);
+      if (r.rows.length) {
+        setRows(r.rows);
+        setSource(r.source);
+        writeRankCache(tab, { savedAt: Date.now(), rows: r.rows, source: r.source });
+      } else if (!cached?.rows?.length) {
+        setRows([]);
+        setSource("排行数据源暂不可用");
+      }
     }).catch(() => {
       if (!live) return;
-      setRows([]);
-      setSource("数据源暂不可用");
+      if (!cached?.rows?.length) {
+        setRows([]);
+        setSource("排行数据源暂不可用");
+      }
+    }).finally(() => {
+      if (!live) return;
       setLoading(false);
+      setRefreshing(false);
     });
-    return () => {
-      live = false;
-    };
+    return () => { live = false; };
   }, [tab]);
 
   return (
@@ -59,9 +90,10 @@ function FundsPage() {
             </button>
           ))}
         </div>
+        {refreshing ? <div className="mt-2 text-[10px] text-muted">后台刷新中 · 先显示本地最近数据</div> : null}
       </Glass>
       {loading ? <EmptyNote>正在读取排行…</EmptyNote> : null}
-      {!loading && !rows.length ? <EmptyNote>暂无可靠排行数据，请稍后刷新</EmptyNote> : null}
+      {!loading && !rows.length ? <EmptyNote>暂无可靠排行数据，当前数据源不可用。</EmptyNote> : null}
       {rows.map((r, i) => {
         const addable = r.nav != null && Number.isFinite(r.nav) && r.nav > 0;
         const displayValue = tab === "z" ? r.week : tab === "1n" ? r.ytd : tab === "6y" ? r.month : r.day;
