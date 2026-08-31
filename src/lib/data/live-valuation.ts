@@ -38,15 +38,7 @@ async function getBase(code: string) {
   const hj = parseMaybeJsonp(histRaw) as any;
   const ordered: FundHistoryPoint[] = (hj?.Data?.LSJZList || []).map((x:any)=>({date:String(x.FSRQ||""),nav:n(x.DWJZ)??0,changePct:n(x.JZZZL)})).filter((x:FundHistoryPoint)=>x.date&&x.nav>0).reverse();
   const latest = ordered.at(-1);
-  const gz = live ? {
-    fundcode: code,
-    name: live.name || code,
-    jzrq: live.date || latest?.date || "",
-    dwjz: live.nav ?? latest?.nav ?? null,
-    gsz: live.estimate,
-    gszzl: live.pct,
-    gztime: live.time || null,
-  } : null;
+  const gz = live ? { fundcode: code, name: live.name || code, fundtype: live.type || "基金", jzrq: live.date || latest?.date || "", dwjz: live.nav ?? latest?.nav ?? null, gsz: live.estimate, gszzl: live.pct, gztime: live.time || null } : null;
   return { gz, ordered, latest };
 }
 
@@ -77,9 +69,7 @@ async function getHoldings(code: string): Promise<LiveHolding[]> {
   return out;
 }
 
-async function getStockQuotes(holdings: LiveHolding[]): Promise<CrossCheckedHolding[]> {
-  return crossCheckStockQuotes(holdings);
-}
+async function getStockQuotes(holdings: LiveHolding[]): Promise<CrossCheckedHolding[]> { return crossCheckStockQuotes(holdings); }
 
 function buildEstimate(nav:number|null,holdings:Array<LiveHolding & Partial<Pick<CrossCheckedHolding,"quoteStatus">>>,externalPct:number|null) {
   const totalDisclosed = holdings.reduce((s,h)=>s+Math.max(0,h.weight),0);
@@ -98,11 +88,7 @@ function buildEstimate(nav:number|null,holdings:Array<LiveHolding & Partial<Pick
   if (quoteCrossRate < 0.5 || disagreedWeight / usableWeight > 0.2) confidence = "low";
   else if (quoteCrossRate < 0.7 && confidence === "high") confidence = "medium";
   let validation = "无法验证";
-  if (deviation!=null) {
-    if (deviation<=0.35) validation="一致";
-    else if (deviation<=0.9) validation="轻微偏差";
-    else { validation="明显偏差"; confidence="low"; }
-  }
+  if (deviation!=null) { if (deviation<=0.35) validation="一致"; else if (deviation<=0.9) validation="轻微偏差"; else { validation="明显偏差"; confidence="low"; } }
   return {estimate,pct:weightedContribution,disclosedWeight:totalDisclosed,usableWeight,coverage,coverageOfDisclosed,deviation,confidence,validation,crossCheckedWeight,disagreedWeight};
 }
 
@@ -134,11 +120,7 @@ export const getCalculatedFund = createServerFn({method:"POST"})
         estimate:result.estimate,estimatePct:result.pct,estimateTime:result.estimate!=null?new Date().toISOString():null,
         dayPct:officialToday?officialDayPct:result.pct,
         weekPct,monthPct,history,historyPoints:ordered,metrics,
-        source:result.estimate!=null
-          ?`自有穿透估值 · 前十大重仓 × 双源实时行情 · ${result.validation}${externalPct!=null?` · 参考源差 ${result.deviation?.toFixed(2)}个百分点`:""}`
-          :policy.allowLiveEstimate
-            ?`自有估值暂不可用 · ${result.validation}`
-            :`按基金类型采用官方净值模式 · ${policy.reason}`,
+        source:result.estimate!=null?`自有穿透估值 · 前十大重仓 × 双源实时行情 · ${result.validation}${externalPct!=null?` · 参考源差 ${result.deviation?.toFixed(2)}个百分点`:""}`:policy.allowLiveEstimate?`自有估值暂不可用 · ${result.validation}`:`按基金类型采用官方净值模式 · ${policy.reason}`,
         officialNavPublished:officialToday,
         valuationStatus:officialToday?"official_nav":result.estimate!=null?"estimate":nav!=null?"waiting_official_nav":"unavailable",
         estimateConfidence:result.confidence,
@@ -153,11 +135,7 @@ export const getCalculatedFund = createServerFn({method:"POST"})
         estimateValidation:result.validation,
         quoteCrossCheckedWeight:result.crossCheckedWeight,
         quoteDisagreedWeight:result.disagreedWeight,
-        historyMae20:null,
-        historySample20:0,
-        historyMaxError:null,
-        historyP95Error:null,
-        historyMae5:null
+        historyMae20:null,historySample20:0,historyMaxError:null,historyP95Error:null,historyMae5:null
       };
       CACHE.set(code,{ts:Date.now(),quote});
       return quote;
