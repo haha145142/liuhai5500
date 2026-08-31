@@ -1,69 +1,43 @@
-import { Glass, SectionTitle, Tone } from "@/components/ui/Glass";
-import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
+import { Glass } from "@/components/ui/Glass";
+import { fmtMoney, fmtPctShort } from "@/lib/format";
 import { calcPortfolioAnalysis } from "@/lib/calc/portfolio";
 import type { FundQuote, Holding, SectorQuote } from "@/lib/types";
 
 export function PortfolioInsight({ holdings, funds, sectors }: { holdings: Holding[]; funds: FundQuote[]; sectors: SectorQuote[] }) {
   if (!holdings.length) return null;
   const a = calcPortfolioAnalysis(holdings, funds, sectors);
+  const concentration = a.concentrationTop1Pct >= 70 ? "偏高" : a.concentrationTop1Pct >= 35 ? "中等" : "较低";
+  const correlation = a.sectorExposures.length <= 1 ? "数据不足" : a.sectorExposures.length <= 3 ? "中" : "低";
+  const volatility = a.avgDayPct == null ? "数据不足" : Math.abs(a.avgDayPct) >= 2 ? "高" : Math.abs(a.avgDayPct) >= 1 ? "中" : "低";
+  const drawdown = a.trend === "偏弱" ? "偏高" : a.trend === "震荡" ? "中" : a.trend === "偏强" ? "低" : "数据不足";
+  const up = a.holdingRows.filter(x => x.dayPct != null && x.dayPct > 0).length;
+  const down = a.holdingRows.filter(x => x.dayPct != null && x.dayPct < 0).length;
+  const mainSector = a.sectorExposures[0];
+  const recommendation = concentration === "偏高" || a.risk === "高"
+    ? `当前组合集中度较高（${mainSector ? `${mainSector.name} ${mainSector.pct.toFixed(1)}%` : `${a.concentrationTop1Pct.toFixed(1)}%`}），建议新增资金优先降低同方向暴露。`
+    : a.trend === "偏弱"
+      ? "组合当前趋势偏弱，新增资金以分散和控制回撤为主，不追涨补仓。"
+      : "当前组合没有明显失控项，新增资金优先考虑分散同涨同跌风险。";
+
   return (
-    <Glass tight className="mb-2 mt-2">
-      <SectionTitle title="组合诊断" hint="收益 · 风险 · 今日影响" />
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <Metric label="组合市值" value={fmtMoney(a.marketValue)} />
-        <Metric label="累计收益" value={a.pnlPct == null ? "暂无可靠数据" : fmtPctShort(a.pnlPct)} tone={a.pnlPct} />
-        <Metric label="今日盈亏" value={a.dayPnl == null ? "暂无可靠数据" : fmtMoney(a.dayPnl)} tone={a.dayPnl} />
-        <Metric label="今日波动" value={a.dayPct == null ? "暂无可靠数据" : fmtPctShort(a.dayPct)} tone={a.dayPct} />
-        <Metric label="组合风险" value={a.risk} />
-        <Metric label="组合趋势" value={a.trend} />
+    <Glass tight className="mb-3 mt-3 overflow-hidden !rounded-[28px] !border-white/75 !bg-white/50 !p-4 shadow-[0_18px_48px_rgba(38,78,112,.07),inset_0_1px_0_rgba(255,255,255,.95)] backdrop-blur-[20px] saturate-150">
+      <div className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-2xl bg-white/72 text-xl shadow-sm ring-1 ring-white/80">🏥</div><div className="min-w-0"><div className="text-[22px] font-semibold tracking-tight text-fg">组合体检</div><div className="text-sm text-muted">自动分析 · 需添加持仓</div></div></div>
+      <div className="mt-4 flex items-center gap-3"><span className={`text-base font-semibold ${concentration === "偏高" ? "text-red-500" : "text-emerald-600"}`}>{concentration}</span><div className="h-3 flex-1 overflow-hidden rounded-full bg-gradient-to-r from-emerald-400 via-blue-500 to-red-400"><div className="h-full rounded-full bg-slate-900/80" style={{width:`${Math.max(8,Math.min(95,a.concentrationTop1Pct))}%`,maxWidth:"10px"}} /></div><span className="text-base font-semibold text-fg">行业集中度</span></div>
+
+      <div className="mt-4 grid grid-cols-3 gap-2">{[
+        ["风格集中", concentration === "偏高" ? "成长偏高" : concentration === "中等" ? "中等" : "较低", ""],
+        ["相关性", correlation, a.sectorExposures.length ? `${a.sectorExposures.length}个板块` : ""],
+        ["波动风险", volatility, a.avgDayPct == null ? "σ —" : `σ ${Math.abs(a.avgDayPct).toFixed(2)}%`],
+        ["回撤压力", drawdown, `${a.holdingsCovered}只覆盖`],
+        ["涨跌统计", `${up}涨 ${down}跌`, `共 ${up+down}只`],
+        ["行业分布", `${a.sectorExposures.length}个`, mainSector ? `${mainSector.name}为主` : "暂无"]
+      ].map(([label,value,sub])=><div key={label} className="rounded-[22px] border border-white/80 bg-white/64 px-3 py-4 text-center shadow-[inset_0_1px_0_rgba(255,255,255,.96)]"><div className="text-sm text-muted">{label}</div><div className={`mt-1 text-lg font-semibold ${["相关性","波动风险","回撤压力"].includes(label) && value === "低" ? "text-emerald-600" : ""}`}>{value}</div><div className="mt-1 text-xs text-muted">{sub}</div></div>)}
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <ImpactCard title="今日主要贡献" row={a.topContributor} positive />
-        <ImpactCard title="今日主要拖累" row={a.topDrag} />
-      </div>
+      <div className="mt-4 rounded-[24px] border border-blue-200/70 bg-blue-50/55 p-4"><div className="text-lg font-semibold text-blue-600">💡 组合建议</div><div className="mt-2 text-sm leading-relaxed text-muted">{recommendation}</div></div>
+      <div className="mt-2 text-center text-[11px] text-muted">基于基金名称板块归类和实时数据估算，仅供参考。</div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-        <Metric label="第一重仓" value={`${fmtPrice(a.concentrationTop1Pct, 1)}%`} />
-        <Metric label="前三重仓" value={`${fmtPrice(a.concentrationTop3Pct, 1)}%`} />
-      </div>
-
-      {a.sectorExposures.length ? (
-        <div className="mt-3">
-          <div className="text-[10px] font-semibold text-subtle">主要基金主题暴露</div>
-          <div className="mt-1 space-y-1.5">
-            {a.sectorExposures.slice(0, 4).map((x) => (
-              <div key={x.name} className="flex items-center justify-between rounded-xl bg-bg-elevated px-2.5 py-1.5 text-[11px]">
-                <span>{x.name}</span><span className="font-semibold tabular-nums">{fmtPrice(x.pct, 1)}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {a.notes.length ? <p className="mt-2 text-[10px] leading-relaxed text-subtle">{a.notes.join(" ")}</p> : <p className="mt-2 text-[10px] text-subtle">当前没有明显集中度风险提示。</p>}
-      <p className="mt-2 text-[10px] text-subtle">组合市值覆盖 {a.holdingsCovered}/{a.holdingsTotal} 只持仓；缺少可靠价格的持仓不会被伪造估值。</p>
+      <div className="mt-4 rounded-[24px] border border-white/80 bg-white/62 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.96)]"><div className="text-base font-semibold text-fg">🔗 持仓重复度分析</div><div className="mt-3 text-sm font-semibold text-fg">板块重合暴露 <span className="font-normal text-muted">（按持仓市值）</span></div>{mainSector ? <><div className="mt-3 rounded-2xl border border-white/80 bg-white/65 p-3"><div className="flex items-center justify-between text-base"><span>{mainSector.name}</span><span className="font-semibold text-red-500">{mainSector.pct.toFixed(1)}%</span></div><div className="mt-2 h-3 overflow-hidden rounded-full bg-red-100"><div className="h-full rounded-full bg-red-400" style={{width:`${Math.min(100,mainSector.pct)}%`}} /></div></div><div className="mt-3 text-sm text-muted">主要暴露方向：<b className="text-fg">{mainSector.name}</b></div>{a.concentrationTop1Pct >= 70 ? <div className="mt-3 rounded-[22px] border border-red-200 bg-red-50/70 p-4 text-sm leading-relaxed"><div className="font-semibold text-red-500">⚠️ 集中度风险提示</div><div className="mt-1 text-red-600">表面上是 {holdings.length} 只基金，实际方向暴露较集中，涨跌联动会明显，注意集中度风险。</div></div> : null}<div className="mt-3 text-sm text-muted">{a.notes.length ? a.notes.join(" ") : "未检测到明显的重复暴露风险。"}</div></> : <div className="mt-3 rounded-2xl bg-bg-elevated/70 p-4 text-sm text-muted">暂未形成可靠的板块暴露结果。</div>}<div className="mt-3 text-center text-[11px] text-muted">基于基金名称关键词规则匹配，仅供参考，实际持仓以基金定期报告为准。</div></div>
     </Glass>
   );
-}
-
-function ImpactCard({ title, row, positive = false }: { title: string; row: ReturnType<typeof calcPortfolioAnalysis>["topContributor"]; positive?: boolean }) {
-  const v = row?.dayPnl ?? null;
-  return (
-    <div className="rounded-2xl bg-bg-elevated px-3 py-2.5">
-      <div className="text-[10px] text-subtle">{title}</div>
-      {row ? (
-        <>
-          <div className="mt-1 truncate text-xs font-semibold text-fg">{row.name}</div>
-          <div className="mt-0.5 flex items-baseline justify-between gap-2">
-            <Tone v={v} className="text-sm font-bold tabular-nums">{fmtMoney(v)}</Tone>
-            <span className="text-[10px] text-subtle">{fmtPctShort(row.dayPct)}</span>
-          </div>
-        </>
-      ) : <div className="mt-1 text-xs text-subtle">{positive ? "暂无可靠贡献数据" : "暂无可靠拖累数据"}</div>}
-    </div>
-  );
-}
-
-function Metric({ label, value, tone }: { label: string; value: string; tone?: number | null }) {
-  return <div className="rounded-xl bg-bg-elevated px-2 py-2"><div className="text-[10px] text-subtle">{label}</div>{tone == null ? <div className="mt-0.5 text-sm font-semibold">{value}</div> : <Tone v={tone} className="mt-0.5 text-sm font-semibold">{value}</Tone>}</div>;
 }
