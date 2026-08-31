@@ -1,5 +1,4 @@
-import type { Holding } from "./types";
-import type { FundQuote, NewsFeed, Snapshot } from "./types";
+import type { Holding, FundQuote, NewsFeed, Snapshot } from "./types";
 import { DEFAULT_FUND_SECTOR_IDS, FUND_SECTORS } from "./data/fund-sectors";
 
 const PORT_KEYS = ["fund_ai_pro_portfolio_v3", "fund_ai_pro_portfolio_v2", "fund_ai_pro_portfolio"];
@@ -28,8 +27,38 @@ export function saveCachedNews(data: NewsFeed) { saveCache(NEWS_CACHE_KEY, data)
 export function loadCachedFunds(maxAge = 48 * 60 * 60_000): Record<string, FundQuote> { return loadCache<Record<string, FundQuote>>(FUNDS_CACHE_KEY, maxAge) || {}; }
 export function saveCachedFunds(data: Record<string, FundQuote>) { saveCache(FUNDS_CACHE_KEY, data); }
 
-export function loadPortfolio(): Holding[] { if (typeof window === "undefined") return []; for (const key of PORT_KEYS) { try { const arr = JSON.parse(localStorage.getItem(key) || "null"); if (Array.isArray(arr) && arr.length) { const cleaned = arr.filter((x: Holding) => x && /^\d{6}$/.test(x.code) && Number(x.shares) > 0 && Number(x.cost) > 0) as Holding[]; if (cleaned.length) { if (key !== PORT_KEYS[0]) savePortfolio(cleaned); return cleaned; } } } catch {} } return []; }
-export function savePortfolio(list: Holding[]) { try { localStorage.setItem(PORT_KEYS[0], JSON.stringify(list)); } catch {} }
+export function sanitizePortfolio(value: unknown): Holding[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: Holding[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const x = item as Partial<Holding>;
+    const code = String(x.code || "").trim();
+    const shares = Number(x.shares);
+    const cost = Number(x.cost);
+    if (!/^\d{6}$/.test(code) || !Number.isFinite(shares) || shares <= 0 || !Number.isFinite(cost) || cost <= 0) continue;
+    if (seen.has(code)) continue;
+    seen.add(code);
+    out.push({ code, name: String(x.name || code).trim() || code, shares, cost });
+  }
+  return out;
+}
+
+export function loadPortfolio(): Holding[] {
+  if (typeof window === "undefined") return [];
+  for (const key of PORT_KEYS) {
+    try {
+      const cleaned = sanitizePortfolio(JSON.parse(localStorage.getItem(key) || "null"));
+      if (cleaned.length) {
+        if (key !== PORT_KEYS[0]) savePortfolio(cleaned);
+        return cleaned;
+      }
+    } catch {}
+  }
+  return [];
+}
+export function savePortfolio(list: Holding[]) { try { localStorage.setItem(PORT_KEYS[0], JSON.stringify(sanitizePortfolio(list))); } catch {} }
 
 export function getDSKey(): string { if (typeof window === "undefined") return ""; return localStorage.getItem(DS_KEY) || ""; }
 export function setDSKey(key: string) { if (!key) localStorage.removeItem(DS_KEY); else localStorage.setItem(DS_KEY, key); }
@@ -38,8 +67,7 @@ export function setDSModel(model: string) { localStorage.setItem(DS_MODEL, model
 
 export function loadSelectedSectors(): string[] { const saved = readJson<string[]>(SECTOR_KEY, DEFAULT_FUND_SECTOR_IDS); const validIds = new Set(FUND_SECTORS.map((s) => s.id)); const cleaned = Array.isArray(saved) ? saved.filter((id) => validIds.has(id)) : []; if (cleaned.length) return cleaned; saveSelectedSectors(DEFAULT_FUND_SECTOR_IDS); return [...DEFAULT_FUND_SECTOR_IDS]; }
 export function saveSelectedSectors(ids: string[]) { try { localStorage.setItem(SECTOR_KEY, JSON.stringify(ids)); } catch {} }
-
-export function loadWatchlist(): string[] { return readJson<string[]>(WATCH_KEY, []); }
-export function saveWatchlist(codes: string[]) { try { localStorage.setItem(WATCH_KEY, JSON.stringify(codes)); } catch {} }
+export function loadWatchlist(): string[] { return readJson<string[]>(WATCH_KEY, []).filter((x) => /^\d{6}$/.test(String(x))); }
+export function saveWatchlist(codes: string[]) { try { localStorage.setItem(WATCH_KEY, JSON.stringify(codes.filter((x) => /^\d{6}$/.test(String(x))))); } catch {} }
 export function loadSettings(): AppSettings { const saved = readJson<Partial<AppSettings>>(SETTINGS_KEY, {}); return { ...DEFAULT_SETTINGS, ...saved, autoRefreshMs: Number.isFinite(Number(saved.autoRefreshMs)) ? Math.max(30_000, Number(saved.autoRefreshMs)) : DEFAULT_SETTINGS.autoRefreshMs, newsRefreshMs: Number.isFinite(Number(saved.newsRefreshMs)) ? Math.max(60_000, Number(saved.newsRefreshMs)) : DEFAULT_SETTINGS.newsRefreshMs }; }
 export function saveSettings(s: AppSettings) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch {} }
