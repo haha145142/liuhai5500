@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { FundCard } from "@/components/portfolio/FundCard";
 import { PortfolioInsight } from "@/components/portfolio/PortfolioInsight";
+import { QuickAddFund } from "@/components/portfolio/QuickAddFund";
 import { EmptyNote, Glass, SectionTitle, Tone } from "@/components/ui/Glass";
 import { matchFundSector } from "@/lib/data/sectors";
 import { fmtMoney, fmtPctShort } from "@/lib/format";
@@ -14,33 +15,14 @@ export const Route = createFileRoute("/portfolio")({ component: PortfolioPage })
 
 type AlertRule = { code: string; kind: "止盈" | "止损"; targetPct: number };
 const ALERT_KEY = "fund_ai_pro_alerts_v1";
-
 type SummaryTab = "today" | "week" | "month" | "year" | "since";
 
 function readAlerts(): AlertRule[] {
   if (typeof window === "undefined") return [];
-  try {
-    const raw = JSON.parse(localStorage.getItem(ALERT_KEY) || "[]");
-    return Array.isArray(raw) ? (raw as AlertRule[]) : [];
-  } catch {
-    return [];
-  }
+  try { const raw = JSON.parse(localStorage.getItem(ALERT_KEY) || "[]"); return Array.isArray(raw) ? (raw as AlertRule[]) : []; } catch { return []; }
 }
-
-function monthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function monthCells(cursor: Date) {
-  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-  const start = new Date(first);
-  start.setDate(1 - first.getDay());
-  return Array.from({ length: 42 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    return d;
-  });
-}
+function monthKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`; }
+function monthCells(cursor: Date) { const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1); const start = new Date(first); start.setDate(1 - first.getDay()); return Array.from({ length: 42 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; }); }
 
 function PortfolioPage() {
   const portfolio = useApp((s) => s.portfolio);
@@ -56,34 +38,21 @@ function PortfolioPage() {
   const [summaryTab, setSummaryTab] = useState<SummaryTab>("today");
 
   useEffect(() => setAlerts(readAlerts()), []);
-  useEffect(() => {
-    try { localStorage.setItem(ALERT_KEY, JSON.stringify(alerts)); } catch { /* local only */ }
-  }, [alerts]);
+  useEffect(() => { try { localStorage.setItem(ALERT_KEY, JSON.stringify(alerts)); } catch { /* local only */ } }, [alerts]);
 
   const bench = snapshot?.indices[0]?.pct ?? null;
   const summary = useMemo(() => calcPortfolioReturn(portfolio, funds), [funds, portfolio]);
   const week = useMemo(() => calcPortfolioPeriodReturn("week", portfolio, funds), [funds, portfolio]);
   const month = useMemo(() => calcPortfolioPeriodReturn("month", portfolio, funds), [funds, portfolio]);
   const year = useMemo(() => calcPortfolioPeriodReturn("year", portfolio, funds), [funds, portfolio]);
-
   const selectedSummary = useMemo(() => {
-    switch (summaryTab) {
-      case "week": return { label: "本周收益", amount: week.amount, pct: week.pct };
-      case "month": return { label: "本月收益", amount: month.amount, pct: month.pct };
-      case "year": return { label: "今年收益", amount: year.amount, pct: year.pct };
-      case "since": return { label: "买入以来收益", amount: summary.pricedCount ? summary.holdingPnl : null, pct: summary.holdingPnlPct };
-      default: return { label: "今日收益", amount: summary.todayPnl, pct: summary.todayPnlPct };
-    }
+    if (summaryTab === "week") return { label: "本周收益", amount: week.amount, pct: week.pct };
+    if (summaryTab === "month") return { label: "本月收益", amount: month.amount, pct: month.pct };
+    if (summaryTab === "year") return { label: "今年收益", amount: year.amount, pct: year.pct };
+    if (summaryTab === "since") return { label: "买入以来收益", amount: summary.pricedCount ? summary.holdingPnl : null, pct: summary.holdingPnlPct };
+    return { label: "今日收益", amount: summary.todayPnl, pct: summary.todayPnlPct };
   }, [month, summary, summaryTab, week, year]);
-
-  const calendar = useMemo(() => {
-    const cells = monthCells(calendarCursor);
-    const activeMonth = monthKey(calendarCursor);
-    return cells.map((date) => {
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      return { date, key, inMonth: monthKey(date) === activeMonth };
-    });
-  }, [calendarCursor]);
+  const calendar = useMemo(() => { const cells = monthCells(calendarCursor); const activeMonth = monthKey(calendarCursor); return cells.map((date) => ({ date, key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`, inMonth: monthKey(date) === activeMonth })); }, [calendarCursor]);
 
   const addAlert = () => {
     const pct = Number(alertPct);
@@ -95,45 +64,16 @@ function PortfolioPage() {
   return (
     <div>
       <Glass className="mb-3 overflow-hidden rounded-[28px] border border-white/75 bg-white/50 p-4 shadow-[0_18px_48px_rgba(38,78,112,.07),inset_0_1px_0_rgba(255,255,255,.95)] backdrop-blur-[20px] saturate-150">
-        <div className="flex items-center justify-between gap-3">
-          <SectionTitle title="💼 我的持仓" hint="盘中估值 · 收盘以官方净值为准" />
-          <span className="shrink-0 rounded-full bg-blue-100/75 px-3 py-1.5 text-xs font-semibold text-blue-600">{portfolio.length}只</span>
-        </div>
-        <div className="mt-2 flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-sm text-muted">整体盈亏</div>
-            <Tone v={selectedSummary.amount} className="mt-1 block text-[38px] font-bold leading-none tracking-tight">
-              {selectedSummary.amount == null ? "—" : fmtMoney(selectedSummary.amount)}
-            </Tone>
-            <Tone v={selectedSummary.pct} className="mt-2 block text-xl font-semibold">{selectedSummary.pct == null ? "—" : fmtPctShort(selectedSummary.pct)}</Tone>
-          </div>
-          <div className="shrink-0 text-right text-xs text-muted">
-            <div>{summary.totalCount}张 总持仓</div>
-            <div className="mt-1">成本 {fmtMoney(summary.costValue)}</div>
-            <div className="mt-1">持仓市值 {fmtMoney(summary.marketValue)}</div>
-          </div>
-        </div>
-        <div className="mt-4 grid grid-cols-5 gap-1.5 rounded-2xl bg-white/48 p-1 ring-1 ring-white/75">
-          {(["today", "week", "month", "year", "since"] as const).map((tab) => {
-            const label = tab === "today" ? "今天" : tab === "week" ? "本周" : tab === "month" ? "本月" : tab === "year" ? "今年" : "买入以来";
-            return <button key={tab} type="button" onClick={() => setSummaryTab(tab)} className={`rounded-2xl px-2 py-2.5 text-sm font-medium transition ${summaryTab === tab ? "bg-blue-500 text-white shadow-[0_5px_14px_rgba(59,130,246,.22)]" : "bg-white/65 text-muted"}`}>{label}</button>;
-          })}
-        </div>
-        <div className="mt-3 rounded-2xl bg-white/58 px-3 py-3 ring-1 ring-white/70">
-          <div className="flex items-center justify-between gap-3"><span className="text-sm text-muted">{selectedSummary.label}</span><Tone v={selectedSummary.amount} className="text-2xl font-bold">{selectedSummary.amount == null ? "—" : fmtMoney(selectedSummary.amount)}</Tone></div>
-        </div>
+        <div className="flex items-center justify-between gap-3"><SectionTitle title="💼 我的持仓" hint="盘中估值 · 收盘以官方净值为准" /><span className="shrink-0 rounded-full bg-blue-100/75 px-3 py-1.5 text-xs font-semibold text-blue-600">{portfolio.length}只</span></div>
+        <div className="mt-2 flex items-end justify-between gap-3"><div className="min-w-0"><div className="text-sm text-muted">{selectedSummary.label}</div><Tone v={selectedSummary.amount} className="mt-1 block text-[38px] font-bold leading-none tracking-tight">{selectedSummary.amount == null ? "—" : fmtMoney(selectedSummary.amount)}</Tone><Tone v={selectedSummary.pct} className="mt-2 block text-xl font-semibold">{selectedSummary.pct == null ? "—" : fmtPctShort(selectedSummary.pct)}</Tone></div><div className="shrink-0 text-right text-xs text-muted"><div>{summary.totalCount}张 总持仓</div><div className="mt-1">成本 {fmtMoney(summary.costValue)}</div><div className="mt-1">持仓市值 {fmtMoney(summary.marketValue)}</div></div></div>
+        <div className="mt-4 grid grid-cols-5 gap-1.5 rounded-2xl bg-white/48 p-1 ring-1 ring-white/75">{(["today","week","month","year","since"] as const).map((tab) => { const label = tab === "today" ? "今天" : tab === "week" ? "本周" : tab === "month" ? "本月" : tab === "year" ? "今年" : "买入以来"; return <button key={tab} type="button" onClick={() => setSummaryTab(tab)} className={`rounded-2xl px-2 py-2.5 text-sm font-medium transition ${summaryTab === tab ? "bg-blue-500 text-white shadow-[0_5px_14px_rgba(59,130,246,.22)]" : "bg-white/65 text-muted"}`}>{label}</button>; })}</div>
+        <div className="mt-3 rounded-2xl bg-white/58 px-3 py-3 ring-1 ring-white/70"><div className="flex items-center justify-between gap-3"><span className="text-sm text-muted">今日收益</span><Tone v={summary.todayPnl} className="text-2xl font-bold">{summary.todayPnl == null ? "—" : fmtMoney(summary.todayPnl)}</Tone></div></div>
         {summary.totalCount > summary.pricedCount ? <div className="mt-2 rounded-xl bg-amber-50/75 px-3 py-2 text-[10px] text-muted">还有 {summary.totalCount - summary.pricedCount} 只基金暂未取得可靠行情；无法确认的数字不猜。</div> : null}
       </Glass>
 
-      {portfolio.length ? portfolio.map((h) => {
-        const fname = funds[h.code]?.name || h.name;
-        const rule = matchFundSector(fname);
-        const sector = rule ? snapshot?.sectors.find((s) => s.id === rule.id) : undefined;
-        return <FundCard key={h.code} holding={h} fund={funds[h.code]} sector={sector} benchPct={bench} onUpdate={(patch) => updateHolding(h.code, patch)} onRemove={() => removeHolding(h.code)} />;
-      }) : (
-        <Glass><EmptyNote>还没有持仓。添加基金后会自动拉取官方净值、盘中估值和历史指标。</EmptyNote></Glass>
-      )}
+      {portfolio.length ? portfolio.map((h) => { const fname = funds[h.code]?.name || h.name; const rule = matchFundSector(fname); const sector = rule ? snapshot?.sectors.find((s) => s.id === rule.id) : undefined; return <FundCard key={h.code} holding={h} fund={funds[h.code]} sector={sector} benchPct={bench} onUpdate={(patch) => updateHolding(h.code, patch)} onRemove={() => removeHolding(h.code)} />; }) : <Glass><EmptyNote>还没有持仓。添加基金后会自动拉取官方净值、盘中估值和历史指标。</EmptyNote></Glass>}
 
+      <QuickAddFund />
       <PortfolioInsight holdings={portfolio} funds={Object.values(funds)} sectors={snapshot?.sectors || []} />
 
       <Glass>
@@ -155,15 +95,7 @@ function PortfolioPage() {
 
 function CalendarCell({ date, inMonth, portfolio, funds }: { date: Date; inMonth: boolean; portfolio: Holding[]; funds: Record<string, FundQuote> }) {
   const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  let pnl = 0;
-  let found = false;
-  for (const h of portfolio) {
-    const points = funds[h.code]?.historyPoints || [];
-    const idx = points.findIndex((p) => p.date === key);
-    if (idx > 0) {
-      pnl += h.shares * (points[idx].nav - points[idx - 1].nav);
-      found = true;
-    }
-  }
+  let pnl = 0; let found = false;
+  for (const h of portfolio) { const points = funds[h.code]?.historyPoints || []; const idx = points.findIndex((p) => p.date === key); if (idx > 0) { pnl += h.shares * (points[idx].nav - points[idx - 1].nav); found = true; } }
   return <div className={`min-h-12 rounded-xl p-1 ${inMonth ? "bg-bg-elevated" : "opacity-30"}`}><div className="text-xs">{date.getDate()}</div><Tone v={found ? pnl : null} className="mt-1 block text-[10px] font-semibold">{found ? fmtMoney(pnl) : "—"}</Tone></div>;
 }
