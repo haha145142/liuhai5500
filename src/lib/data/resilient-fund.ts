@@ -16,18 +16,16 @@ export const getResilientFund = createServerFn({ method: "POST" })
   .validator((input: { code: string }) => input)
   .handler(async ({ data }): Promise<FundQuote> => {
     const code = data.code.trim();
-    try {
-      const validated = await getValidatedFund({ data: { code } });
-      if (hasUsableFundData(validated)) return validated;
-    } catch {
-      // direct fallback below
-    }
+    const [validatedResult, directResult] = await Promise.allSettled([
+      getValidatedFund({ data: { code } }),
+      getDirectFundFallback({ data: { code } }),
+    ]);
 
-    try {
-      const direct = await getDirectFundFallback({ data: { code } });
-      if (direct) return direct;
-    } catch {
-      // fail closed with an explicit unavailable state
+    if (validatedResult.status === "fulfilled" && hasUsableFundData(validatedResult.value)) {
+      return validatedResult.value;
+    }
+    if (directResult.status === "fulfilled" && directResult.value) {
+      return directResult.value;
     }
 
     return {
