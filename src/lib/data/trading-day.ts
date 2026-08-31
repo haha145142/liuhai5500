@@ -49,9 +49,9 @@ export function isAshareTradingDay(date = new Date()): boolean {
   return !isExchangeClosed(date);
 }
 
+/** Backward-compatible closed-day alias used by data services. */
 export function isWeekend(date = new Date()): boolean {
-  const day = cnDate(date).getUTCDay();
-  return day === 0 || day === 6;
+  return isExchangeClosed(date);
 }
 
 export function isTradingDay(date = new Date()): boolean {
