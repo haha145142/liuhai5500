@@ -77,15 +77,6 @@ export function QuickAddFund() {
     return () => { active = false; };
   }, [code]);
 
-  useEffect(() => {
-    if (!/^\d{6}$/.test(code)) return;
-    const id = window.setInterval(() => {
-      const latest = funds[code];
-      if (latest) setRemoteQuote(latest);
-    }, 30_000);
-    return () => window.clearInterval(id);
-  }, [code, funds]);
-
   const preview = useMemo(() => {
     if (!code && !shares && !cost) return "输入完成后，这里立即计算；行情异步更新，不阻塞录入";
     if (previewResult.costValue == null) return "输入份额和成本价，持仓成本马上计算";
