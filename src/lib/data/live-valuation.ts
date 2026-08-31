@@ -4,6 +4,7 @@ import { policyForFund } from "../calc/fund-type-policy";
 import type { FundHistoryPoint, FundMetrics, FundQuote } from "../types";
 import { fetchText, n, parseMaybeJsonp } from "./fetch-util";
 import { crossCheckStockQuotes, type CrossCheckedHolding } from "./live-quote-cross-check";
+import { getLiveFundQuote } from "./fund-live-provider";
 
 export type LiveHolding = { code: string; name: string; weight: number; price: number | null; pct: number | null; source: string };
 
@@ -19,7 +20,6 @@ type ValuationAudit = {
   quoteDisagreedWeight?: number;
 };
 
-const YJB = "https://fundgz.1234567.com.cn/js";
 const HOLDING = "https://fundf10.eastmoney.com/FundArchivesDatas.aspx";
 const NAV = "https://api.fund.eastmoney.com/f10/lsjz";
 const CACHE = new Map<string, { ts: number; quote: FundQuote & ValuationAudit }>();
@@ -31,14 +31,22 @@ function htmlEntity(s: string) { return s.replace(/&nbsp;/g," ").replace(/&amp;/
 function stripTags(s: string) { return htmlEntity(s.replace(/<[^>]+>/g," ").replace(/\s+/g," ")); }
 
 async function getBase(code: string) {
-  const [gzRaw, histRaw] = await Promise.all([
-    fetchText(`${YJB}/${code}.js?rt=${Date.now()}`, 8000, { Referer:"https://fund.eastmoney.com/" }),
+  const [live, histRaw] = await Promise.all([
+    getLiveFundQuote(code),
     fetchText(`${NAV}?fundCode=${code}&pageIndex=1&pageSize=300`, 10000, { Referer:"https://fund.eastmoney.com/" }),
   ]);
-  const gz = parseMaybeJsonp(gzRaw) as any;
   const hj = parseMaybeJsonp(histRaw) as any;
   const ordered: FundHistoryPoint[] = (hj?.Data?.LSJZList || []).map((x:any)=>({date:String(x.FSRQ||""),nav:n(x.DWJZ)??0,changePct:n(x.JZZZL)})).filter((x:FundHistoryPoint)=>x.date&&x.nav>0).reverse();
   const latest = ordered.at(-1);
+  const gz = live ? {
+    fundcode: code,
+    name: live.name || code,
+    jzrq: live.date || latest?.date || "",
+    dwjz: live.nav ?? latest?.nav ?? null,
+    gsz: live.estimate,
+    gszzl: live.pct,
+    gztime: live.time || null,
+  } : null;
   return { gz, ordered, latest };
 }
 
@@ -78,7 +86,6 @@ function buildEstimate(nav:number|null,holdings:Array<LiveHolding & Partial<Pick
   const usable = holdings.filter(h=>h.weight>0&&h.pct!=null);
   const usableWeight = usable.reduce((s,h)=>s+h.weight,0);
   if (nav==null || usableWeight<=0 || totalDisclosed<=0) return {estimate:null,pct:null,disclosedWeight:totalDisclosed,usableWeight,coverage:usableWeight,coverageOfDisclosed:totalDisclosed?usableWeight/totalDisclosed*100:0,deviation:null,confidence:"low" as const,validation:"无法验证",crossCheckedWeight:0,disagreedWeight:0};
-
   const weightedContribution = usable.reduce((s,h)=>s+h.weight*(h.pct as number),0)/100;
   const estimate = nav*(1+weightedContribution/100);
   const coverage = Math.min(100,usableWeight);
