@@ -76,6 +76,7 @@ export function quoteFromFundState(input: {
   navDate?: string | null;
   estimateTime?: string | null;
   officialNavPublished?: boolean | null;
+  historyPoints?: Array<{ date: string; changePct: number | null }>;
   tradeTime: boolean;
 }): HoldingEntryQuote {
   if (input.tradeTime && input.estimate != null && Number.isFinite(input.estimate) && input.estimate > 0) {
@@ -89,9 +90,12 @@ export function quoteFromFundState(input: {
 
   if (input.nav != null && Number.isFinite(input.nav) && input.nav > 0) {
     const officialToday = input.officialNavPublished === true && sameChinaDate(input.navDate);
+    const historicalPct = input.navDate
+      ? input.historyPoints?.find((point) => point.date === input.navDate)?.changePct
+      : null;
     return {
       price: input.nav,
-      pct: input.dayPct ?? null,
+      pct: input.dayPct ?? (historicalPct != null && Number.isFinite(historicalPct) ? historicalPct : null),
       label: officialToday
         ? (input.navDate ? `今日官方净值 · ${input.navDate}` : "今日官方净值")
         : (input.navDate ? `最近官方净值 · ${input.navDate}` : "最近官方净值"),
