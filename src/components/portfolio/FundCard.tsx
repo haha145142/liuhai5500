@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { SwingPlan } from "@/components/portfolio/SwingPlan";
+import { ValuationTrustRow } from "@/components/valuation/ValuationTrustRow";
 import { Tone } from "@/components/ui/Glass";
 import { calcSixFactor } from "@/lib/calc/six-factor";
 import { calcSwingTrade } from "@/lib/calc/indicators";
 import { synthesizeSwing } from "@/lib/calc/swing-synthesis";
 import { matchFundSector } from "@/lib/data/sectors";
+import { buildValuationDisplaySummary } from "@/lib/data/valuation-display";
 import { selectFundDisplayQuote } from "@/lib/data/quote-mode";
 import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
 import type { FundQuote, Holding, SectorQuote } from "@/lib/types";
@@ -38,6 +40,12 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
   const saveEdit = () => { const s = Number(shares); const c = Number(cost); if (s > 0 && c > 0) { onUpdate({ shares: s, cost: c }); setEditing(false); } };
   const quoteSourceLabel = quote.mode === "official_today" ? "今日官方净值已发布" : quote.mode === "live_estimate" ? `盘中自算估值 · ${quote.confidence === "high" ? "高" : "中"}置信度` : quote.mode === "latest_official" ? "最近官方净值" : "暂无可靠行情";
   const estimateAudit = fund?.estimateMethod ? `${fund.estimateMethod} · 覆盖 ${fund.estimateCoverage?.toFixed(1) ?? "—"}% · ${fund.estimateValidation || "待验证"}${fund.estimateDeviation != null ? ` · 偏差 ${fund.estimateDeviation.toFixed(2)}个百分点` : ""}` : null;
+  const valuationSummary = fund ? buildValuationDisplaySummary({
+    valuationStatus: fund.valuationStatus,
+    estimateConfidence: fund.estimateConfidence,
+    estimateCoverage: fund.estimateCoverage,
+    estimateValidation: fund.estimateValidation,
+  }) : null;
   const signalTone = synthesis ? (synthesis.score >= 65 ? "up" : synthesis.score <= 40 ? "down" : "flat") : "flat";
 
   return (
@@ -72,6 +80,16 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
           <div className="mt-2 rounded-xl bg-bg-elevated/75 px-2.5 py-2 text-[10px] text-muted">
             {fund?.nav != null ? `官方 ${fmtPrice(fund.nav, 4)} · ${fund.navDate || "日期未知"}` : "官方净值暂无"}
             {fund?.estimate != null ? `  ·  自算 ${fmtPrice(fund.estimate, 4)}${fund.estimateTime ? ` · ${fund.estimateTime}` : ""}` : ""}
+          </div>
+        ) : null}
+        {valuationSummary ? (
+          <div className="mt-2">
+            <ValuationTrustRow summary={{
+              modeLabel: valuationSummary.mode,
+              coverageLabel: valuationSummary.coverage,
+              validationLabel: valuationSummary.validation,
+              historyLabel: valuationSummary.history,
+            }} />
           </div>
         ) : null}
         {estimateAudit ? <div className="mt-2 text-[10px] text-subtle">估值审计 · {estimateAudit}</div> : null}
