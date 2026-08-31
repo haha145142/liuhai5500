@@ -52,41 +52,47 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
     estimateValidation: fund.estimateValidation,
   }) : null;
   const signalTone = synthesis ? (synthesis.score >= 65 ? "up" : synthesis.score <= 40 ? "down" : "flat") : "flat";
+  const holdingIdentity = fund?.name || holding.name || holding.code;
 
   return (
     <article className="glass mb-3 overflow-hidden p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[17px] font-semibold tracking-tight text-fg">{fund?.name || holding.name || holding.code}</div>
+          <div className="truncate text-[17px] font-semibold tracking-tight text-fg">{holdingIdentity}</div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-muted"><span>{holding.code}</span><DataStatus mode={quoteStatusMode} detail={quoteStatusDetail} /></div>
         </div>
         <div className="shrink-0 text-right">
           <Tone v={day} className="text-[25px] font-bold leading-none tracking-tight">{fmtPctShort(day)}</Tone>
-          <div className="mt-1 text-[10px] text-subtle">{quote.mode === "official_today" ? "官方净值" : quote.mode === "live_estimate" ? "盘中估值" : quote.mode === "latest_official" ? "最近净值" : "涨跌暂无"}</div>
+          <div className="mt-1 text-[10px] text-subtle">{quote.mode === "official_today" ? "官方净值" : quote.mode === "live_estimate" ? "盘中估值" : quote.mode === "latest_official" ? "最近净值" : "行情暂无"}</div>
         </div>
       </div>
 
       <div className="mt-3 rounded-[20px] border border-white/55 bg-white/45 p-3 shadow-sm backdrop-blur-[6px]">
-        <div className="flex items-end justify-between gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <div className="text-[10px] text-muted">当前价格</div>
-            <div className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">{fmtPrice(px, 4)}</div>
+            <div className="text-[10px] text-muted">持有份额</div>
+            <div className="mt-1 text-[20px] font-bold tabular-nums">{holding.shares}</div>
           </div>
           <div className="text-right">
-            <div className="text-[10px] text-muted">持仓市值</div>
-            <div className="mt-1 text-[18px] font-semibold tabular-nums">{fmtMoney(value)}</div>
+            <div className="text-[10px] text-muted">持仓成本</div>
+            <div className="mt-1 text-[20px] font-bold tabular-nums">{fmtMoney(costVal)}</div>
           </div>
         </div>
-        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted">
-          <span>{quote.label}</span>
-          <span className="shrink-0">成本 {fmtPrice(holding.cost, 4)} · {holding.shares} 份</span>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Metric label="成本价" value={fmtPrice(holding.cost, 4)} />
+          <Metric label={quote.mode === "live_estimate" ? "盘中估值" : quote.mode === "official_today" ? "今日官方净值" : quote.mode === "latest_official" ? "最近官方净值" : "当前价格"} value={fmtPrice(px, 4)} />
+          <Metric label="当前市值" value={fmtMoney(value)} />
+          <Metric label="真实持有收益" value={fmtMoney(pnl)} tone={pnl} />
         </div>
-        {fund?.nav != null || fund?.estimate != null ? (
-          <div className="mt-2 rounded-xl bg-bg-elevated/75 px-2.5 py-2 text-[10px] text-muted">
-            {fund?.nav != null ? `官方 ${fmtPrice(fund.nav, 4)} · ${fund.navDate || "日期未知"}` : "官方净值暂无"}
-            {fund?.estimate != null ? `  ·  自算 ${fmtPrice(fund.estimate, 4)}${fund.estimateTime ? ` · ${fund.estimateTime}` : ""}` : ""}
-          </div>
-        ) : null}
+
+        <div className="mt-2 rounded-xl bg-bg-elevated/75 px-2.5 py-2 text-[10px] text-muted">
+          {fund?.nav != null ? `官方 ${fmtPrice(fund.nav, 4)} · ${fund.navDate || "日期未知"}` : "官方净值暂无"}
+          {fund?.estimate != null ? ` · 自算 ${fmtPrice(fund.estimate, 4)}${fund.estimateTime ? ` · ${fund.estimateTime}` : ""}` : ""}
+        </div>
+
+        {!fund?.nav && !fund?.estimate ? <div className="mt-2 rounded-xl border border-dashed border-white/70 bg-white/35 px-2.5 py-2 text-[10px] leading-relaxed text-muted">本地持仓数据已保存：{holding.shares} 份 × {fmtPrice(holding.cost, 4)} = {fmtMoney(costVal)}。当前净值/估值尚未取得，所以不虚构“赚了多少”；联网恢复后自动补齐市值、盈亏和波段状态。</div> : null}
+
         {valuationSummary ? (
           <div className="mt-2">
             <ValuationTrustRow summary={{
@@ -123,7 +129,13 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
             <Metric label="主题" value={sector?.change != null ? fmtPctShort(sector.change) : "未验证"} />
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="mt-3 rounded-[20px] border border-dashed border-white/70 bg-white/35 p-3">
+          <div className="text-[10px] text-subtle">最近波段状态</div>
+          <div className="mt-1 text-sm font-semibold text-fg">等待可靠行情数据</div>
+          <div className="mt-1 text-[10px] text-muted">没有历史行情或技术指标时，不把“强 / 弱”猜出来。</div>
+        </div>
+      )}
 
       {fund?.metrics ? (
         <div className="mt-3 flex items-center justify-between rounded-2xl bg-bg-elevated px-3 py-2.5">
@@ -131,7 +143,7 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
           <div className="text-right"><div className="text-[10px] text-subtle">RSI</div><div className="text-sm font-semibold tabular-nums">{safeFixed(fund.metrics.rsi, 1)}</div></div>
           <div className="text-right"><div className="text-[10px] text-subtle">波段</div><div className="text-sm font-semibold tabular-nums text-accent">{fund.metrics.bandScore == null || !Number.isFinite(fund.metrics.bandScore) ? "—" : fund.metrics.bandScore}</div></div>
         </div>
-      ) : <p className="mt-3 text-[11px] text-muted">净值历史不足 35 个交易日，暂不生成可靠波段信号。</p>}
+      ) : null}
 
       <button type="button" className="mt-3 flex w-full items-center justify-between rounded-2xl bg-bg-elevated px-3 py-2.5 text-left text-xs font-semibold text-fg" onClick={() => setOpen((v) => !v)}>
         <span>{open ? "收起详细依据" : "查看详细依据"}</span>
@@ -152,7 +164,7 @@ export function FundCard({ holding, fund, sector, benchPct, onRemove, onUpdate }
 
       <SwingPlan holding={holding} fund={fund} price={px} officialToday={quote.mode === "official_today"} />
 
-      {mapped ? <div className="mt-3 rounded-2xl bg-accent/8 p-3 text-[11px] text-muted"><b className="text-fg">映射板块：{mapped.name}</b>{sector?.change != null ? <span> · 今日 <Tone v={sector.change}>{fmtPctShort(sector.change)}</Tone></span> : " · 暂无板块行情"}{six ? <div className="mt-1">组合判断：{six.advice} · 置信 {six.confidence}% · {six.basis}</div> : null}</div> : null}
+      {mapped ? <div className="mt-3 rounded-2xl bg-accent/8 p-3 text-[11px] text-muted"><b className="text-fg">映射板块：{mapped.name}</b>{sector?.change != null ? <span> · 今日 <Tone v={sector.change}>{fmtPctShort(sector.change)}</Tone></span> : " · 板块行情暂无"}{six ? <div className="mt-1">组合判断：{six.advice} · 置信 {six.confidence}% · {six.basis}</div> : null}</div> : null}
 
       {editing ? (
         <div className="mt-3 grid grid-cols-2 gap-2">
