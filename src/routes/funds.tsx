@@ -96,7 +96,7 @@ function FundsPage() {
       {!loading && !rows.length ? <EmptyNote>暂无可靠排行数据，当前数据源不可用。</EmptyNote> : null}
       {rows.map((r, i) => {
         const addable = r.nav != null && Number.isFinite(r.nav) && r.nav > 0;
-        const displayValue = tab === "z" ? r.week : tab === "1n" ? r.ytd : tab === "6y" ? r.month : r.day;
+        const displayValue = tab === "z" ? r.week : tab === "1n" ? r.oneYear : tab === "6y" ? r.sixMonth : r.day;
         return (
           <article key={r.code} className="glass-tight mb-2 flex items-center gap-3 p-3">
             <div className="w-6 text-xs font-semibold text-subtle">{i + 1}</div>
