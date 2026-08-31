@@ -4,4 +4,6 @@ Trigger a production deployment from the current `main` revision. No application
 
 Current batch includes DeepSeek connection test, local-key AI analysis, retired fund valuation endpoint replacement, mobile side drawer navigation, compact home layout, and paged fund sector cards.
 
-Last deployment trigger check: 2026-08-31 13:10 +08:00
+Build fix: export DeepSeek server functions from the shared data module.
+
+Last deployment trigger check: 2026-08-31 13:16 +08:00
