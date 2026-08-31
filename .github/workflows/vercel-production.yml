@@ -1,16 +1,18 @@
 name: Vercel Production Deploy
 
+# Production is deployed by Vercel's native Git integration.
+# Keep this workflow manual-only so a main push does not create a second deployment
+# and consume another Hobby deployment slot.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  deploy:
+  verify-production-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,8 +28,3 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Deploy to Vercel
-        run: npx vercel deploy --prod --yes --scope haha145142s-projects --token "$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
