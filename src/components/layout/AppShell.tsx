@@ -24,98 +24,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  useEffect(() => {
-    hydrate();
-    const id = window.setTimeout(() => {
-      void refreshSnapshot();
-      void refreshNews();
-      void refreshFunds();
-    }, BOOT_DELAY_MS);
-    return () => window.clearTimeout(id);
-  }, [hydrate, refreshSnapshot, refreshNews, refreshFunds]);
+  useEffect(() => { hydrate(); const id = window.setTimeout(() => { void refreshSnapshot(); void refreshNews(); void refreshFunds(); }, BOOT_DELAY_MS); return () => window.clearTimeout(id); }, [hydrate, refreshSnapshot, refreshNews, refreshFunds]);
+  useEffect(() => { const id = window.setInterval(() => { if (document.hidden) return; void refreshSnapshot(); if (isTradeTime()) void refreshFunds(); }, Math.max(30_000, settings.autoRefreshMs)); return () => window.clearInterval(id); }, [refreshSnapshot, refreshFunds, settings.autoRefreshMs]);
+  useEffect(() => { if (pathname !== "/" && !pathname.startsWith("/news")) return; const id = window.setInterval(() => { if (document.hidden) return; void refreshNews(); }, Math.max(60_000, settings.newsRefreshMs || NEWS_REFRESH_MS)); return () => window.clearInterval(id); }, [pathname, refreshNews, settings.newsRefreshMs]);
+  useEffect(() => { setDrawerOpen(false); }, [pathname]);
 
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      if (document.hidden) return;
-      void refreshSnapshot();
-      if (isTradeTime()) void refreshFunds();
-    }, Math.max(30_000, settings.autoRefreshMs));
-    return () => window.clearInterval(id);
-  }, [refreshSnapshot, refreshFunds, settings.autoRefreshMs]);
-
-  useEffect(() => {
-    if (pathname !== "/" && !pathname.startsWith("/news")) return;
-    const id = window.setInterval(() => {
-      if (document.hidden) return;
-      void refreshNews();
-    }, Math.max(60_000, settings.newsRefreshMs || NEWS_REFRESH_MS));
-    return () => window.clearInterval(id);
-  }, [pathname, refreshNews, settings.newsRefreshMs]);
-
-  useEffect(() => {
-    setDrawerOpen(false);
-  }, [pathname]);
-
-  const onRefresh = () => {
-    void refreshSnapshot();
-    if (isTradeTime()) void refreshFunds();
-    if (pathname.startsWith("/news") || pathname === "/") void refreshNews();
-  };
-
+  const onRefresh = () => { void refreshSnapshot(); if (isTradeTime()) void refreshFunds(); if (pathname.startsWith("/news") || pathname === "/") void refreshNews(); };
   const failedSources = snapshot?.sources.filter((s) => s.status === "err").map((s) => s.name) || [];
-  const validationLabel = snapshot?.validation === "cross_checked"
-    ? "双源核验"
-    : snapshot?.validation === "cached_latest_trading_day"
-      ? "最近交易日缓存"
-      : snapshot?.validation === "single_source"
-        ? "单源可用"
-        : "数据状态待确认";
-  const statusText = snapshot
-    ? isWeekend()
-      ? `周末休市 · 数据日 ${snapshot.marketDate || tradingDateLabel()} · ${validationLabel} · ${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`
-      : `数据日 ${snapshot.marketDate || "今日"} · ${validationLabel} · ${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`
-    : lastError
-      ? "行情暂时不可用 · 已保留本地数据"
-      : "正在后台接入行情 · 界面不阻塞";
+  const validationLabel = snapshot?.validation === "cross_checked" ? "双源核验" : snapshot?.validation === "cached_latest_trading_day" ? "最近交易日缓存" : snapshot?.validation === "single_source" ? "单源可用" : "数据状态待确认";
+  const statusText = snapshot ? (isWeekend() ? `周末休市 · 数据日 ${snapshot.marketDate || tradingDateLabel()} · ${validationLabel} · ${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}` : `数据日 ${snapshot.marketDate || "今日"} · ${validationLabel} · ${failedSources.length ? `${failedSources.join("、")}暂不可用 · ` : ""}更新 ${clockStr(new Date(snapshot.fetchedAt))}`) : lastError ? "行情暂时不可用 · 已保留本地数据" : "正在后台接入行情 · 界面不阻塞";
 
-  const header = (
-    <header className="app-header">
-      <div className="app-header-card">
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          aria-label="打开侧边菜单"
-          className="relative z-10 mr-2 flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/65 bg-white/55 text-slate-700 shadow-sm backdrop-blur-md transition active:scale-95"
-        >
-          <Menu className="size-6" strokeWidth={2} />
-        </button>
-        <div className="min-w-0 flex-1">
-          <h1 className="app-header-title">Fund AI Pro</h1>
-          <p className="app-header-meta">{sessionLabel()} · {statusText}</p>
-        </div>
-        <button type="button" onClick={onRefresh} aria-label="刷新" className="app-refresh-button">
-          <RefreshCw className={cn("size-6", loading && "animate-spin")} />
-        </button>
-      </div>
-    </header>
-  );
-
+  const header = <header className="app-header"><div className="app-header-card"><button type="button" onClick={() => setDrawerOpen(true)} aria-label="打开侧边菜单" className="relative z-10 mr-2 flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/65 bg-white/55 text-slate-700 shadow-sm backdrop-blur-md transition active:scale-95"><Menu className="size-6" strokeWidth={2} /></button><div className="min-w-0 flex-1"><h1 className="app-header-title">Fund AI Pro</h1><p className="app-header-meta">{sessionLabel()} · {statusText}</p></div><button type="button" onClick={onRefresh} aria-label="刷新" className="app-refresh-button"><RefreshCw className={cn("size-6", loading && "animate-spin")} /></button></div></header>;
   const mainContent = pathname === "/portfolio" ? <><QuickAddFund />{children}</> : children;
-
-  return (
-    <div className="app-shell">
-      {pathname === "/" ? (
-        <section className="home-panel">
-          {header}
-          <main className="app-main home-main">{mainContent}</main>
-        </section>
-      ) : (
-        <>
-          {header}
-          <main className="app-main">{mainContent}</main>
-        </>
-      )}
-      <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
-    </div>
-  );
+  return <div className="app-shell" data-app-shell="v3">{pathname === "/" ? <section className="home-panel">{header}<main className="app-main home-main">{mainContent}</main></section> : <><>{header}</><main className="app-main">{mainContent}</main></>}<SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} /></div>;
 }
