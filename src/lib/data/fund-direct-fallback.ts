@@ -33,13 +33,19 @@ function extractJson(text: string, key: string): unknown[] {
   }
 }
 
+function chinaDateLabelFromTimestamp(ts: number | null): string {
+  if (ts == null || !Number.isFinite(ts)) return "";
+  const shifted = new Date(ts + 8 * 60 * 60 * 1000);
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
+}
+
 function parseDirect(text: string, code: string): ParsedDirect {
   const trend = extractJson(text, "Data_netWorthTrend");
   const historyPoints = trend.map((x) => {
     const item = x as { x?: unknown; y?: unknown; equityReturn?: unknown };
     const ts = n(item.x);
     return {
-      date: ts != null ? new Date(ts).toISOString().slice(0, 10) : "",
+      date: chinaDateLabelFromTimestamp(ts),
       nav: n(item.y) ?? 0,
       changePct: n(item.equityReturn),
     };
