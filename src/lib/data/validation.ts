@@ -24,7 +24,7 @@ export const validateFundQuote = createServerFn({ method: "POST" })
       const gz = parseMaybeJsonp(raw) as Record<string, unknown> | null;
       const backupNav = gz ? n(gz.dwjz) : null;
       const backupPct = gz ? n(gz.gszzl) : null;
-      const officialDate = gz ? String(gz.jzrq || "") : "";
+      const backupDate = gz ? String(gz.jzrq || "") : "";
 
       if (backupNav == null || q.nav == null) {
         return {
@@ -36,7 +36,7 @@ export const validateFundQuote = createServerFn({ method: "POST" })
       }
 
       const navGap = Math.abs(q.nav - backupNav) / Math.max(Math.abs(q.nav), 1e-9);
-      const dateSame = !q.navDate || !officialDate || q.navDate === officialDate;
+      const dateSame = !q.navDate || !backupDate || q.navDate === backupDate;
       const consistent = navGap <= 0.001 && dateSame;
 
       if (!consistent) {
@@ -61,9 +61,11 @@ export const validateFundQuote = createServerFn({ method: "POST" })
       return {
         quote: {
           ...q,
-          officialNavPublished: q.navDate != null && officialDate === q.navDate,
+          // Publication truth must come from the upstream official-NAV check.
+          // The backup estimate endpoint's jzrq is used only for cross-checking.
+          officialNavPublished: q.officialNavPublished,
           estimateConfidence: q.estimate != null ? confidence : "medium",
-          valuationStatus: q.estimate != null ? "estimate" : "official_nav",
+          valuationStatus: q.valuationStatus ?? (q.estimate != null ? "estimate" : "waiting_official_nav"),
           source: `${q.source} · 净值双源一致`,
         },
         checked: true,
