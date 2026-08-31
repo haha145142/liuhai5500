@@ -1,5 +1,5 @@
 import { Glass, SectionTitle, Tone } from "@/components/ui/Glass";
-import { fmtMoney, fmtPctShort } from "@/lib/format";
+import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
 import { calcPortfolioAnalysis } from "@/lib/calc/portfolio";
 import type { FundQuote, Holding, SectorQuote } from "@/lib/types";
 
@@ -24,8 +24,8 @@ export function PortfolioInsight({ holdings, funds, sectors }: { holdings: Holdi
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-        <Metric label="第一重仓" value={`${a.concentrationTop1Pct.toFixed(1)}%`} />
-        <Metric label="前三重仓" value={`${a.concentrationTop3Pct.toFixed(1)}%`} />
+        <Metric label="第一重仓" value={`${fmtPrice(a.concentrationTop1Pct, 1)}%`} />
+        <Metric label="前三重仓" value={`${fmtPrice(a.concentrationTop3Pct, 1)}%`} />
       </div>
 
       {a.sectorExposures.length ? (
@@ -34,7 +34,7 @@ export function PortfolioInsight({ holdings, funds, sectors }: { holdings: Holdi
           <div className="mt-1 space-y-1.5">
             {a.sectorExposures.slice(0, 4).map((x) => (
               <div key={x.name} className="flex items-center justify-between rounded-xl bg-bg-elevated px-2.5 py-1.5 text-[11px]">
-                <span>{x.name}</span><span className="font-semibold tabular-nums">{x.pct.toFixed(1)}%</span>
+                <span>{x.name}</span><span className="font-semibold tabular-nums">{fmtPrice(x.pct, 1)}%</span>
               </div>
             ))}
           </div>
