@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Cockpit } from "@/components/market/Cockpit";
 import { IndexGrid } from "@/components/market/IndexGrid";
-import { PortfolioInsight } from "@/components/portfolio/PortfolioInsight";
 import { FundSectorWatchV2 } from "@/components/fund-sector/FundSectorWatchV2";
 import { Glass, EmptyNote, Tone } from "@/components/ui/Glass";
 import { useApp } from "@/lib/store";
@@ -108,16 +107,6 @@ function Home() {
           </div>
           {snapshot ? <IndexGrid indices={snapshot.indices} /> : <Glass tight><EmptyNote>行情正在后台刷新，首屏不会阻塞。</EmptyNote></Glass>}
         </section>
-      </section>
-
-      <section className="home-block" aria-label="组合判断">
-        <div className="home-section-heading">
-          <div>
-            <div className="text-base font-semibold tracking-tight text-fg">组合判断</div>
-            <div className="text-[10px] text-subtle">收益 · 风险 · 板块</div>
-          </div>
-        </div>
-        <PortfolioInsight holdings={portfolio} funds={Object.values(funds)} sectors={snapshot?.sectors || []} />
       </section>
 
       <section className="home-block" aria-label="板块与市场">
