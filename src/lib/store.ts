@@ -43,14 +43,15 @@ function chinaTodayLabel(date = new Date()) {
   return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
 }
 
-function withLatestOfficialMode(quote: FundQuote): FundQuote {
+function withLatestOfficialMode(quote: FundQuote, expectedDate: string): FundQuote {
+  const isOfficialLatest = quote.nav != null && quote.navDate === expectedDate && quote.officialNavPublished === true;
   return {
     ...quote,
     estimate: null,
     estimatePct: null,
     estimateTime: null,
-    valuationStatus: quote.nav != null ? "official_nav" : "stale",
-    estimateConfidence: quote.nav != null ? "high" : "low",
+    valuationStatus: isOfficialLatest ? "official_nav" : "stale",
+    estimateConfidence: isOfficialLatest ? "high" : "low",
   };
 }
 
@@ -195,8 +196,8 @@ export const useApp = create<AppState>((set, get) => ({
     try {
       const entries = await Promise.allSettled(codes.map(async (code) => {
         const raw = await getFund({ data: { code } });
-        try { const validated = await validateFundQuote({ data: { quote: raw } }); const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(validated.quote) : validated.quote; return [code, quote] as const; }
-        catch { const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(raw) : raw; return [code, quote] as const; }
+        try { const validated = await validateFundQuote({ data: { quote: raw } }); const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(validated.quote, referenceDate) : validated.quote; return [code, quote] as const; }
+        catch { const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(raw, referenceDate) : raw; return [code, quote] as const; }
       }));
       const funds = { ...get().funds };
       let updatedCount = 0;
