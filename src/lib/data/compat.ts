@@ -22,7 +22,17 @@ export const getFundRank = createServerFn({ method: "POST" }).validator((input: 
     const j = parseMaybeJsonp(text) as { datas?: string[] } | null;
     const rows: RankRow[] = (j?.datas || []).map(line => {
       const a = String(line).split(",");
-      return { code: a[0] || "", name: a[1] || "", nav: n(a[4]), day: n(a[6]), week: n(a[7]), month: n(a[8]), ytd: n(a[14]) };
+      return {
+        code: a[0] || "",
+        name: a[1] || "",
+        nav: n(a[4]),
+        day: n(a[6]),
+        week: n(a[7]),
+        month: n(a[8]),
+        sixMonth: n(a[10]),
+        oneYear: n(a[11]),
+        ytd: n(a[14]),
+      };
     }).filter(x => x.code && x.name);
     return { rows, source: rows.length ? "天天基金/东方财富排行" : "数据源暂不可用", fetchedAt: Date.now() };
   } catch {
