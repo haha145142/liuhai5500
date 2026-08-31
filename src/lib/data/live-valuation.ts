@@ -145,11 +145,16 @@ export const getCalculatedFund = createServerFn({method:"POST"})
         estimateDeviation:result.deviation,
         estimateValidation:result.validation,
         quoteCrossCheckedWeight:result.crossCheckedWeight,
-        quoteDisagreedWeight:result.disagreedWeight
+        quoteDisagreedWeight:result.disagreedWeight,
+        historyMae20:null,
+        historySample20:0,
+        historyMaxError:null,
+        historyP95Error:null,
+        historyMae5:null
       };
       CACHE.set(code,{ts:Date.now(),quote});
       return quote;
     } catch {
-      return {code,name:code,type:"基金",nav:null,navDate:null,estimate:null,estimatePct:null,estimateTime:null,dayPct:null,weekPct:null,monthPct:null,history:[],historyPoints:[],metrics:null,source:"自有估值引擎暂不可用",officialNavPublished:false,valuationStatus:"unavailable",estimateConfidence:"low"};
+      return {code,name:code,type:"基金",nav:null,navDate:null,estimate:null,estimatePct:null,estimateTime:null,dayPct:null,weekPct:null,monthPct:null,history:[],historyPoints:[],metrics:null,source:"自有估值引擎暂不可用",officialNavPublished:false,valuationStatus:"unavailable",estimateConfidence:"low",historyMae20:null,historySample20:0,historyMaxError:null,historyP95Error:null,historyMae5:null};
     }
   });
