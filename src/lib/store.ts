@@ -69,22 +69,36 @@ function mergeSnapshot(previous: Snapshot | null, incoming: Snapshot): Snapshot 
   const byCode = new Map(previous.indices.map((x) => [x.code, x]));
   const indices = incoming.indices.map((x) => {
     const old = byCode.get(x.code);
-    return x.pct != null || x.price != null ? x : old || x;
+    if (!old) return x;
+    return { ...old, ...x, price: x.price ?? old.price, pct: x.pct ?? old.pct, change: x.change ?? old.change };
   });
   const bySector = new Map(previous.sectors.map((x) => [x.id, x]));
   const sectors = incoming.sectors.map((x) => {
     const old = bySector.get(x.id);
-    return x.change != null ? x : old || x;
+    if (!old) return x;
+    return {
+      ...old, ...x,
+      change: x.change ?? old.change,
+      flow: x.flow ?? old.flow,
+      super: x.super ?? old.super,
+      large: x.large ?? old.large,
+      mid: x.mid ?? old.mid,
+      small: x.small ?? old.small,
+      turnover: x.turnover ?? old.turnover,
+      available: x.change != null ? true : old.available,
+      validation: x.validation && x.validation !== "unavailable" ? x.validation : old.validation,
+    };
   });
   const byBoard = new Map(previous.boards.map((x) => [x.code, x]));
-  const boards = incoming.boards.length
-    ? incoming.boards.map((x) => x.change != null ? x : byBoard.get(x.code) || x)
-    : previous.boards;
+  const boards = incoming.boards.length ? incoming.boards.map((x) => {
+    const old = byBoard.get(x.code);
+    return old ? { ...old, ...x, change: x.change ?? old.change, flow: x.flow ?? old.flow } : x;
+  }) : previous.boards;
   const flow = incoming.flow || previous.flow || null;
   const globalByName = new Map(previous.global.map((x) => [x.name, x]));
   const global = incoming.global.map((x) => {
     const old = globalByName.get(x.name);
-    return x.pct != null || x.price != null ? x : old || x;
+    return old ? { ...old, ...x, price: x.price ?? old.price, pct: x.pct ?? old.pct } : x;
   });
   const sources = incoming.sources.length ? incoming.sources : previous.sources;
   return { ...incoming, indices, sectors, boards, flow, global, sources };
@@ -94,62 +108,33 @@ export const useApp = create<AppState>((set, get) => ({
   ready: false, loading: false, newsLoading: false, fundsLoading: false,
   snapshot: null, news: null, portfolio: [], funds: {}, selectedSectors: [], watchlist: [],
   settings: loadSettings(), lastError: null,
-
   hydrate: () => {
     if (get().ready) return;
     set({ ready: true, snapshot: loadCachedSnapshot(), news: loadCachedNews(), funds: loadCachedFunds(), portfolio: loadPortfolio(), selectedSectors: loadSelectedSectors(), watchlist: loadWatchlist(), settings: loadSettings() });
   },
-
   refreshSnapshot: async () => {
     if (get().loading) return;
     const phase = getMarketPhase();
     const cached = get().snapshot || loadCachedSnapshot();
-
     if (phase === "lunch") {
       const today = chinaTodayLabel();
-      if (cached?.marketDate === today) {
-        set({ snapshot: cached, loading: false, lastError: null });
-        return;
-      }
+      if (cached?.marketDate === today) { set({ snapshot: cached, loading: false, lastError: null }); return; }
     }
-
     if (phase === "preopen" || phase === "weekend") {
       const latest = tradingDateLabel();
       const cacheKey = `${phase}:${latest}`;
-      if (cached?.marketDate === latest && usableIndices(cached.indices) > 0 && usableSectors(cached.sectors) > 0) {
-        set({ snapshot: { ...cached, validation: "cached_latest_trading_day" as const }, loading: false, lastError: null });
-        return;
-      }
-      if (phase === "weekend" && lastWeekendSnapshotKey === cacheKey) {
-        if (cached) set({ snapshot: { ...cached, validation: "cached_latest_trading_day" as const }, loading: false, lastError: null });
-        return;
-      }
+      if (cached?.marketDate === latest && usableIndices(cached.indices) > 0 && usableSectors(cached.sectors) > 0) { set({ snapshot: { ...cached, validation: "cached_latest_trading_day" as const }, loading: false, lastError: null }); return; }
+      if (phase === "weekend" && lastWeekendSnapshotKey === cacheKey) { if (cached) set({ snapshot: { ...cached, validation: "cached_latest_trading_day" as const }, loading: false, lastError: null }); return; }
       set({ loading: true, lastError: null });
       try {
         lastWeekendSnapshotKey = cacheKey;
-        const [fallback, recent] = await Promise.allSettled([
-          getLatestTradingMarketData(),
-          getSnapshot(),
-        ]);
+        const [fallback, recent] = await Promise.allSettled([getLatestTradingMarketData(), getSnapshot()]);
         const fallbackData = fallback.status === "fulfilled" ? fallback.value : null;
         const recentSnapshot = recent.status === "fulfilled" ? recent.value : null;
         const base = cached || { indices: [], sectors: [], boards: [], flow: null, global: [], sources: [], fetchedAt: Date.now() };
-        const historical: Snapshot = {
-          ...base,
-          indices: fallbackData?.indices?.length ? fallbackData.indices : base.indices,
-          sectors: fallbackData?.sectors?.length ? fallbackData.sectors : base.sectors,
-          marketDate: fallbackData?.marketDate || latest,
-          validation: "cached_latest_trading_day",
-          fetchedAt: Date.now(),
-          sources: [...base.sources.filter((s) => s.name !== "最近交易日历史行情"), { name: "最近交易日历史行情", status: fallbackData?.marketDate ? "ok" : "warn", note: fallbackData?.note || "最近交易日历史行情暂不可用" }],
-        };
+        const historical: Snapshot = { ...base, indices: fallbackData?.indices?.length ? fallbackData.indices : base.indices, sectors: fallbackData?.sectors?.length ? fallbackData.sectors : base.sectors, marketDate: fallbackData?.marketDate || latest, validation: "cached_latest_trading_day", fetchedAt: Date.now(), sources: [...base.sources.filter((s) => s.name !== "最近交易日历史行情"), { name: "最近交易日历史行情", status: fallbackData?.marketDate ? "ok" : "warn", note: fallbackData?.note || "最近交易日历史行情暂不可用" }] };
         const merged = mergeSnapshot(historical, recentSnapshot ? { ...recentSnapshot, marketDate: latest, validation: "cached_latest_trading_day" as const } : historical);
-        const snapshot: Snapshot = {
-          ...merged,
-          marketDate: latest,
-          validation: "cached_latest_trading_day",
-          fetchedAt: Date.now(),
-        };
+        const snapshot: Snapshot = { ...merged, marketDate: latest, validation: "cached_latest_trading_day", fetchedAt: Date.now() };
         if (usableIndices(snapshot.indices) || usableSectors(snapshot.sectors) || !!snapshot.flow || usableGlobal(snapshot.global)) saveCachedSnapshot(snapshot);
         set({ snapshot, loading: false, lastError: null });
       } catch {
@@ -158,7 +143,6 @@ export const useApp = create<AppState>((set, get) => ({
       }
       return;
     }
-
     set({ loading: true, lastError: null });
     try {
       const snapshot = await getSnapshot();
@@ -167,15 +151,7 @@ export const useApp = create<AppState>((set, get) => ({
       const indices = checked.validated.map((x) => x.pct != null || x.price != null ? x : previous?.indices.find((p) => p.code === x.code) || x);
       const phaseAfterFetch = getMarketPhase();
       const shouldKeepPrevious = phaseAfterFetch === "lunch" && previous?.marketDate === chinaTodayLabel();
-      const normalized: Snapshot = {
-        ...snapshot,
-        indices,
-        marketDate: snapshot.marketDate || previous?.marketDate || null,
-        validation: checked.checked ? "cross_checked" : snapshot.validation || previous?.validation || "single_source",
-        sources: checked.checked
-          ? snapshot.sources.map((s) => s.name === "指数" ? { ...s, note: `${s.note} · ${checked.note}` } : s)
-          : [...snapshot.sources, { name: "交叉验证", status: "warn", note: checked.note }],
-      };
+      const normalized: Snapshot = { ...snapshot, indices, marketDate: snapshot.marketDate || previous?.marketDate || null, validation: checked.checked ? "cross_checked" : snapshot.validation || previous?.validation || "single_source", sources: checked.checked ? snapshot.sources.map((s) => s.name === "指数" ? { ...s, note: `${s.note} · ${checked.note}` } : s) : [...snapshot.sources, { name: "交叉验证", status: "warn", note: checked.note }] };
       const finalSnapshot = shouldKeepPrevious ? previous! : mergeSnapshot(previous, normalized);
       const hasUsableMarket = usableIndices(finalSnapshot.indices) > 0 || usableSectors(finalSnapshot.sectors) > 0 || !!finalSnapshot.flow || usableGlobal(finalSnapshot.global) > 0;
       if (hasUsableMarket) saveCachedSnapshot(finalSnapshot);
@@ -186,81 +162,48 @@ export const useApp = create<AppState>((set, get) => ({
       else set({ loading: false, lastError: e instanceof Error ? e.message : "行情暂时不可用" });
     }
   },
-
   refreshNews: async () => {
     if (get().newsLoading) return;
     set({ newsLoading: true });
     try {
       const news = await getNews();
       const hasUsableNews = news.items.length > 0 || news.sentiment.length > 0;
-      if (hasUsableNews) {
-        saveCachedNews(news);
-        set({ news, newsLoading: false });
-      } else {
-        const cached = get().news || loadCachedNews();
-        set({ news: cached, newsLoading: false });
-      }
-    } catch {
-      const cached = loadCachedNews();
-      set({ news: get().news || cached, newsLoading: false });
-    }
+      if (hasUsableNews) { saveCachedNews(news); set({ news, newsLoading: false }); } else { const cached = get().news || loadCachedNews(); set({ news: cached, newsLoading: false }); }
+    } catch { const cached = loadCachedNews(); set({ news: get().news || cached, newsLoading: false }); }
   },
-
   refreshFunds: async () => {
     if (get().fundsLoading) return;
     const list = get().portfolio;
     if (!list.length) return;
-
     const phase = getMarketPhase();
     if (phase === "lunch") return;
-
     const currentFunds = get().funds;
     const codes = [...new Set(list.map((h) => h.code))];
     const referenceDate = phase === "weekend" || phase === "preopen" ? tradingDateLabel() : chinaTodayLabel();
-
     if (phase === "weekend" || phase === "preopen") {
       const routineKey = `${phase}:${referenceDate}:${codes.join(",")}`;
       if (lastFundRoutineKey === routineKey) return;
       lastFundRoutineKey = routineKey;
     }
-
     if (phase === "postclose") {
-      const allOfficial = codes.every((code) => {
-        const q = currentFunds[code];
-        return q?.nav != null && q.navDate === referenceDate && q.officialNavPublished === true;
-      });
+      const allOfficial = codes.every((code) => { const q = currentFunds[code]; return q?.nav != null && q.navDate === referenceDate && q.officialNavPublished === true; });
       if (allOfficial) return;
       if (Date.now() - lastPostCloseFundAttemptAt < 180_000) return;
       lastPostCloseFundAttemptAt = Date.now();
     }
-
     set({ fundsLoading: true });
     try {
       const entries = await Promise.allSettled(codes.map(async (code) => {
         const raw = await getFund({ data: { code } });
-        try {
-          const validated = await validateFundQuote({ data: { quote: raw } });
-          const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(validated.quote) : validated.quote;
-          return [code, quote] as const;
-        } catch {
-          const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(raw) : raw;
-          return [code, quote] as const;
-        }
+        try { const validated = await validateFundQuote({ data: { quote: raw } }); const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(validated.quote) : validated.quote; return [code, quote] as const; }
+        catch { const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(raw) : raw; return [code, quote] as const; }
       }));
       const funds = { ...get().funds };
-      for (const result of entries) {
-        if (result.status !== "fulfilled") continue;
-        const [code, quote] = result.value;
-        const hasUsableValue = quote.nav != null || quote.estimate != null || quote.history.length > 0;
-        if (hasUsableValue) funds[code] = quote;
-      }
+      for (const result of entries) { if (result.status !== "fulfilled") continue; const [code, quote] = result.value; const hasUsableValue = quote.nav != null || quote.estimate != null || quote.history.length > 0; if (hasUsableValue) funds[code] = quote; }
       if (Object.keys(funds).length) saveCachedFunds(funds);
       set({ funds });
-    } finally {
-      set({ fundsLoading: false });
-    }
+    } finally { set({ fundsLoading: false }); }
   },
-
   addHolding: (h) => { const list = get().portfolio.slice(); const i = list.findIndex((x) => x.code === h.code); if (i >= 0) list[i] = { ...list[i], ...h }; else list.push(h); savePortfolio(list); set({ portfolio: list }); void get().refreshFunds(); },
   updateHolding: (code, patch) => { const list = get().portfolio.map((x) => (x.code === code ? { ...x, ...patch } : x)); savePortfolio(list); set({ portfolio: list }); },
   removeHolding: (code) => { const list = get().portfolio.filter((x) => x.code !== code); savePortfolio(list); set({ portfolio: list }); },
