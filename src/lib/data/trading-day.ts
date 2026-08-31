@@ -13,8 +13,7 @@ function dateLabel(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-// Exchange-wide 2026 closed dates. Weekend dates are handled separately, so
-// only the weekday holiday closures need to be listed here.
+// Exchange-wide 2026 closed dates. Weekend dates are handled separately.
 const EXCHANGE_CLOSED_2026 = new Set([
   "2026-01-01",
   "2026-01-02",
@@ -45,13 +44,18 @@ export function isExchangeClosed(date = new Date()): boolean {
   return EXCHANGE_CLOSED_2026.has(dateLabel(d));
 }
 
+/** Canonical trading-day predicate used by market-hours.ts. */
+export function isAshareTradingDay(date = new Date()): boolean {
+  return !isExchangeClosed(date);
+}
+
 export function isWeekend(date = new Date()): boolean {
   const day = cnDate(date).getUTCDay();
   return day === 0 || day === 6;
 }
 
 export function isTradingDay(date = new Date()): boolean {
-  return !isExchangeClosed(date);
+  return isAshareTradingDay(date);
 }
 
 export function latestTradingDate(date = new Date()): Date {
