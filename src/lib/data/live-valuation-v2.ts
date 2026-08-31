@@ -53,6 +53,7 @@ function pickValuation(row: Record<string, unknown> | null) {
   return {
     code,
     name: String(row.SHORTNAME ?? row.name ?? "").trim(),
+    type: String(row.FUNDTYPE ?? row.fundtype ?? row.FTYPE ?? row.type ?? "").trim(),
     estimate: n(row.GSZ ?? row.gsz),
     pct: n(row.GSZZL ?? row.gszzl),
     nav: n(row.NAV ?? row.dwjz),
@@ -64,7 +65,7 @@ function pickValuation(row: Record<string, unknown> | null) {
 async function fetchValuation(code: string) {
   const results = await Promise.all(VALUATION_PROVIDERS.map(async (base) => {
     try {
-      const url = `${base}?FCODES=${encodeURIComponent(code)}&FIELDS=FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE&_=${Date.now()}`;
+      const url = `${base}?FCODES=${encodeURIComponent(code)}&FIELDS=FCODE,SHORTNAME,FUNDTYPE,FTYPE,GSZZL,GZTIME,GSZ,NAV,PDATE&_=${Date.now()}`;
       const text = await fetchText(url, 8_000, { Referer: "https://fund.eastmoney.com/" });
       const row = parseValuationRows(text).find((x) => String(x.FCODE ?? x.fundcode ?? x.CODE ?? "").trim() === code) ?? null;
       return pickValuation(row);
@@ -158,7 +159,7 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
       const nav = valuation?.nav ?? latest?.nav ?? null;
       const navDate = valuation?.navDate ?? latest?.date ?? null;
       const fundName = valuation?.name || code;
-      const fundType = "基金";
+      const fundType = valuation?.type || "";
       const policy = policyForFund(fundType, fundName);
       const externalPct = valuation?.pct ?? null;
       const rawHoldings = policy.allowAshareLookThrough ? await getHoldings(code) : [];
@@ -181,7 +182,7 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
       const quote: FundQuote & ValuationAudit & { liveHoldings?: CrossCheckedHolding[] } = {
         code,
         name: fundName,
-        type: fundType,
+        type: fundType || policy.className,
         nav: officialNav,
         navDate: officialNavDate,
         estimate: officialToday ? officialNav : result.estimate,
