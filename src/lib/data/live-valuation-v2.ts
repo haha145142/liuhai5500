@@ -73,7 +73,30 @@ async function fetchValuation(code: string) {
       return null;
     }
   }));
-  return results.find((x) => x?.code === code) ?? results.find(Boolean) ?? null;
+
+  const valid = results.filter((x): x is NonNullable<typeof x> => !!x && x.code === code && (x.estimate != null || x.pct != null));
+  if (!valid.length) return null;
+  if (valid.length === 1) return { ...valid[0], validation: "单源外部估值", sourceCount: 1 };
+
+  const pctValues = valid.map((x) => x.pct).filter((x): x is number => x != null);
+  const estimateValues = valid.map((x) => x.estimate).filter((x): x is number => x != null);
+  const pctDeviation = pctValues.length >= 2 ? Math.abs(pctValues[0] - pctValues[1]) : null;
+  const estimateDeviation = estimateValues.length >= 2 ? Math.abs(estimateValues[0] - estimateValues[1]) : null;
+  const disputed = (pctDeviation != null && pctDeviation > 0.35) || (estimateDeviation != null && estimateDeviation > 0.005);
+  const median = (values: number[]) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+  };
+  const base = valid.find((x) => x.estimate != null || x.pct != null) ?? valid[0];
+  return {
+    ...base,
+    estimate: estimateValues.length ? median(estimateValues) : null,
+    pct: pctValues.length ? median(pctValues) : null,
+    validation: disputed ? "外部估值源分歧" : "双源外部估值一致",
+    sourceCount: valid.length,
+    sourceDeviationPct: pctDeviation,
+    sourceDeviationNav: estimateDeviation,
+  };
 }
 
 async function fetchHistory(code: string): Promise<FundHistoryPoint[]> {
@@ -135,12 +158,11 @@ function calculateEstimate(nav: number | null, holdings: CrossCheckedHolding[], 
   const crossCheckedWeight = usable.filter((h) => h.quoteStatus === "cross_checked").reduce((sum, h) => sum + h.weight, 0);
   const disagreedWeight = usable.filter((h) => h.quoteStatus === "disagreed").reduce((sum, h) => sum + h.weight, 0);
   const crossRate = usableWeight > 0 ? crossCheckedWeight / usableWeight : 0;
-  let confidence: "high" | "medium" | "low" = usableWeight >= 60 && coverageOfDisclosed >= 70 ? "high" : usableWeight >= 35 && coverageOfDisclosed >= 50 ? "medium" : "low";
+  let confidence: "high"|"medium"|"low" = usableWeight >= 60 && coverageOfDisclosed >= 70 ? "high" : usableWeight >= 35 && coverageOfDisclosed >= 50 ? "medium" : "low";
   if (crossRate < 0.5 || disagreedWeight / usableWeight > 0.2) confidence = "low";
   else if (crossRate < 0.7 && confidence === "high") confidence = "medium";
   let validation = "暂无外部参考";
   if (deviation != null) validation = deviation <= 0.35 ? "一致" : deviation <= 0.9 ? "轻微偏差" : "明显偏差";
-  if (validation === "明显偏差") confidence = "low";
   return { estimate, pct, disclosedWeight, usableWeight, coverage: Math.min(100, usableWeight), coverageOfDisclosed, deviation, confidence, validation, crossCheckedWeight, disagreedWeight };
 }
 
@@ -173,51 +195,34 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
       const weekPct = latest && weekBase?.nav ? (latest.nav / weekBase.nav - 1) * 100 : null;
       const monthPct = latest && monthBase?.nav ? (latest.nav / monthBase.nav - 1) * 100 : null;
       const metrics: FundMetrics | null = calcIndicators(history);
-      // A date in the valuation endpoint is not enough to prove publication.
-      // The official historical-NAV endpoint must explicitly contain today's NAV.
       const officialToday = latest?.date === today() && latest.nav > 0;
       const officialNav = officialToday ? latest.nav : nav;
       const officialNavDate = officialToday ? latest.date : navDate;
       const dayPct = officialToday ? latest?.changePct ?? null : result.pct ?? valuation?.pct ?? null;
+      const externalValidation = valuation?.validation || "暂无外部估值验证";
       const quote: FundQuote & ValuationAudit & { liveHoldings?: CrossCheckedHolding[] } = {
-        code,
-        name: fundName,
-        type: fundType || policy.className,
-        nav: officialNav,
-        navDate: officialNavDate,
+        code, name: fundName, type: fundType || policy.className,
+        nav: officialNav, navDate: officialNavDate,
         estimate: officialToday ? officialNav : result.estimate,
         estimatePct: officialToday ? null : result.pct,
         estimateTime: result.estimate != null && !officialToday ? new Date().toISOString() : null,
         dayPct,
-        weekPct,
-        monthPct,
-        history,
-        historyPoints,
-        metrics,
+        weekPct, monthPct, history, historyPoints, metrics,
         source: officialToday
           ? "今日官方净值 · 历史净值已发布"
           : result.estimate != null
-            ? `自算盘中估值 · 前十大重仓×双源行情 · ${result.validation}`
-            : "暂无可靠盘中估值 · 已保留最近官方净值",
+            ? `自算盘中估值 · 前十大重仓×双源行情 · ${result.validation} · ${externalValidation}`
+            : `暂无可靠盘中估值 · ${externalValidation}`,
         officialNavPublished: officialToday,
         valuationStatus: officialToday ? "official_nav" : result.estimate != null ? "estimate" : nav != null ? "waiting_official_nav" : "unavailable",
         estimateConfidence: result.confidence,
-        estimateMethod: policy.allowAshareLookThrough ? "已披露前十大重仓权重×实时资产涨跌；双源交叉校验；未覆盖部分不猜测" : policy.reason,
+        estimateMethod: policy.allowAshareLookThrough ? "已披露前十大重仓权重×实时资产涨跌；双源交叉校验；外部估值双源复核；未覆盖部分不猜测" : policy.reason,
         estimateCoverage: result.coverage,
-        disclosedWeight: result.disclosedWeight,
-        usableWeight: result.usableWeight,
-        coverageOfDisclosed: result.coverageOfDisclosed,
-        externalEstimatePct: externalPct,
-        estimateDeviation: result.deviation,
-        estimateValidation: result.validation,
-        quoteCrossCheckedWeight: result.crossCheckedWeight,
-        quoteDisagreedWeight: result.disagreedWeight,
+        disclosedWeight: result.disclosedWeight, usableWeight: result.usableWeight, coverageOfDisclosed: result.coverageOfDisclosed,
+        externalEstimatePct: externalPct, estimateDeviation: result.deviation, estimateValidation: `${result.validation} · ${externalValidation}`,
+        quoteCrossCheckedWeight: result.crossCheckedWeight, quoteDisagreedWeight: result.disagreedWeight,
         liveHoldings: holdings,
-        historyMae20: null,
-        historySample20: 0,
-        historyMaxError: null,
-        historyP95Error: null,
-        historyMae5: null,
+        historyMae20: null, historySample20: 0, historyMaxError: null, historyP95Error: null, historyMae5: null,
       };
       CACHE.set(code, { ts: Date.now(), quote });
       return quote;
