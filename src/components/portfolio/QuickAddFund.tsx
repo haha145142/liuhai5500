@@ -55,6 +55,15 @@ export function QuickAddFund() {
     historyMae20: quote?.historyMae20,
     historySample20: quote?.historySample20,
   });
+  const recentSwing = quote?.metrics;
+  const swingTone = recentSwing
+    ? recentSwing.bandTone === "high" ? "down" : recentSwing.bandTone === "low" ? "up" : "flat"
+    : "flat";
+  const swingLabel = recentSwing
+    ? `${recentSwing.band} · ${recentSwing.trend}`
+    : historyPoints.length >= 20
+      ? "指标计算中"
+      : "历史数据不足";
   const auditLine = quote
     ? ownEstimate
       ? `自有穿透估值 · 覆盖 ${safeFixed(quote.estimateCoverage, 1)}% · ${quote.estimateValidation || "待验证"}${quote.estimateDeviation != null ? ` · 偏差 ${safeFixed(quote.estimateDeviation, 2)} 个百分点` : ""}`
@@ -125,6 +134,13 @@ export function QuickAddFund() {
             <span>{displaySummary.coverage}</span>
             <span>{displaySummary.validation}</span>
             <span>{displaySummary.history}</span>
+          </div>
+        ) : null}
+        {quote ? (
+          <div className="quick-swing-row">
+            <span>最近波段</span>
+            <b className={swingTone === "up" ? "up" : swingTone === "down" ? "down" : "flat"}>{swingLabel}</b>
+            {recentSwing ? <span className="quick-swing-score">{recentSwing.bandScore} 分 · {recentSwing.conf}置信 · RSI {safeFixed(recentSwing.rsi, 1)}</span> : <span className="quick-swing-score">历史行情补齐后自动计算</span>}
           </div>
         ) : null}
         <div className="quick-preview-note">{preview}</div>
