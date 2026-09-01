@@ -29,6 +29,12 @@ async function assertNoHorizontalOverflow(page, label) {
   }
 }
 
+async function waitForText(page, text, label, timeout = 15_000) {
+  await page.getByText(text, { exact: false }).first().waitFor({ state: "visible", timeout }).catch(() => {
+    throw new Error(`${label}: expected text not rendered: ${text}`);
+  });
+}
+
 try {
   await waitForServer();
   const browser = await chromium.launch({ headless: true });
@@ -47,19 +53,21 @@ try {
         cost: 1,
       }));
       localStorage.setItem("fund_ai_pro_portfolio_v3", JSON.stringify(holdings));
-      localStorage.setItem("fund_ai_pro_board_watch_v7", JSON.stringify({ items: [] }));
+      localStorage.setItem("fund_ai_pro_board_watch_v6", JSON.stringify({ items: [] }));
     });
 
     await page.goto(`${baseURL}/`, { waitUntil: "domcontentloaded" });
-    await page.getByText("我的组合", { exact: true }).first().waitFor({ state: "visible", timeout: 15_000 });
+    await waitForText(page, "我的组合", `${viewport.label} homepage`);
     if ((await page.locator("body").innerText()).trim().length < 80) throw new Error(`${viewport.label}: homepage rendered blank/minimal content`);
     await assertNoHorizontalOverflow(page, `${viewport.label} homepage`);
 
     await page.goto(`${baseURL}/portfolio`, { waitUntil: "domcontentloaded" });
-    await page.getByText("我的持仓", { exact: false }).first().waitFor({ state: "visible", timeout: 15_000 });
-    if (!(await page.locator("body").innerText()).includes("20只")) throw new Error(`${viewport.label}: 20-holding portfolio summary missing`);
+    await waitForText(page, "我的持仓", `${viewport.label} portfolio`);
+    await waitForText(page, "000020", `${viewport.label} 20-holding render`, 15_000);
+    const bodyText = await page.locator("body").innerText();
+    if (!bodyText.includes("20只")) throw new Error(`${viewport.label}: 20-holding portfolio summary missing after holdings rendered`);
     for (const code of ["000001", "000010", "000020"]) {
-      if (!(await page.locator("body").innerText()).includes(code)) throw new Error(`${viewport.label}: expected holding ${code} not rendered`);
+      if (!bodyText.includes(code)) throw new Error(`${viewport.label}: expected holding ${code} not rendered`);
     }
     await assertNoHorizontalOverflow(page, `${viewport.label} portfolio`);
 
