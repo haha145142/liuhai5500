@@ -166,11 +166,7 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
       const rawHoldings = policy.allowAshareLookThrough ? await getHoldings(code) : [];
       const holdings = policy.allowAshareLookThrough ? await crossCheckStockQuotes(rawHoldings) : [];
       const result = policy.allowAshareLookThrough
-        ? estimateFundNav({
-            previousNav: nav ?? 0,
-            positions: holdings,
-            externalEstimatePct: externalPct,
-          })
+        ? estimateFundNav({ previousNav: nav ?? 0, positions: holdings, externalEstimatePct: externalPct })
         : { estimate: null, pct: null, grossPct: null, dailyFeePct: 0, disclosedWeight: 0, usableWeight: 0, coverageOfDisclosed: 0, crossCheckedWeight: 0, disagreedWeight: 0, confidence: "low" as const, method: policy.reason, validation: policy.reason, inferredFactorWeights: {} };
       const history = historyPoints.map((x) => x.nav);
       const weekBase = historyPoints[Math.max(0, historyPoints.length - 6)];
@@ -185,6 +181,7 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
       const externalValidation = valuation?.validation || "暂无外部估值验证";
       const estimateValue = result.estimate != null ? result.estimate : null;
       const estimatePct = result.pct != null ? result.pct : null;
+      const estimateDeviation = externalPct != null && estimatePct != null ? Math.abs(estimatePct - externalPct) : null;
       const quote: FundQuote & ValuationAudit & { liveHoldings?: CrossCheckedHolding[] } = {
         code, name: fundName, type: fundType || policy.className,
         nav: officialNav, navDate: officialNavDate,
@@ -204,7 +201,7 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
         estimateMethod: policy.allowAshareLookThrough ? result.method : policy.reason,
         estimateCoverage: result.usableWeight,
         disclosedWeight: result.disclosedWeight, usableWeight: result.usableWeight, coverageOfDisclosed: result.coverageOfDisclosed,
-        externalEstimatePct: externalPct, estimateDeviation: result.externalEstimatePct != null ? Math.abs((result.pct ?? 0) - result.externalEstimatePct) : result.deviation ?? null, estimateValidation: `${result.validation} · ${externalValidation}`,
+        externalEstimatePct: externalPct, estimateDeviation, estimateValidation: `${result.validation} · ${externalValidation}`,
         quoteCrossCheckedWeight: result.crossCheckedWeight, quoteDisagreedWeight: result.disagreedWeight,
         liveHoldings: holdings,
         historyMae20: null, historySample20: 0, historyMaxError: null, historyP95Error: null, historyMae5: null,
