@@ -112,10 +112,26 @@ async function testSectorFundPool(page, label) {
   await assertNoHorizontalOverflow(page, `${label} sector fund pool`);
 }
 
+async function testFundPk(page, label) {
+  await page.goto(`${baseURL}/funds`, { waitUntil: "domcontentloaded" });
+  await waitForText(page, "基金排行", `${label} fund ranking`, 15_000);
+  await waitForHydration(page, `${label} fund ranking`);
+  await page.waitForFunction(() => document.querySelectorAll('button[aria-label^="比较"]').length >= 4, { timeout: 15_000 });
+  const pkButtons = page.locator('button[aria-label^="比较"]');
+  for (let i = 0; i < 4; i += 1) await pkButtons.nth(i).click();
+  await waitForText(page, "四基金 PK", `${label} four fund PK`, 15_000);
+  await waitForText(page, "最多 4 只", `${label} PK max count`);
+  await waitForText(page, "最大回撤", `${label} PK drawdown`);
+  await waitForText(page, "夏普", `${label} PK sharpe`);
+  await waitForText(page, "趋势", `${label} PK trend`);
+  await waitForText(page, "波段", `${label} PK band`);
+  const selectedText = await page.locator("body").innerText();
+  if (!selectedText.includes("已选 4/4")) throw new Error(`${label}: four-fund selection did not reach 4/4`);
+  await assertNoHorizontalOverflow(page, `${label} four fund PK`);
+}
+
 async function testQuickAdd(browser, viewport) {
-  const page = await browser.newPage({
-    viewport: { width: viewport.width, height: viewport.height },
-  });
+  const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
   try {
     await page.addInitScript(() => {
       if (!sessionStorage.getItem("fap_quick_add_test_initialized")) {
@@ -132,32 +148,20 @@ async function testQuickAdd(browser, viewport) {
 
     const form = page.locator(".quick-add-fund:visible").first();
     await form.waitFor({ state: "visible", timeout: 8_000 });
-
     const codeInput = form.locator('input[aria-label="基金代码"]');
     const sharesInput = form.locator('input[aria-label="持有份额"]');
     const costInput = form.locator('input[aria-label="成本价"]');
-
     await codeInput.fill("123456");
     await sharesInput.fill("100");
     await costInput.fill("1.23");
-
-    if (await codeInput.inputValue() !== "123456") {
-      throw new Error(`${viewport.label} quick add: fund code input did not settle`);
+    if (await codeInput.inputValue() !== "123456" || await sharesInput.inputValue() !== "100" || await costInput.inputValue() !== "1.23") {
+      throw new Error(`${viewport.label} quick add: input values did not settle`);
     }
-    if (await sharesInput.inputValue() !== "100") {
-      throw new Error(`${viewport.label} quick add: shares input did not settle`);
-    }
-    if (await costInput.inputValue() !== "1.23") {
-      throw new Error(`${viewport.label} quick add: cost input did not settle`);
-    }
-
     const button = form.locator(".quick-add-inputs button");
     await button.waitFor({ state: "visible", timeout: 8_000 });
     await button.click({ timeout: 8_000 });
-
     await waitForText(page, "已添加", `${viewport.label} quick add confirmation`, 8_000);
     await waitForHolding(page, `${viewport.label} quick add`);
-
     await page.reload({ waitUntil: "domcontentloaded" });
     await waitForText(page, "我的持仓", `${viewport.label} quick add reload`);
     await waitForHydration(page, `${viewport.label} quick add reload`);
@@ -172,41 +176,28 @@ async function testQuickAdd(browser, viewport) {
 try {
   await waitForServer();
   const browser = await chromium.launch({ headless: true });
-
   for (const viewport of [
     { width: 390, height: 844, label: "390x844" },
     { width: 430, height: 932, label: "430x932" },
   ]) {
-    const page = await browser.newPage({
-      viewport: { width: viewport.width, height: viewport.height },
-    });
-
+    const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
     try {
       await page.addInitScript(() => {
-        const holdings = Array.from({ length: 20 }, (_, i) => ({
-          code: String(i + 1).padStart(6, "0"),
-          name: `测试基金${i + 1}`,
-          shares: 100,
-          cost: 1,
-        }));
+        const holdings = Array.from({ length: 20 }, (_, i) => ({ code: String(i + 1).padStart(6, "0"), name: `测试基金${i + 1}`, shares: 100, cost: 1 }));
         localStorage.setItem("fund_ai_pro_portfolio_v3", JSON.stringify(holdings));
         localStorage.removeItem("fund_ai_pro_board_watch_v7");
         localStorage.removeItem("fund_ai_pro_board_watch_v8");
         localStorage.removeItem("fund_ai_pro_fund_candidates_v1");
       });
-
       await page.goto(`${baseURL}/`, { waitUntil: "domcontentloaded" });
       await waitForText(page, "我的基金", `${viewport.label} homepage`);
       await waitForHydration(page, `${viewport.label} homepage`);
       await waitForText(page, "今日评估", `${viewport.label} daily assessment`);
       await waitForText(page, "今日市场评分", `${viewport.label} daily score`);
-      if ((await page.locator("body").innerText()).trim().length < 80) {
-        throw new Error(`${viewport.label}: homepage rendered blank/minimal content`);
-      }
+      if ((await page.locator("body").innerText()).trim().length < 80) throw new Error(`${viewport.label}: homepage rendered blank/minimal content`);
       await assertNoHorizontalOverflow(page, `${viewport.label} homepage`);
-
       await testSectorFundPool(page, viewport.label);
-
+      await testFundPk(page, viewport.label);
       await page.goto(`${baseURL}/portfolio`, { waitUntil: "domcontentloaded" });
       await waitForText(page, "我的持仓", `${viewport.label} portfolio`);
       await waitForHydration(page, `${viewport.label} portfolio`);
@@ -214,22 +205,14 @@ try {
       await waitForText(page, "组合体检", `${viewport.label} portfolio insight`);
       await waitForText(page, "持仓重复度分析", `${viewport.label} overlap`);
       const bodyText = await page.locator("body").innerText();
-      if (!bodyText.includes("20只")) {
-        throw new Error(`${viewport.label}: 20-holding portfolio summary missing after holdings rendered`);
-      }
-      for (const code of ["000001", "000010", "000020"]) {
-        if (!bodyText.includes(code)) {
-          throw new Error(`${viewport.label}: expected holding ${code} not rendered`);
-        }
-      }
+      if (!bodyText.includes("20只")) throw new Error(`${viewport.label}: 20-holding portfolio summary missing after holdings rendered`);
+      for (const code of ["000001", "000010", "000020"]) if (!bodyText.includes(code)) throw new Error(`${viewport.label}: expected holding ${code} not rendered`);
       await assertNoHorizontalOverflow(page, `${viewport.label} portfolio`);
-
       await page.goto(`${baseURL}/band`, { waitUntil: "domcontentloaded" });
       await waitForText(page, "波段信号", `${viewport.label} band signal`);
       await waitForText(page, "趋势强弱", `${viewport.label} trend strength`);
       await waitForText(page, "卖出提示 · 做T/波段", `${viewport.label} swing trade plan`);
       await assertNoHorizontalOverflow(page, `${viewport.label} band`);
-
       await page.goto(`${baseURL}/market`, { waitUntil: "domcontentloaded" });
       await waitForText(page, "操作建议", `${viewport.label} operation advice`);
       await waitForText(page, "外围市场", `${viewport.label} market data`);
@@ -237,10 +220,8 @@ try {
     } finally {
       await page.close();
     }
-
     await testQuickAdd(browser, viewport);
   }
-
   await browser.close();
   console.log("UI smoke checks passed");
 } finally {
