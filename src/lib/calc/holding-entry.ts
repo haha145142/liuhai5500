@@ -115,6 +115,12 @@ export function quoteFromFundState(input: {
     };
   }
 
+  // During an open trading session, stale NAV is not a current quote.
+  // Never let the holding-entry preview silently fall back to yesterday's NAV.
+  if (input.tradeTime) {
+    return { price: null, pct: null, label: "暂无可靠行情", mode: "none" };
+  }
+
   if (input.nav != null && Number.isFinite(input.nav) && input.nav > 0) {
     const officialToday = input.officialNavPublished === true && sameChinaDate(input.navDate);
     const historicalPct = input.navDate
