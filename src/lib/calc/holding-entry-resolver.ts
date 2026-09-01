@@ -1,5 +1,5 @@
 import type { FundQuote } from "@/lib/types";
-import { calculateHoldingEntry, type HoldingEntryInput, type HoldingEntryMarket } from "./holding-entry";
+import { calculateHoldingEntry, type HoldingEntryInput, type HoldingEntryMarket } from "./holding-entry.ts";
 
 export type HoldingEntryResolverResult = ReturnType<typeof calculateHoldingEntry> & {
   matched: boolean;
@@ -22,7 +22,7 @@ export function resolveHoldingEntryPreview(input: HoldingEntryInput, funds: Reco
     : {
         price: fund?.nav ?? null,
         pct: fund?.dayPct ?? null,
-        source: fund?.nav != null ? "official_today" : "none",
+        source: fund?.nav != null ? (fund.officialNavPublished ? "official_today" : "latest_official") : "none",
       };
 
   const preview = calculateHoldingEntry(input, market);
