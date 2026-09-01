@@ -1,5 +1,5 @@
 import type { FundQuote, Holding } from "../types";
-import { calcPortfolioPeriodReturn as calcUnifiedPortfolioPeriodReturn } from "./portfolio-periods";
+import { calcPortfolioPeriodReturn as calcUnifiedPortfolioPeriodReturn } from "./portfolio-periods.ts";
 
 export type PeriodKey = "week" | "month" | "year";
 
@@ -13,12 +13,6 @@ export type PeriodReturn = {
   totalCount: number;
 };
 
-/**
- * Single public portfolio-period entry point.
- * The implementation intentionally delegates to portfolio-periods.ts so the
- * dashboard, fund cards and portfolio analytics cannot drift into different
- * calendar/date/price definitions.
- */
 export function calcPortfolioPeriodReturn(
   holdings: Holding[],
   funds: Record<string, FundQuote>,
