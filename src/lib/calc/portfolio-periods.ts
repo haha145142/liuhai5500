@@ -109,23 +109,24 @@ export type PeriodReturn = {
 
 function periodStart(id: PeriodId, now = new Date()): string {
   const shifted = chinaDate(now);
-  if (id === "year") return `${shifted.getUTCFullYear()}-01-01`;
-  if (id === "month") return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  if (id === "week") {
+    const start = new Date(shifted);
+    start.setUTCDate(start.getUTCDate() - 7);
+    return dateKeyFromParts(start);
+  }
+  if (id === "month") return dateKeyFromParts(subtractCalendarMonths(shifted, 1));
   if (id === "quarter") return dateKeyFromParts(subtractCalendarMonths(shifted, 3));
-  const day = shifted.getUTCDay();
-  const delta = day === 0 ? 6 : day - 1;
-  const monday = new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate() - delta));
-  return dateKeyFromParts(monday);
+  return `${shifted.getUTCFullYear()}-01-01`;
 }
 
-/** Portfolio calendar-period return for the shared summary header. */
+/** Portfolio rolling-period return for the shared summary header. */
 export function calcPortfolioPeriodReturn(
   period: PeriodId,
   holdings: Holding[],
   funds: Record<string, FundQuote>,
   now = new Date(),
 ): PeriodReturn {
-  const labels: Record<PeriodId, string> = { week: "本周", month: "本月", quarter: "近三个月", year: "今年" };
+  const labels: Record<PeriodId, string> = { week: "一周", month: "一个月", quarter: "近三个月", year: "今年" };
   const start = periodStart(period, now);
   let amount = 0;
   let baseValue = 0;
@@ -146,11 +147,13 @@ export function calcPortfolioPeriodReturn(
     baseDates.add(base.date);
   }
 
+  // Do not present a partial portfolio period return as the result for the full portfolio.
+  const complete = holdings.length > 0 && pricedCount === holdings.length && eligibleCount === holdings.length;
   return {
     id: period,
     label: labels[period],
-    amount: eligibleCount > 0 ? amount : null,
-    pct: eligibleCount > 0 && baseValue > 0 ? (amount / baseValue) * 100 : null,
+    amount: complete ? amount : null,
+    pct: complete && baseValue > 0 ? (amount / baseValue) * 100 : null,
     pricedCount,
     eligibleCount,
     baseDate: baseDates.size === 1 ? [...baseDates][0] : null,
