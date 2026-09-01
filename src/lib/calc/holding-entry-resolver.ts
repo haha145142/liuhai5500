@@ -1,5 +1,5 @@
 import type { FundQuote } from "@/lib/types";
-import { calculateHoldingEntry, type HoldingEntryInput, type HoldingEntryMarket } from "./holding-entry.ts";
+import { calculateHoldingEntry, quoteFromFundState, type HoldingEntryInput } from "./holding-entry.ts";
 
 export type HoldingEntryResolverResult = ReturnType<typeof calculateHoldingEntry> & {
   matched: boolean;
@@ -9,28 +9,37 @@ export type HoldingEntryResolverResult = ReturnType<typeof calculateHoldingEntry
 
 /**
  * Resolves an entry preview from already-loaded local fund data.
- * Critical rule: during trading hours, an old NAV is never used as today's intraday price.
+ * Uses the same quote-selection rules as the main holding-entry calculator.
  */
-export function resolveHoldingEntryPreview(input: HoldingEntryInput, funds: Record<string, FundQuote>, trading: boolean): HoldingEntryResolverResult {
+export function resolveHoldingEntryPreview(
+  input: HoldingEntryInput,
+  funds: Record<string, FundQuote>,
+  trading: boolean,
+): HoldingEntryResolverResult {
   const fund = funds[input.code];
-  const market: HoldingEntryMarket = trading
-    ? {
-        price: fund?.estimate ?? null,
-        pct: fund?.estimate != null ? (fund.estimatePct ?? fund.dayPct ?? null) : null,
-        source: fund?.estimate != null ? "live_estimate" : "none",
-      }
-    : {
-        price: fund?.nav ?? null,
-        pct: fund?.dayPct ?? null,
-        source: fund?.nav != null ? (fund.officialNavPublished ? "official_today" : "latest_official") : "none",
-      };
+  const quote = quoteFromFundState({
+    estimate: fund?.estimate ?? null,
+    estimatePct: fund?.estimatePct ?? null,
+    nav: fund?.nav ?? null,
+    dayPct: fund?.dayPct ?? null,
+    navDate: fund?.navDate ?? null,
+    estimateTime: fund?.estimateTime ?? null,
+    officialNavPublished: fund?.officialNavPublished ?? null,
+    historyPoints: fund?.historyPoints,
+    tradeTime: trading,
+  });
 
-  const preview = calculateHoldingEntry(input, market);
-  const marketLabel = market.source === "live_estimate"
+  const preview = calculateHoldingEntry(input, {
+    price: quote.price,
+    pct: quote.pct,
+    source: quote.mode,
+  });
+
+  const marketLabel = quote.mode === "live_estimate"
     ? "盘中自算估值"
-    : market.source === "official_today"
+    : quote.mode === "official_today"
       ? "今日官方净值"
-      : market.source === "latest_official"
+      : quote.mode === "latest_official"
         ? "最近可用数据"
         : "暂无可靠行情";
 
