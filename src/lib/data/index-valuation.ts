@@ -21,13 +21,6 @@ const CORE: Config[] = [
   { code: "000300", secid: "1.000300", name: "沪深300" },
 ];
 
-function level(percentile: number | null): IndexValuation["level"] {
-  if (percentile == null || !Number.isFinite(percentile)) return "暂无可靠数据";
-  if (percentile >= 80) return "高估";
-  if (percentile <= 20) return "低估";
-  return "中性";
-}
-
 async function load(config: Config): Promise<IndexValuation> {
   try {
     const url = `https://push2.eastmoney.com/api/qt/stock/get?secid=${config.secid}&fields=f57,f58,f43,f169,f162,f167&_=${Date.now()}`;
@@ -37,15 +30,16 @@ async function load(config: Config): Promise<IndexValuation> {
     const pbRaw = n(data?.f167);
     const pe = peRaw == null ? null : peRaw / 100;
     const pb = pbRaw == null ? null : pbRaw / 100;
+    const roe = pe != null && pb != null && pe > 0 ? (pb / pe) * 100 : null;
     return {
       code: config.code,
       name: config.name,
       pe,
       pb,
-      roe: null,
+      roe,
       percentile: null,
       level: "暂无可靠数据",
-      source: pe != null || pb != null ? "东方财富指数行情" : "东方财富指数估值字段不可用",
+      source: roe == null ? "东方财富指数估值字段" : "东方财富指数估值字段 · ROE由PB/PE推导",
       updatedAt: new Date().toISOString(),
     };
   } catch {
@@ -53,6 +47,4 @@ async function load(config: Config): Promise<IndexValuation> {
   }
 }
 
-export const getCoreIndexValuations = createServerFn({ method: "GET" }).handler(async (): Promise<IndexValuation[]> => {
-  return Promise.all(CORE.map(load));
-});
+export const getCoreIndexValuations = createServerFn({ method: "GET" }).handler(async (): Promise<IndexValuation[]> => Promise.all(CORE.map(load)));
