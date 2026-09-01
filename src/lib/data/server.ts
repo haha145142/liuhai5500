@@ -1,4 +1,6 @@
 import { getResilientFund } from "./resilient-fund";
+import { getCalculatedFund } from "./live-valuation-v2";
+import { getMarketPhase } from "../market-hours";
 import { getSnapshot as getStableSnapshot } from "./server-stable";
 import { getMultiSourceQuote } from "./multi-source-quotes";
 import { validateGlobalQuotes } from "./global-quote-validation";
@@ -16,17 +18,36 @@ const FUND_CACHE_TTL_MS = 15_000;
 const fundResolved = new Map<string, { at: number; value: FundQuote }>();
 const fundPending = new Map<string, Promise<FundQuote>>();
 
+function usableFundData(quote: FundQuote | null | undefined) {
+  return !!quote && (quote.nav != null || quote.estimate != null || quote.historyPoints.length > 0 || quote.metrics != null);
+}
+
+function isIntradayPhase() {
+  const phase = getMarketPhase();
+  return phase === "morning" || phase === "afternoon";
+}
+
+async function loadFundQuote(code: string): Promise<FundQuote> {
+  if (isIntradayPhase()) {
+    try {
+      const calculated = await getCalculatedFund({ data: { code } });
+      if (usableFundData(calculated) && (calculated.valuationStatus === "estimate" || calculated.estimate != null || calculated.officialNavPublished)) {
+        return calculated;
+      }
+    } catch {}
+  }
+  return getResilientFund({ data: { code } });
+}
+
 export const getFund = async ({ data }: { data: { code: string } }): Promise<FundQuote> => {
   const code = data.code.trim();
   const cached = fundResolved.get(code);
   if (cached && Date.now() - cached.at < FUND_CACHE_TTL_MS) return cached.value;
   const running = fundPending.get(code);
   if (running) return running;
-  const request = getResilientFund({ data: { code } })
+  const request = loadFundQuote(code)
     .then((value) => {
-      if (value.nav != null || value.estimate != null || value.historyPoints.length > 0 || value.metrics != null) {
-        fundResolved.set(code, { at: Date.now(), value });
-      }
+      if (usableFundData(value)) fundResolved.set(code, { at: Date.now(), value });
       return value;
     })
     .finally(() => fundPending.delete(code));
@@ -48,9 +69,7 @@ export const getSnapshot = async () => {
   const indices = snapshot.indices.map((index) => {
     const hit = checked.find((item) => item.code === index.code)?.quote;
     if (!hit || hit.pct == null || hit.price == null) return index;
-    if (["three_source", "two_source", "single_source"].includes(hit.agreement)) {
-      return { ...index, price: hit.price, pct: hit.pct };
-    }
+    if (["three_source", "two_source", "single_source"].includes(hit.agreement)) return { ...index, price: hit.price, pct: hit.pct };
     return index;
   });
   const sources = snapshot.sources.map((entry) => {
