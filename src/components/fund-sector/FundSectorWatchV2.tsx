@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronRight, Plus, Search, X } from "lucide-react";
 import { getBoardWatchQuotes, searchFundBoards, type BoardCandidate, type BoardWatchQuote } from "@/lib/data/board-watch";
+import { fmtPctShort } from "@/lib/format";
 import type { FundQuote, Holding } from "@/lib/types";
 
 type Selection = { code: string; name: string; icon: string };
@@ -19,6 +20,7 @@ function readState(): State {
 }
 function tone(v: number | null) { return v == null ? "text-muted" : v > 0 ? "text-up" : v < 0 ? "text-down" : "text-muted"; }
 function formatFlow(v: number | null) { if (v == null || !Number.isFinite(v)) return "—"; const yi = v / 1e8; return `${yi >= 0 ? "+" : ""}${yi.toFixed(2)}亿`; }
+function flowLabel(v: number | null) { if (v == null || !Number.isFinite(v)) return "暂无"; return v > 0 ? "净流入" : v < 0 ? "净流出" : "基本持平"; }
 
 export function FundSectorWatchV2(_props?: { portfolio?: Holding[]; funds?: Record<string, FundQuote> }) {
   const [{ items }, setState] = useState<State>(readState);
@@ -85,7 +87,7 @@ export function FundSectorWatchV2(_props?: { portfolio?: Holding[]; funds?: Reco
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2"><h2 className="text-[16px] font-semibold tracking-tight text-fg">自选板块</h2><span className="rounded-full bg-blue/10 px-2 py-0.5 text-[9px] font-medium text-blue">自己添加</span></div>
-          <p className="mt-1 text-[10px] text-subtle">输入板块名称，直接显示该板块今日涨跌</p>
+          <p className="mt-1 text-[10px] text-subtle">输入板块名称，直接显示该板块今日涨跌与资金方向</p>
         </div>
         <button type="button" onClick={() => setSearchOpen((v) => !v)} className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-[0_6px_18px_rgba(15,23,42,.18)] active:scale-95" aria-label="添加板块">{searchOpen ? <X size={17} /> : <Plus size={17} />}</button>
       </div>
@@ -99,11 +101,30 @@ export function FundSectorWatchV2(_props?: { portfolio?: Holding[]; funds?: Reco
 
       {items.length ? <div className="mt-3 space-y-2">{items.map((item) => { const q = quoteMap.get(item.code); const open = openCode === item.code; return <article key={item.code} className="overflow-hidden rounded-[18px] border border-white/80 bg-white/58 shadow-[0_8px_24px_rgba(38,78,112,.045)]">
         <button type="button" onClick={() => setOpenCode(open ? null : item.code)} className="flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-white/55"><span className="flex size-9 shrink-0 items-center justify-center rounded-2xl bg-white/78 text-lg shadow-sm">{item.icon}</span><span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-semibold text-slate-900">{item.name}</span><span className="mt-0.5 block text-[9px] text-slate-400">{item.code} · {q?.marketDate || "等待行情"}</span></span><span className={`shrink-0 text-[20px] font-bold tabular-nums ${tone(q?.pct ?? null)}`}>{q?.pct == null ? "—" : fmtPctShort(q.pct)}</span><ChevronRight size={15} className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-90" : ""}`} /></button>
-        {open ? <div className="border-t border-white/75 px-3.5 pb-3 pt-2.5"><div className="grid grid-cols-2 gap-2"><div className="rounded-[14px] bg-white/66 px-3 py-2"><div className="text-[9px] text-slate-400">板块涨跌</div><div className={`mt-1 text-[15px] font-bold ${tone(q?.pct ?? null)}`}>{q?.pct == null ? "暂无可靠数据" : fmtPctShort(q.pct)}</div></div><div className="rounded-[14px] bg-white/66 px-3 py-2"><div className="text-[9px] text-slate-400">主力净流入</div><div className={`mt-1 text-[15px] font-bold ${tone(q?.mainFlow ?? null)}`}>{formatFlow(q?.mainFlow ?? null)}</div></div></div><div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-slate-400"><span>{q?.source || "当前暂无可靠行情"}</span><button type="button" onClick={() => remove(item.code)} className="rounded-full bg-white/75 px-2.5 py-1 text-slate-500"><X size={10} className="inline mr-1"/>移除</button></div></div> : null}
+        {open ? <div className="border-t border-white/75 px-3.5 pb-3 pt-2.5">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-[14px] bg-white/66 px-3 py-2"><div className="text-[9px] text-slate-400">板块涨跌</div><div className={`mt-1 text-[15px] font-bold ${tone(q?.pct ?? null)}`}>{q?.pct == null ? "暂无可靠数据" : fmtPctShort(q.pct)}</div></div>
+            <div className="rounded-[14px] bg-white/66 px-3 py-2"><div className="text-[9px] text-slate-400">主力净流向</div><div className={`mt-1 text-[15px] font-bold ${tone(q?.mainFlow ?? null)}`}>{formatFlow(q?.mainFlow ?? null)}</div><div className={`mt-0.5 text-[9px] ${tone(q?.mainFlow ?? null)}`}>{flowLabel(q?.mainFlow ?? null)}</div></div>
+          </div>
+          <div className="mt-2 rounded-[14px] bg-slate-50/75 px-3 py-2.5 ring-1 ring-white/70">
+            <div className="flex items-center justify-between"><span className="text-[9px] font-medium text-slate-400">资金分档</span><span className="text-[9px] text-slate-400">东财板块资金口径</span></div>
+            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
+              <FlowRow label="超大单" value={q?.superFlow ?? null} />
+              <FlowRow label="大单" value={q?.largeFlow ?? null} />
+              <FlowRow label="中单" value={q?.midFlow ?? null} />
+              <FlowRow label="小单" value={q?.smallFlow ?? null} />
+            </div>
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-slate-400"><span className="truncate">{q?.source || (loading ? "正在更新行情…" : "当前暂无可靠行情")}</span><button type="button" onClick={() => remove(item.code)} className="rounded-full bg-white/75 px-2.5 py-1 text-slate-500"><X size={10} className="inline mr-1"/>移除</button></div>
+        </div> : null}
       </article>; })}</div> : null}
 
       {message ? <div className="mt-2 px-1 text-[9px] text-slate-400">{message}</div> : null}
       {items.length ? <div className="mt-2 flex items-center justify-between px-1 text-[9px] text-slate-400"><span>已选 {items.length} 个板块</span><span className="inline-flex items-center gap-1"><Check size={10}/> 自动保存 · 30秒刷新</span></div> : null}
     </section>
   );
+}
+
+function FlowRow({ label, value }: { label: string; value: number | null }) {
+  return <div className="flex items-center justify-between gap-2 rounded-xl bg-white/62 px-2.5 py-1.5"><span className="text-slate-500">{label}</span><span className={`font-semibold tabular-nums ${tone(value)}`}>{formatFlow(value)}</span></div>;
 }
