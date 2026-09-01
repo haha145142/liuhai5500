@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Cockpit } from "@/components/market/Cockpit";
 import { IndexGrid } from "@/components/market/IndexGrid";
+import { MarketPanorama } from "@/components/market/MarketPanorama";
 import { FundSectorWatchV2 } from "@/components/fund-sector/FundSectorWatchV2";
 import { Glass, EmptyNote, Tone } from "@/components/ui/Glass";
 import { useApp } from "@/lib/store";
@@ -111,6 +112,7 @@ function Home() {
 
       <section className="home-block" aria-label="板块与市场">
         <FundSectorWatchV2 portfolio={portfolio} funds={funds} />
+        <MarketPanorama />
       </section>
 
       <section className="home-block" aria-label="市场驾驶舱">
