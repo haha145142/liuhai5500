@@ -22,17 +22,35 @@ function cleanCode(v: unknown) {
   return /^\d{6}$/.test(s) ? s : "";
 }
 
-function chinaDateKey() {
-  const d = new Date(Date.now() + 8 * 60 * 60 * 1000);
+function chinaDateKey(date = new Date()) {
+  const d = new Date(date.getTime() + 8 * 60 * 60 * 1000);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-function isIntradayTimestamp(value: string | null, today = chinaDateKey()) {
+function parseClock(value: string) {
+  const m = value.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return null;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  const second = Number(m[3] ?? "0");
+  if (hour > 23 || minute > 59 || second > 59) return null;
+  return hour * 60 * 60 + minute * 60 + second;
+}
+
+function isIntradayTimestamp(value: string | null, today = chinaDateKey(), now = new Date()) {
   if (!value) return false;
   const s = String(value).trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10) === today;
   if (/^\d{8}/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` === today;
-  return /^\d{1,2}:\d{2}(:\d{2})?$/.test(s);
+
+  // Some live endpoints only return HH:MM[:SS]. Treat that as current-day data
+  // only when the quote clock is valid and no more than 20 minutes behind China time.
+  const clock = parseClock(s);
+  if (clock == null) return false;
+  const shiftedNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  const nowSeconds = shiftedNow.getUTCHours() * 3600 + shiftedNow.getUTCMinutes() * 60 + shiftedNow.getUTCSeconds();
+  const lag = nowSeconds - clock;
+  return lag >= 0 && lag <= 20 * 60;
 }
 
 function scan(value: unknown, code: string, depth = 0): LiveFundQuote | null {
@@ -108,7 +126,8 @@ export async function getLiveFundQuote(code: string): Promise<LiveFundQuote | nu
   const valid = rest.filter((x): x is LiveFundQuote => !!x && (x.estimate != null || x.pct != null));
   if (!valid.length) return null;
 
-  const fresh = valid.filter((x) => isIntradayTimestamp(x.time, today) || isIntradayTimestamp(x.date, today));
+  const now = new Date();
+  const fresh = valid.filter((x) => isIntradayTimestamp(x.time, today, now) || isIntradayTimestamp(x.date, today, now));
   const inSession = isChinaTradingSession();
   if (inSession && !fresh.length) return null;
   const pool = fresh.length ? fresh : valid;
@@ -121,7 +140,7 @@ export async function getLiveFundQuote(code: string): Promise<LiveFundQuote | nu
   const consensus = complete.filter((x) => complete.every((y) => Math.abs((x.pct as number) - (y.pct as number)) <= 0.15));
   const source = consensus.length >= 2 ? "多源实时估值一致" : complete.length >= 2 ? "多源实时估值" : complete[0].source;
   const chosen = consensus.length ? consensus[0] : complete[0];
-  if (chosen.time == null && chosen.date != null && !isIntradayTimestamp(chosen.date, today)) return null;
+  if (inSession && !isIntradayTimestamp(chosen.time, today, now) && !isIntradayTimestamp(chosen.date, today, now)) return null;
   return { ...chosen, source, type: chosen.type || type };
 }
 
