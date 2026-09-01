@@ -13,64 +13,74 @@ function hasUsableFundData(quote: FundQuote | null | undefined) {
   );
 }
 
+function hasCurrentEstimate(quote: FundQuote | null | undefined) {
+  return !!quote && quote.estimate != null && quote.estimatePct != null && quote.valuationStatus === "estimate";
+}
+
 const IN_FLIGHT = new Map<string, Promise<FundQuote>>();
 const RECENT = new Map<string, { at: number; value: FundQuote }>();
 const CACHE_TTL_MS = 15_000;
 
 /**
- * The direct historical-NAV path and the deep validated path start together.
- * Return the first usable real snapshot instead of waiting for both; callers
- * can refresh later and receive the deeper valuation when it is available.
+ * The validated live-valuation path is authoritative during market hours.
+ * The direct pingzhongdata path is historical-NAV fallback only and must not
+ * win a race against a slower intraday valuation request.
  */
 async function loadFund(code: string): Promise<FundQuote> {
-  const validated = getValidatedFund({ data: { code } }).then((value) => {
-    if (!hasUsableFundData(value)) throw new Error("validated fund data unavailable");
-    return value;
-  });
+  try {
+    const validated = await getValidatedFund({ data: { code } });
+    if (hasCurrentEstimate(validated) || validated.officialNavPublished === true) {
+      return withEstimateSafety(validated);
+    }
 
-  const direct = getDirectFundFallback({ data: { code } }).then((value) => {
-    if (!value || !hasUsableFundData(value)) throw new Error("direct fund data unavailable");
-    return value;
-  });
+    // A validated response may legitimately say there is no usable intraday
+    // estimate (for example because the disclosed holdings cannot be verified).
+    // In that case keep its explicit state rather than replacing it with an
+    // apparently fresh-looking historical NAV.
+    if (hasUsableFundData(validated)) return withEstimateSafety(validated);
+  } catch {
+    // Fall through to the direct historical-NAV fallback below.
+  }
 
   try {
-    return await Promise.any([direct, validated]).then(withEstimateSafety);
+    const direct = await getDirectFundFallback({ data: { code } });
+    if (direct && hasUsableFundData(direct)) return withEstimateSafety(direct);
   } catch {
-    return withEstimateSafety({
-      code,
-      name: code,
-      type: "基金",
-      nav: null,
-      navDate: null,
-      estimate: null,
-      estimatePct: null,
-      estimateTime: null,
-      dayPct: null,
-      weekPct: null,
-      monthPct: null,
-      history: [],
-      historyPoints: [],
-      metrics: null,
-      source: "基金数据源暂不可用 · 已保存本地持仓",
-      officialNavPublished: false,
-      valuationStatus: "unavailable",
-      estimateConfidence: "low",
-      historyMae20: null,
-      historySample20: 0,
-      historyMaxError: null,
-      historyP95Error: null,
-      historyMae5: null,
-    });
+    // Fail closed below.
   }
+
+  return withEstimateSafety({
+    code,
+    name: code,
+    type: "基金",
+    nav: null,
+    navDate: null,
+    estimate: null,
+    estimatePct: null,
+    estimateTime: null,
+    dayPct: null,
+    weekPct: null,
+    monthPct: null,
+    history: [],
+    historyPoints: [],
+    metrics: null,
+    source: "基金数据源暂不可用 · 已保存本地持仓",
+    officialNavPublished: false,
+    valuationStatus: "unavailable",
+    estimateConfidence: "low",
+    historyMae20: null,
+    historySample20: 0,
+    historyMaxError: null,
+    historyP95Error: null,
+    historyMae5: null,
+  });
 }
 
 export const getResilientFund = createServerFn({ method: "POST" })
   .validator((input: { code: string }) => input)
   .handler(async ({ data }): Promise<FundQuote> => {
     const code = data.code.trim();
-    if (!/^\d{6}$/.test(code)) {
-      return loadFund(code);
-    }
+    if (!/^\d{6}$/.test(code)) return loadFund(code);
 
     const recent = RECENT.get(code);
     if (recent && Date.now() - recent.at < CACHE_TTL_MS && hasUsableFundData(recent.value)) {
