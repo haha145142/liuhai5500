@@ -72,6 +72,38 @@ async function waitForHolding(page, label, timeout = 10_000) {
     });
 }
 
+async function testSectorFundPool(page, label) {
+  const addSectorButton = page.getByRole("button", { name: "添加板块" });
+  await addSectorButton.waitFor({ state: "visible", timeout: 15_000 });
+  await addSectorButton.scrollIntoViewIfNeeded();
+  await addSectorButton.click();
+  const sectorInput = page.locator('input[aria-label="板块搜索"]');
+  await sectorInput.waitFor({ state: "visible", timeout: 8_000 });
+  await sectorInput.fill("半导体");
+  await waitForText(page, "半导体", `${label} sector suggestion`);
+  const sectorSuggestion = page.getByRole("button", { name: /半导体/ }).first();
+  await sectorSuggestion.waitFor({ state: "visible", timeout: 8_000 });
+  await sectorSuggestion.click();
+  await waitForText(page, "相关基金", `${label} sector fund pool`, 15_000);
+  for (const control of ["今日", "近一月", "回撤", "全部", "主动基金", "ETF"]) {
+    await waitForText(page, control, `${label} sector pool control`);
+  }
+  const candidateButton = page.getByRole("button", { name: "加入候选" }).first();
+  await candidateButton.waitFor({ state: "visible", timeout: 15_000 });
+  await candidateButton.click();
+  await waitForText(page, "已加入候选", `${label} candidate action`, 8_000);
+  const candidateState = await page.evaluate(() => {
+    try {
+      const rows = JSON.parse(localStorage.getItem("fund_ai_pro_fund_candidates_v1") || "[]");
+      return Array.isArray(rows) && rows.some((item) => item && item.code);
+    } catch {
+      return false;
+    }
+  });
+  if (!candidateState) throw new Error(`${label}: candidate action was not persisted`);
+  await assertNoHorizontalOverflow(page, `${label} sector fund pool`);
+}
+
 async function testQuickAdd(browser, viewport) {
   const page = await browser.newPage({
     viewport: { width: viewport.width, height: viewport.height },
@@ -152,6 +184,7 @@ try {
         localStorage.setItem("fund_ai_pro_portfolio_v3", JSON.stringify(holdings));
         localStorage.removeItem("fund_ai_pro_board_watch_v7");
         localStorage.removeItem("fund_ai_pro_board_watch_v8");
+        localStorage.removeItem("fund_ai_pro_fund_candidates_v1");
       });
 
       await page.goto(`${baseURL}/`, { waitUntil: "domcontentloaded" });
@@ -164,15 +197,7 @@ try {
       }
       await assertNoHorizontalOverflow(page, `${viewport.label} homepage`);
 
-      const addSectorButton = page.getByRole("button", { name: "添加板块" });
-      await addSectorButton.waitFor({ state: "visible", timeout: 15_000 });
-      await addSectorButton.scrollIntoViewIfNeeded();
-      await addSectorButton.click();
-      const sectorInput = page.locator('input[aria-label="板块搜索"]');
-      await sectorInput.waitFor({ state: "visible", timeout: 8_000 });
-      await sectorInput.fill("半导体");
-      await waitForText(page, "半导体", `${viewport.label} sector suggestion`);
-      await assertNoHorizontalOverflow(page, `${viewport.label} sector search`);
+      await testSectorFundPool(page, viewport.label);
 
       await page.goto(`${baseURL}/portfolio`, { waitUntil: "domcontentloaded" });
       await waitForText(page, "我的持仓", `${viewport.label} portfolio`);
