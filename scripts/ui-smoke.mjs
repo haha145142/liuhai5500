@@ -36,10 +36,11 @@ async function waitForText(page, text, label, timeout = 15_000) {
 }
 
 async function waitForHydration(page, label) {
-  await page.waitForFunction(() => document.readyState === "complete", null, { timeout: 10_000 }).catch(() => {
-    throw new Error(`${label}: document did not reach complete state`);
-  });
-  await page.waitForTimeout(700);
+  try {
+    await page.locator('body[data-fap-hydrated="true"]').waitFor({ state: "attached", timeout: 15_000 });
+  } catch {
+    throw new Error(`${label}: client hydration marker not observed`);
+  }
 }
 
 try {
@@ -73,7 +74,7 @@ try {
     const addSectorButton = page.getByRole("button", { name: "添加板块" });
     await addSectorButton.waitFor({ state: "visible", timeout: 15_000 });
     await addSectorButton.scrollIntoViewIfNeeded();
-    await addSectorButton.click({ force: true });
+    await addSectorButton.click();
     const sectorInput = page.locator('input[aria-label="板块搜索"]');
     await sectorInput.waitFor({ state: "visible", timeout: 8_000 });
     await sectorInput.fill("半导体");
