@@ -6,7 +6,6 @@ import { clockStr } from "@/lib/format";
 import { sessionLabel } from "@/lib/market-hours";
 import { tradingDateLabel } from "@/lib/data/trading-day";
 import { cn } from "@/lib/cn";
-import { QuickAddFund } from "@/components/portfolio/QuickAddFund";
 import { SideDrawer } from "./SideDrawer";
 
 const NEWS_REFRESH_MS = 3 * 60_000;
@@ -93,6 +92,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     : lastError ? "行情暂时不可用 · 已保留本地数据" : "后台连接行情…";
 
   const header = <header className="app-header"><div className="app-header-card !min-h-[88px] !rounded-[26px] !px-3.5 !py-3.5"><button type="button" onClick={() => setDrawerOpen(true)} aria-label="打开侧边菜单" className="relative z-10 mr-2 flex !size-11 shrink-0 items-center justify-center rounded-2xl border border-white/75 bg-white/58 text-slate-700 shadow-[0_7px_22px_rgba(70,95,120,.10)] backdrop-blur-xl transition active:scale-95"><Menu className="size-5" strokeWidth={2} /></button><div className="min-w-0 flex-1"><h1 className="app-header-title !text-[22px]">Fund AI Pro</h1><p className="app-header-meta !mt-1 !text-[11px] !leading-[1.3]">{sessionLabel()} · {statusText}</p></div><button type="button" onClick={onRefresh} aria-label="刷新" className="app-refresh-button !size-11 !w-11 !h-11 !m-0 !ml-2 !rounded-full"><RefreshCw className={cn("size-4", loading && "animate-spin")} /></button></div></header>;
-  const mainContent = pathname === "/portfolio" ? <><QuickAddFund />{children}</> : children;
+  const mainContent = children;
   return <div className="app-shell" data-app-shell="v4">{pathname === "/" ? <section className="home-panel">{header}<main className="app-main home-main">{mainContent}</main></section> : <><>{header}</><main className="app-main">{mainContent}</main></>}<SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} /></div>;
 }
