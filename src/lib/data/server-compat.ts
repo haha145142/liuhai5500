@@ -16,7 +16,7 @@ export const getFundRank = createServerFn({ method: "POST" }).validator((input: 
   try {
     const raw = await fetchText(`https://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=${sc}&st=desc&pi=1&pn=40&dx=1&_=${Date.now()}`, 12000, { Referer: "https://fund.eastmoney.com/" });
     const j = parseMaybeJsonp(raw) as { datas?: string[] } | null;
-    const rows = (j?.datas || []).map(line => { const a = String(line).split(","); return { code: a[0] || "", name: a[1] || "", nav: n(a[4]), day: n(a[6]), week: n(a[7]), month: n(a[8]), ytd: n(a[14]) }; }).filter(x => x.code && x.name);
+    const rows = (j?.datas || []).map(line => { const a = String(line).split(","); return { code: a[0] || "", name: a[1] || "", nav: n(a[4]), day: n(a[6]), week: n(a[7]), month: n(a[8]), sixMonth: n(a[10]), oneYear: n(a[11]), ytd: n(a[14]) }; }).filter(x => x.code && x.name);
     return { rows, source: rows.length ? "天天基金/东方财富排行" : "数据源暂不可用", fetchedAt: Date.now() };
   } catch { return { rows: [], source: "数据源暂不可用", fetchedAt: Date.now() }; }
 });
