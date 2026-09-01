@@ -10,10 +10,10 @@ import { useApp } from "@/lib/store";
 
 export const Route=createFileRoute("/market")({component:MarketPage});
 function MarketPage(){
-  const snapshot=useApp(s=>s.snapshot); const portfolio=useApp(s=>s.portfolio); const funds=useApp(s=>s.funds);
+  const snapshot=useApp(s=>s.snapshot);
   const benchPct=snapshot?.indices[0]?.pct??null;
   return <div className="market-page">
-    <FundSectorWatchV2 portfolio={portfolio} funds={funds}/>
+    <FundSectorWatchV2 />
     <OperationAdvice sectors={snapshot?.sectors||[]} benchPct={benchPct}/>
     <TodayAiInsight sectors={snapshot?.sectors||[]} benchPct={benchPct}/>
     {snapshot?<IndexGrid indices={snapshot.indices}/>:<EmptyNote>指数后台更新中，先看你关注的基金板块。</EmptyNote>}
