@@ -1,7 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { fetchText, n, parseMaybeJsonp } from "./fetch-util";
 import { getLiveFundQuote } from "./fund-live-provider";
+import { getCalculatedFund } from "./live-valuation";
 import { SECTOR_RULES, type SectorRule } from "./sectors";
+
+export type SectorFundTrust = { score:number; label:"高"|"中"|"低"; updatedAt:string|null };
 
 export type SectorFundRow = {
   code: string;
@@ -16,11 +19,15 @@ export type SectorFundRow = {
   oneYear: number | null;
   matchScore: number;
   matchReason: string;
+  valuationTrust?: SectorFundTrust;
 };
 
 const RANK_URL = "https://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=rzf&st=desc&pi=1&pn=2000&dx=1";
 const CACHE_MS = 60 * 60 * 1000;
 let cached: { savedAt: number; rows: SectorFundRow[] } | null = null;
+
+type TrustQuote = { estimate:number|null; valuationStatus?:FundQuoteStatus; estimateRoutes?:{pct:number|null;source:string}[]; estimateRouteSpreadPct?:number|null; estimateTime:string|null; estimateCoverage?:number; usableWeight?:number; crossCheckedWeightPct?:number|null };
+type FundQuoteStatus = "estimate"|"waiting_official_nav"|"official_nav"|"stale"|"unavailable"|"live_estimate";
 
 function parseRows(value: unknown): SectorFundRow[] {
   const data = value as { datas?: string[] } | null;
@@ -106,6 +113,37 @@ function withDerivedLabels(row: SectorFundRow, reason: string): SectorFundRow {
   return { ...row, matchReason: `${reason} · ${trend.label} · ${band}` };
 }
 
+function trustFromQuote(quote: TrustQuote): SectorFundTrust | undefined {
+  if (quote.estimate == null || quote.valuationStatus !== "estimate") return undefined;
+  const routes = quote.estimateRoutes ?? [];
+  const values = routes.map((r) => r.pct).filter((v): v is number => v != null && Number.isFinite(v));
+  const routeScore = Math.min(30, values.length / 3 * 30);
+  const spread = quote.estimateRouteSpreadPct;
+  const consistencyScore = spread == null ? 0 : Math.max(0, Math.min(25, (1 - Math.min(spread, 2) / 2) * 25));
+  const coverage = typeof quote.estimateCoverage === "number" ? Math.max(0, Math.min(100, quote.estimateCoverage)) : 0;
+  const coverageScore = coverage / 100 * 20;
+  const usable = quote.usableWeight ?? 0;
+  const checked = quote.crossCheckedWeightPct ?? 0;
+  const crossScore = usable > 0 ? Math.max(0, Math.min(15, checked / usable * 15)) : routes[0]?.source?.includes("双源") ? 15 : 0;
+  const ageSec = quote.estimateTime ? Math.max(0, (Date.now() - new Date(quote.estimateTime).getTime()) / 1000) : Infinity;
+  const freshnessScore = ageSec <= 30 ? 10 : ageSec <= 60 ? 8 : ageSec <= 120 ? 5 : ageSec <= 300 ? 2 : 0;
+  const score = Math.round(Math.max(0, Math.min(100, routeScore + consistencyScore + coverageScore + crossScore + freshnessScore)));
+  return { score, label: score >= 80 ? "高" : score >= 60 ? "中" : "低", updatedAt: quote.estimateTime ?? null };
+}
+
+async function enrichValuationTrust(rows: SectorFundRow[]) {
+  const targets = rows.slice(0, 6);
+  if (!targets.length) return rows;
+  const settled = await Promise.allSettled(targets.map((row) => getCalculatedFund({ data: { code: row.code } })));
+  const byCode = new Map<string, SectorFundTrust>();
+  settled.forEach((result, index) => {
+    if (result.status !== "fulfilled") return;
+    const trust = trustFromQuote(result.value as TrustQuote);
+    if (trust) byCode.set(targets[index].code, trust);
+  });
+  return rows.map((row) => { const valuationTrust = byCode.get(row.code); return valuationTrust ? { ...row, valuationTrust } : row; });
+}
+
 async function fallbackRepresentativeFund(rule: SectorRule): Promise<SectorFundRow[]> {
   const etf = rule.etf;
   if (!etf) return [];
@@ -160,6 +198,6 @@ export const getSectorFunds = createServerFn({ method: "POST" })
       .filter((x): x is SectorFundRow => !!x)
       .sort((a, b) => (b.matchScore - a.matchScore) || ((b.day ?? -999) - (a.day ?? -999)))
       .slice(0, 40);
-    if (matched.length) return matched;
+    if (matched.length) return enrichValuationTrust(matched);
     return fallbackRepresentativeFund(rule);
   });
