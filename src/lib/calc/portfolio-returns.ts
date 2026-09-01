@@ -43,19 +43,26 @@ function selectReturnQuote(fund: FundQuote | undefined): ReturnQuote {
 }
 
 /**
- * Return the previous trading day's official NAV from the chronological history.
+ * Return the latest official NAV that precedes the current intraday quote.
+ * During the session, `fund.nav` is the latest published official NAV and is
+ * therefore the correct previous-day baseline. The historical array is only
+ * used as a fallback when that NAV is unavailable.
  */
 function previousOfficialNav(fund: FundQuote | undefined, currentPrice: number | null) {
   if (!fund || currentPrice == null) return null;
-  const history = Array.isArray(fund.history) ? fund.history.filter((x) => Number.isFinite(x) && x > 0) : [];
+  const latestNav = finitePositive(fund.nav);
+  if (latestNav != null && currentPrice !== latestNav) return latestNav;
+
+  const history = Array.isArray(fund.history)
+    ? fund.history.filter((x) => Number.isFinite(x) && x > 0)
+    : [];
   if (history.length < 2) return null;
 
   const latest = history[history.length - 1];
-  const latestNav = finitePositive(fund.nav);
-  if (latestNav != null && Math.abs(latest - latestNav) > Math.max(0.0000001, latestNav * 0.000001)) {
-    return latestNav;
+  if (latestNav != null && Math.abs(latest - latestNav) <= Math.max(0.0000001, latestNav * 0.000001)) {
+    return history[history.length - 2];
   }
-  return history[history.length - 2];
+  return latest;
 }
 
 /**
