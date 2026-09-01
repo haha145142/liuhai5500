@@ -26,7 +26,7 @@ function localDateKey(date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
-export type PeriodId = "week" | "month" | "year";
+export type PeriodId = "week" | "month" | "quarter" | "year";
 export type PeriodReturn = {
   id: PeriodId;
   label: string;
@@ -40,6 +40,10 @@ export type PeriodReturn = {
 function periodStart(id: PeriodId, now = new Date()): string {
   if (id === "year") return `${now.getFullYear()}-01-01`;
   if (id === "month") return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  if (id === "quarter") {
+    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+    return `${now.getFullYear()}-${String(quarterStartMonth + 1).padStart(2, "0")}-01`;
+  }
   const day = now.getDay();
   const delta = day === 0 ? 6 : day - 1;
   const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - delta);
@@ -57,7 +61,7 @@ export function calcPortfolioPeriodReturn(
   funds: Record<string, FundQuote>,
   now = new Date(),
 ): PeriodReturn {
-  const labels: Record<PeriodId, string> = { week: "本周", month: "本月", year: "今年" };
+  const labels: Record<PeriodId, string> = { week: "本周", month: "本月", quarter: "近三个月", year: "今年" };
   const start = periodStart(period, now);
   let amount = 0;
   let baseValue = 0;
@@ -92,8 +96,8 @@ export function calcPortfolioPeriodReturn(
 export type DailyPnl = { amount: number | null; coveredFunds: number; totalFunds: number };
 
 /**
- * Daily portfolio P&L from official NAVs. This is historical review only and
- * deliberately does not mix today's intraday estimate into calendar cells.
+ * Daily portfolio P&L from official NAVs. Historical review only; it deliberately
+ * does not mix today's intraday estimate into calendar cells.
  */
 export function calcDailyPortfolioPnl(dateKey: string, holdings: Holding[], funds: Record<string, FundQuote>): DailyPnl {
   let amount = 0;
