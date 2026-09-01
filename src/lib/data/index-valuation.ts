@@ -21,7 +21,52 @@ const CORE: Config[] = [
   { code: "000300", secid: "1.000300", name: "沪深300" },
 ];
 
-async function load(config: Config): Promise<IndexValuation> {
+const PERCENTILE_SOURCE = "https://baifenwei.com/indices/";
+
+function levelFromPercentile(percentile: number | null): IndexValuation["level"] {
+  if (percentile == null) return "暂无可靠数据";
+  if (percentile >= 70) return "高估";
+  if (percentile <= 30) return "低估";
+  return "中性";
+}
+
+function parsePercentileTable(html: string): Map<string, { pe: number; pePercentile: number; pb: number | null; pbPercentile: number | null }> {
+  const result = new Map<string, { pe: number; pePercentile: number; pb: number | null; pbPercentile: number | null }>();
+  const normalized = html.replace(/\s+/g, " ");
+  const rowPattern = /(?:上证指数|深证成指|创业板指|沪深300)[^\n]{0,500}?\(?(000001|399001|399006|000300)[^\n]{0,500}?([0-9]+(?:\.[0-9]+)?)%[^\n]{0,300}?([0-9]+(?:\.[0-9]+)?)%/g;
+  for (const match of normalized.matchAll(rowPattern)) {
+    const code = match[1];
+    const pePercentile = Number(match[2]);
+    const pbPercentile = Number(match[3]);
+    if (Number.isFinite(pePercentile)) {
+      result.set(code, { pe: Number.NaN, pePercentile, pb: null, pbPercentile: Number.isFinite(pbPercentile) ? pbPercentile : null });
+    }
+  }
+  return result;
+}
+
+async function loadPercentiles(): Promise<Map<string, { pePercentile: number; pbPercentile: number | null }>> {
+  try {
+    const raw = await fetchText(`${PERCENTILE_SOURCE}?_=${Date.now()}`, 8000, { Referer: "https://baifenwei.com/" });
+    const normalized = raw.replace(/\s+/g, " ");
+    const result = new Map<string, { pePercentile: number; pbPercentile: number | null }>();
+    const codes = ["000001", "399001", "399006", "000300"];
+    for (const code of codes) {
+      const index = normalized.indexOf(code);
+      if (index < 0) continue;
+      const row = normalized.slice(Math.max(0, index - 120), Math.min(normalized.length, index + 450));
+      const percents = [...row.matchAll(/(\d+(?:\.\d+)?)%/g)].map((m) => Number(m[1])).filter((v) => Number.isFinite(v) && v >= 0 && v <= 100);
+      if (percents.length >= 2) {
+        result.set(code, { pePercentile: percents[0], pbPercentile: percents[1] });
+      }
+    }
+    return result;
+  } catch {
+    return new Map();
+  }
+}
+
+async function load(config: Config, percentiles: Map<string, { pePercentile: number; pbPercentile: number | null }>): Promise<IndexValuation> {
   try {
     const url = `https://push2.eastmoney.com/api/qt/stock/get?secid=${config.secid}&fields=f57,f58,f43,f169,f162,f167&_=${Date.now()}`;
     const raw = await fetchText(url, 7000, { Referer: "https://quote.eastmoney.com/" });
@@ -31,15 +76,22 @@ async function load(config: Config): Promise<IndexValuation> {
     const pe = peRaw == null ? null : peRaw / 100;
     const pb = pbRaw == null ? null : pbRaw / 100;
     const roe = pe != null && pb != null && pe > 0 ? (pb / pe) * 100 : null;
+    const valuation = percentiles.get(config.code);
+    const percentile = valuation?.pePercentile ?? null;
+    const pbPercentile = valuation?.pbPercentile ?? null;
+    const level = levelFromPercentile(percentile);
+    const sourceParts = ["东方财富指数估值字段"];
+    if (percentile != null) sourceParts.push("百分位：百分位官网近10年指数估值表");
+    if (roe != null) sourceParts.push("ROE由PB/PE推导");
     return {
       code: config.code,
       name: config.name,
       pe,
       pb,
       roe,
-      percentile: null,
-      level: "暂无可靠数据",
-      source: roe == null ? "东方财富指数估值字段" : "东方财富指数估值字段 · ROE由PB/PE推导",
+      percentile,
+      level,
+      source: sourceParts.join(" · ") + (pbPercentile != null ? ` · PB分位${pbPercentile.toFixed(1)}%` : ""),
       updatedAt: new Date().toISOString(),
     };
   } catch {
@@ -47,4 +99,7 @@ async function load(config: Config): Promise<IndexValuation> {
   }
 }
 
-export const getCoreIndexValuations = createServerFn({ method: "GET" }).handler(async (): Promise<IndexValuation[]> => Promise.all(CORE.map(load)));
+export const getCoreIndexValuations = createServerFn({ method: "GET" }).handler(async (): Promise<IndexValuation[]> => {
+  const percentiles = await loadPercentiles();
+  return Promise.all(CORE.map((config) => load(config, percentiles)));
+});
