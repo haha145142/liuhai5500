@@ -19,9 +19,8 @@ function atOrBefore(points: HistoryPoint[], dateKey: string): HistoryPoint | nul
   return found;
 }
 
-function chinaDateKey(date = new Date()): string {
-  const shifted = new Date(date.getTime() + 8 * 60 * 60 * 1000);
-  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
+function chinaDate(date = new Date()): Date {
+  return new Date(date.getTime() + 8 * 60 * 60 * 1000);
 }
 
 function dateKeyFromParts(date: Date): string {
@@ -32,11 +31,69 @@ function subtractCalendarMonths(date: Date, months: number): Date {
   const y = date.getUTCFullYear();
   const m = date.getUTCMonth();
   const d = date.getUTCDate();
-  const targetMonth = m - months;
-  const target = new Date(Date.UTC(y, targetMonth, 1));
+  const target = new Date(Date.UTC(y, m - months, 1));
   const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
   target.setUTCDate(Math.min(d, lastDay));
   return target;
+}
+
+function subtractCalendarYears(date: Date, years: number): Date {
+  const target = new Date(Date.UTC(date.getUTCFullYear() - years, date.getUTCMonth(), 1));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(date.getUTCDate(), lastDay));
+  return target;
+}
+
+export type FundPeriodId = "week" | "month" | "quarter" | "half" | "year";
+
+function fundPeriodStart(id: FundPeriodId, now = new Date()): string {
+  const shifted = chinaDate(now);
+  if (id === "week") {
+    const start = new Date(shifted);
+    start.setUTCDate(start.getUTCDate() - 7);
+    return dateKeyFromParts(start);
+  }
+  if (id === "month") return dateKeyFromParts(subtractCalendarMonths(shifted, 1));
+  if (id === "quarter") return dateKeyFromParts(subtractCalendarMonths(shifted, 3));
+  if (id === "half") return dateKeyFromParts(subtractCalendarMonths(shifted, 6));
+  return dateKeyFromParts(subtractCalendarYears(shifted, 1));
+}
+
+export type FundPeriodReturn = {
+  id: FundPeriodId;
+  amount: number | null;
+  pct: number | null;
+  baseDate: string | null;
+  currentDate: string | null;
+};
+
+/**
+ * Rolling fund return used by individual fund cards.
+ * Base date is the latest official NAV on or before the rolling calendar boundary.
+ * Current price comes from the same unified quote selector used by portfolio totals.
+ */
+export function calcFundPeriodReturn(
+  period: FundPeriodId,
+  holding: Holding,
+  fund: FundQuote | undefined,
+  now = new Date(),
+): FundPeriodReturn {
+  const points = pointsFor(fund);
+  const ret = calcHoldingReturn(holding, fund);
+  if (ret.price == null || points.length === 0) {
+    return { id: period, amount: null, pct: null, baseDate: null, currentDate: fund?.navDate ?? null };
+  }
+  const base = atOrBefore(points, fundPeriodStart(period, now));
+  if (!base || base.nav <= 0) {
+    return { id: period, amount: null, pct: null, baseDate: null, currentDate: fund?.navDate ?? null };
+  }
+  return {
+    id: period,
+    amount: (ret.price - base.nav) * holding.shares,
+    pct: ((ret.price - base.nav) / base.nav) * 100,
+    baseDate: base.date,
+    currentDate: fund?.navDate ?? null,
+  };
 }
 
 export type PeriodId = "week" | "month" | "quarter" | "year";
@@ -51,7 +108,7 @@ export type PeriodReturn = {
 };
 
 function periodStart(id: PeriodId, now = new Date()): string {
-  const shifted = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  const shifted = chinaDate(now);
   if (id === "year") return `${shifted.getUTCFullYear()}-01-01`;
   if (id === "month") return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-01`;
   if (id === "quarter") return dateKeyFromParts(subtractCalendarMonths(shifted, 3));
@@ -61,14 +118,7 @@ function periodStart(id: PeriodId, now = new Date()): string {
   return dateKeyFromParts(monday);
 }
 
-/**
- * Portfolio period return.
- * - week/month/year use calendar period boundaries.
- * - quarter is a rolling three-calendar-month window, matching the UI label "近三个月".
- * The current price uses the same quote selector as the portfolio-return core, so
- * an intraday estimate can flow into the headline while the base is always an
- * historical official NAV on or before the period start.
- */
+/** Portfolio calendar-period return for the shared summary header. */
 export function calcPortfolioPeriodReturn(
   period: PeriodId,
   holdings: Holding[],
@@ -109,10 +159,7 @@ export function calcPortfolioPeriodReturn(
 
 export type DailyPnl = { amount: number | null; coveredFunds: number; totalFunds: number };
 
-/**
- * Daily portfolio P&L from official NAVs. Historical review only; it deliberately
- * does not mix today's intraday estimate into calendar cells.
- */
+/** Historical calendar cells use official NAV pairs only. */
 export function calcDailyPortfolioPnl(dateKey: string, holdings: Holding[], funds: Record<string, FundQuote>): DailyPnl {
   let amount = 0;
   let coveredFunds = 0;
