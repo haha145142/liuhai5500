@@ -15,6 +15,7 @@ const TABS = [
   { id: "1n", label: "近1年" },
 ] as const;
 const RANK_CACHE_PREFIX = "fund_ai_pro_rank_cache_v2_";
+const RANK_TIMEOUT_MS = 7_000;
 
 type RankCache = { savedAt: number; rows: RankRow[]; source: string };
 
@@ -30,6 +31,13 @@ function readRankCache(tab: string): RankCache | null {
 
 function writeRankCache(tab: string, value: RankCache) {
   try { localStorage.setItem(`${RANK_CACHE_PREFIX}${tab}`, JSON.stringify(value)); } catch {}
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const id = window.setTimeout(() => reject(new Error("rank-timeout")), ms);
+    promise.then((value) => { window.clearTimeout(id); resolve(value); }, (error) => { window.clearTimeout(id); reject(error); });
+  });
 }
 
 function FundsPage() {
@@ -50,7 +58,7 @@ function FundsPage() {
     setLoading(!cached?.rows?.length);
     setRefreshing(!!cached?.rows?.length);
 
-    void getFundRank({ data: { sort: tab } }).then((r) => {
+    void withTimeout(getFundRank({ data: { sort: tab } }), RANK_TIMEOUT_MS).then((r) => {
       if (!live) return;
       if (r.rows.length) {
         setRows(r.rows);
@@ -64,7 +72,7 @@ function FundsPage() {
       if (!live) return;
       if (!cached?.rows?.length) {
         setRows([]);
-        setSource("排行数据源暂不可用");
+        setSource("排行数据源超时 · 已停止等待");
       }
     }).finally(() => {
       if (!live) return;
@@ -75,24 +83,19 @@ function FundsPage() {
   }, [tab]);
 
   return (
-    <div>
+    <div className="funds-page">
       <Glass>
         <SectionTitle title="基金排行" hint={source} />
         <div className="flex gap-1">
           {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={`flex-1 rounded-xl py-2 text-xs font-semibold ${tab === t.id ? "bg-accent text-accent-fg" : "bg-bg-elevated text-muted"}`}
-            >
+            <button key={t.id} type="button" onClick={() => setTab(t.id)} className={`flex-1 rounded-xl py-2 text-xs font-semibold ${tab === t.id ? "bg-accent text-accent-fg" : "bg-bg-elevated text-muted"}`}>
               {t.label}
             </button>
           ))}
         </div>
         {refreshing ? <div className="mt-2 text-[10px] text-muted">后台刷新中 · 先显示本地最近数据</div> : null}
       </Glass>
-      {loading ? <EmptyNote>正在读取排行…</EmptyNote> : null}
+      {loading ? <EmptyNote>正在读取排行… 最多等待 7 秒</EmptyNote> : null}
       {!loading && !rows.length ? <EmptyNote>暂无可靠排行数据，当前数据源不可用。</EmptyNote> : null}
       {rows.map((r, i) => {
         const addable = r.nav != null && Number.isFinite(r.nav) && r.nav > 0;
@@ -102,29 +105,13 @@ function FundsPage() {
             <div className="w-6 text-xs font-semibold text-subtle">{i + 1}</div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold">{r.name}</div>
-              <div className="text-[11px] text-muted">
-                {r.code} · 净值 {fmtPrice(r.nav, 4)}
-              </div>
+              <div className="text-[11px] text-muted">{r.code} · 净值 {fmtPrice(r.nav, 4)}</div>
             </div>
-            <Tone v={displayValue} className="text-sm font-semibold">
-              {fmtPctShort(displayValue)}
-            </Tone>
-            <button
-              type="button"
-              onClick={() => toggleWatch(r.code)}
-              className={`rounded-full px-2 py-1 text-[10px] font-semibold ${watchlist.includes(r.code) ? "bg-accent text-accent-fg" : "bg-bg-elevated text-muted"}`}
-            >
+            <Tone v={displayValue} className="text-sm font-semibold">{fmtPctShort(displayValue)}</Tone>
+            <button type="button" onClick={() => toggleWatch(r.code)} className={`rounded-full px-2 py-1 text-[10px] font-semibold ${watchlist.includes(r.code) ? "bg-accent text-accent-fg" : "bg-bg-elevated text-muted"}`}>
               {watchlist.includes(r.code) ? "已关注" : "关注"}
             </button>
-            <button
-              type="button"
-              disabled={!addable}
-              className="text-[10px] font-semibold text-accent disabled:cursor-not-allowed disabled:opacity-40"
-              onClick={() => {
-                if (!addable) return;
-                addHolding({ code: r.code, name: r.name, shares: 100, cost: r.nav as number });
-              }}
-            >
+            <button type="button" disabled={!addable} className="text-[10px] font-semibold text-accent disabled:cursor-not-allowed disabled:opacity-40" onClick={() => { if (addable) addHolding({ code: r.code, name: r.name, shares: 100, cost: r.nav as number }); }}>
               {addable ? "加入" : "无可靠净值"}
             </button>
           </article>
