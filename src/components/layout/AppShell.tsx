@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { useRouterState } from "@tanstack/react-router";
-import { Menu, RefreshCw } from "lucide-react";
+import { useRouterState, Link } from "@tanstack/react-router";
+import { BarChart3, Menu, RefreshCw, UserRound, WalletCards, Star } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { clockStr } from "@/lib/format";
 import { sessionLabel } from "@/lib/market-hours";
@@ -12,6 +12,13 @@ const NEWS_REFRESH_MS = 3 * 60_000;
 const BOOT_DELAY_MS = 80;
 const NEWS_BOOT_DELAY_MS = 450;
 const RESUME_DEBOUNCE_MS = 2_000;
+
+const NAV = [
+  { to: "/" as const, label: "自选", icon: Star },
+  { to: "/market" as const, label: "行情", icon: BarChart3 },
+  { to: "/portfolio" as const, label: "交易", icon: WalletCards },
+  { to: "/settings" as const, label: "我的", icon: UserRound },
+];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const hydrate = useApp((s) => s.hydrate);
@@ -91,7 +98,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     ? `${snapshot.marketDate || tradingDateLabel()} · ${validationLabel}${failedSources.length ? ` · ${failedSources.join("、")}暂不可用` : ""} · 更新 ${clockStr(new Date(snapshot.fetchedAt))}`
     : lastError ? "行情暂时不可用 · 已保留本地数据" : "后台连接行情…";
 
-  const header = <header className="app-header"><div className="app-header-card !min-h-[88px] !rounded-[26px] !px-3.5 !py-3.5"><button type="button" onClick={() => setDrawerOpen(true)} aria-label="打开侧边菜单" className="relative z-10 mr-2 flex !size-11 shrink-0 items-center justify-center rounded-2xl border border-white/75 bg-white/58 text-slate-700 shadow-[0_7px_22px_rgba(70,95,120,.10)] backdrop-blur-xl transition active:scale-95"><Menu className="size-5" strokeWidth={2} /></button><div className="min-w-0 flex-1"><h1 className="app-header-title !text-[22px]">Fund AI Pro</h1><p className="app-header-meta !mt-1 !text-[11px] !leading-[1.3]">{sessionLabel()} · {statusText}</p></div><button type="button" onClick={onRefresh} aria-label="刷新" className="app-refresh-button !size-11 !w-11 !h-11 !m-0 !ml-2 !rounded-full"><RefreshCw className={cn("size-4", loading && "animate-spin")} /></button></div></header>;
+  const header = <header className="app-header"><div className="app-header-card !min-h-[78px] !rounded-[24px] !px-3.5 !py-3"><button type="button" onClick={() => setDrawerOpen(true)} aria-label="打开侧边菜单" className="relative z-10 mr-2 flex !size-10 shrink-0 items-center justify-center rounded-2xl border border-white/75 bg-white/58 text-slate-700 shadow-[0_7px_22px_rgba(70,95,120,.10)] backdrop-blur-xl transition active:scale-95"><Menu className="size-5" strokeWidth={2} /></button><div className="min-w-0 flex-1"><h1 className="app-header-title !text-[20px]">Fund AI Pro</h1><p className="app-header-meta !mt-0.5 !text-[10px] !leading-[1.3]">{sessionLabel()} · {statusText}</p></div><button type="button" onClick={onRefresh} aria-label="刷新" className="app-refresh-button !size-10 !w-10 !h-10 !m-0 !ml-2 !rounded-full"><RefreshCw className={cn("size-4", loading && "animate-spin")} /></button></div></header>;
   const mainContent = children;
-  return <div className="app-shell" data-app-shell="v4">{pathname === "/" ? <section className="home-panel">{header}<main className="app-main home-main">{mainContent}</main></section> : <><>{header}</><main className="app-main">{mainContent}</main></>}<SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} /></div>;
+  const bottomNav = <nav aria-label="底部导航" className="fixed inset-x-0 bottom-0 z-[5000] px-3 pb-[max(8px,env(safe-area-inset-bottom))] pt-1"><div className="mx-auto grid max-w-[520px] grid-cols-4 rounded-[24px] border border-white/75 bg-white/65 p-1.5 shadow-[0_10px_34px_rgba(38,78,112,.14),inset_0_1px_0_rgba(255,255,255,.96)] backdrop-blur-[28px] saturate-150">{NAV.map((item) => { const Icon = item.icon; const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to); return <Link key={item.to} to={item.to} aria-current={active ? "page" : undefined} className={cn("flex min-h-12 items-center justify-center gap-1 rounded-[18px] px-2 text-[10px] font-medium transition active:scale-95", active ? "bg-slate-900 text-white shadow-[0_6px_18px_rgba(15,23,42,.16)]" : "text-slate-500")}>{Icon ? <Icon className="size-[17px]" /> : null}<span>{item.label}</span></Link>; })}</div></nav>;
+  return <div className="app-shell pb-[88px]" data-app-shell="v5">{pathname === "/" ? <section className="home-panel">{header}<main className="app-main home-main">{mainContent}</main></section> : <><>{header}</><main className="app-main">{mainContent}</main></>}<SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />{bottomNav}</div>;
 }
