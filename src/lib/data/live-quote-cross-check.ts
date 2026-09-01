@@ -15,21 +15,52 @@ function parseTencent(text: string): Map<string, StockQuote> {
     const m = line.match(/v_(?:sh|sz)(\d{6})=\"([^\"]*)\"/);
     if (!m) continue;
     const p = m[2].split("~");
-    out.set(m[1], { price: n(p[3]), pct: n(p[32]), source: "腾讯财经" });
+    const price = n(p[3]);
+    const previous = n(p[4]);
+    const pct = n(p[32]) ?? (price != null && previous != null && previous !== 0 ? (price / previous - 1) * 100 : null);
+    out.set(m[1], { price, pct, source: "腾讯财经" });
   }
   return out;
 }
 
 function parseSina(text: string): Map<string, StockQuote> {
   const out = new Map<string, StockQuote>();
-  for (const match of text.matchAll(/hq_str_(?:sh|sz)(\d{6})="([^"]*)"/g)) {
+  for (const match of text.matchAll(/hq_str_(?:sh|sz)(\d{6})=\"([^\"]*)\"/g)) {
     const p = match[2].split(",");
-    const prev = n(p[2]);
+    const previous = n(p[2]);
     const current = n(p[3]);
-    const pct = prev != null && prev !== 0 && current != null ? ((current / prev) - 1) * 100 : null;
+    const pct = previous != null && previous !== 0 && current != null ? ((current / previous) - 1) * 100 : null;
     out.set(match[1], { price: current, pct, source: "新浪财经" });
   }
   return out;
+}
+
+function fuse(primary: StockQuote, secondary: StockQuote) {
+  const pctDeviation = primary.pct != null && secondary.pct != null ? Math.abs(primary.pct - secondary.pct) : null;
+  const priceDeviation = primary.price != null && secondary.price != null && primary.price !== 0
+    ? Math.abs(primary.price - secondary.price) / Math.abs(primary.price) * 100
+    : null;
+  const pctAgree = pctDeviation == null || pctDeviation <= 0.15;
+  const priceAgree = priceDeviation == null || priceDeviation <= 0.20;
+  const agree = pctAgree && priceAgree;
+
+  if (!agree) {
+    return {
+      price: null,
+      pct: null,
+      status: "disagreed" as const,
+      deviation: pctDeviation,
+      note: `腾讯财经与新浪财经存在分歧${pctDeviation != null ? `，涨跌幅差 ${pctDeviation.toFixed(2)} 个百分点` : ""}`,
+    };
+  }
+
+  return {
+    price: primary.price != null && secondary.price != null ? (primary.price + secondary.price) / 2 : primary.price ?? secondary.price,
+    pct: primary.pct != null && secondary.pct != null ? (primary.pct + secondary.pct) / 2 : primary.pct ?? secondary.pct,
+    status: "cross_checked" as const,
+    deviation: pctDeviation,
+    note: "腾讯财经 + 新浪财经融合",
+  };
 }
 
 export type CrossCheckedHolding = LiveHolding & {
@@ -66,29 +97,14 @@ export async function crossCheckStockQuotes(holdings: LiveHolding[]): Promise<Cr
       return { ...holding, price: primary.price, pct: primary.pct, quoteStatus: "single_source", quoteDeviationPctPoints: null, quoteNote: "仅腾讯财经有可靠行情" };
     }
 
-    const pctDeviation = primary.pct != null && secondary.pct != null ? Math.abs(primary.pct - secondary.pct) : null;
-    const priceDeviation = primary.price != null && secondary.price != null && primary.price !== 0
-      ? Math.abs(primary.price - secondary.price) / Math.abs(primary.price) * 100
-      : null;
-    const pctAgree = pctDeviation == null || pctDeviation <= 0.15;
-    const priceAgree = priceDeviation == null || priceDeviation <= 0.20;
-    const agree = pctAgree && priceAgree;
-    const fusedPrice = primary.price != null && secondary.price != null
-      ? (primary.price + secondary.price) / 2
-      : primary.price ?? secondary.price;
-    const fusedPct = primary.pct != null && secondary.pct != null
-      ? (primary.pct + secondary.pct) / 2
-      : primary.pct ?? secondary.pct;
-
+    const merged = fuse(primary, secondary);
     return {
       ...holding,
-      price: fusedPrice,
-      pct: fusedPct,
-      quoteStatus: agree ? "cross_checked" : "disagreed",
-      quoteDeviationPctPoints: pctDeviation,
-      quoteNote: agree
-        ? "腾讯财经 + 新浪财经融合"
-        : `腾讯财经与新浪财经存在分歧${pctDeviation != null ? `，涨跌幅差 ${pctDeviation.toFixed(2)} 个百分点` : ""}`,
+      price: merged.price,
+      pct: merged.pct,
+      quoteStatus: merged.status,
+      quoteDeviationPctPoints: merged.deviation,
+      quoteNote: merged.note,
     };
   });
 }
