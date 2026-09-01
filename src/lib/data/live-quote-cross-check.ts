@@ -73,15 +73,21 @@ export async function crossCheckStockQuotes(holdings: LiveHolding[]): Promise<Cr
     const pctAgree = pctDeviation == null || pctDeviation <= 0.15;
     const priceAgree = priceDeviation == null || priceDeviation <= 0.20;
     const agree = pctAgree && priceAgree;
+    const fusedPrice = primary.price != null && secondary.price != null
+      ? (primary.price + secondary.price) / 2
+      : primary.price ?? secondary.price;
+    const fusedPct = primary.pct != null && secondary.pct != null
+      ? (primary.pct + secondary.pct) / 2
+      : primary.pct ?? secondary.pct;
 
     return {
       ...holding,
-      price: primary.price,
-      pct: primary.pct,
+      price: fusedPrice,
+      pct: fusedPct,
       quoteStatus: agree ? "cross_checked" : "disagreed",
       quoteDeviationPctPoints: pctDeviation,
       quoteNote: agree
-        ? "腾讯财经 + 新浪财经交叉一致"
+        ? "腾讯财经 + 新浪财经融合"
         : `腾讯财经与新浪财经存在分歧${pctDeviation != null ? `，涨跌幅差 ${pctDeviation.toFixed(2)} 个百分点` : ""}`,
     };
   });
