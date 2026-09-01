@@ -33,7 +33,7 @@ export function calcPortfolioPeriodReturn(
     baseDate: result.baseDate,
     currentDate: result.baseDate ? (result.pricedCount > 0 ? now.toISOString().slice(0, 10) : null) : null,
     pricedCount: result.pricedCount,
-    totalCount: result.totalCount,
+    totalCount: holdings.length,
   };
 }
 
