@@ -25,7 +25,7 @@ test("weekly period uses calendar start, not a fixed trading-day count", () => {
     { "000001": baseFund },
     new Date("2026-08-28T12:00:00+08:00"),
   );
-  assert.equal(result.amount, 3);
+  assert.ok(Math.abs((result.amount ?? 0) - 3) < 1e-12);
   assert.equal(result.baseDate, "2026-08-21");
 });
 
