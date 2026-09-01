@@ -7,16 +7,27 @@ import type { FundQuote, Holding } from "@/lib/types";
 type Selection = { code: string; name: string; icon: string };
 type State = { items: Selection[] };
 const KEY = "fund_ai_pro_board_watch_v6";
+const DEFAULT_ITEMS: Selection[] = [
+  { code: "BK0917", name: "半导体", icon: "🔬" },
+  { code: "BK1134", name: "国产算力", icon: "🤖" },
+  { code: "BK1128", name: "CPO", icon: "◉" },
+  { code: "BK1137", name: "存储芯片", icon: "▣" },
+  { code: "BK1059", name: "半导体材料设备", icon: "▦" },
+  { code: "BK1650", name: "通信", icon: "📡" },
+  { code: "BK1129", name: "人工智能", icon: "🧠" },
+  { code: "BK0890", name: "MLCC", icon: "◈" },
+];
 
 function readState(): State {
-  if (typeof window === "undefined") return { items: [] };
+  if (typeof window === "undefined") return { items: DEFAULT_ITEMS };
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "null") as Partial<State> | null;
     const items = Array.isArray(raw?.items)
       ? raw.items.filter((x): x is Selection => !!x && typeof x === "object" && typeof x.code === "string" && typeof x.name === "string")
       : [];
-    return { items };
-  } catch { return { items: [] }; }
+    // First launch: seed the best validated board set from the uploaded iOS26 master.
+    return { items: items.length ? items : DEFAULT_ITEMS };
+  } catch { return { items: DEFAULT_ITEMS }; }
 }
 function tone(v: number | null) { return v == null ? "text-muted" : v > 0 ? "text-up" : v < 0 ? "text-down" : "text-muted"; }
 function formatFlow(v: number | null) { if (v == null || !Number.isFinite(v)) return "—"; const yi = v / 1e8; return `${yi >= 0 ? "+" : ""}${yi.toFixed(2)}亿`; }
@@ -86,8 +97,8 @@ export function FundSectorWatchV2(_props?: { portfolio?: Holding[]; funds?: Reco
     <section className="mb-3 overflow-hidden rounded-[24px] border border-white/70 bg-white/42 p-3 shadow-[0_18px_50px_rgba(38,78,112,.07),inset_0_1px_0_rgba(255,255,255,.94)] backdrop-blur-[24px] saturate-150">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2"><h2 className="text-[16px] font-semibold tracking-tight text-fg">自选板块</h2><span className="rounded-full bg-blue/10 px-2 py-0.5 text-[9px] font-medium text-blue">自己添加</span></div>
-          <p className="mt-1 text-[10px] text-subtle">输入板块名称，直接显示该板块今日涨跌与资金方向</p>
+          <div className="flex items-center gap-2"><h2 className="text-[16px] font-semibold tracking-tight text-fg">自选板块</h2><span className="rounded-full bg-blue/10 px-2 py-0.5 text-[9px] font-medium text-blue">精选8大板块</span></div>
+          <p className="mt-1 text-[10px] text-subtle">来自上传母版的核心板块；可继续搜索、添加或移除，30秒自动刷新。</p>
         </div>
         <button type="button" onClick={() => setSearchOpen((v) => !v)} className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-[0_6px_18px_rgba(15,23,42,.18)] active:scale-95" aria-label="添加板块">{searchOpen ? <X size={17} /> : <Plus size={17} />}</button>
       </div>
@@ -97,23 +108,16 @@ export function FundSectorWatchV2(_props?: { portfolio?: Holding[]; funds?: Reco
         <div className="mt-2 max-h-52 overflow-y-auto space-y-1">{suggestions.map((item) => <button key={item.code} type="button" onClick={() => add(item)} className="flex w-full items-center gap-2 rounded-[12px] bg-white px-3 py-2.5 text-left shadow-sm active:bg-blue-50"><span className="flex size-7 items-center justify-center rounded-xl bg-blue/10 text-sm">{item.icon}</span><span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-medium text-slate-800">{item.name}</span><span className="block text-[9px] text-slate-400">{item.code} · {item.type === "industry" ? "行业" : "概念"}</span></span><Plus size={14} className="text-blue" /></button>)}{query.trim() && !searching && !suggestions.length ? <div className="px-2 py-4 text-center text-[10px] text-slate-400">没有匹配到东方财富板块</div> : null}</div>
       </div> : null}
 
-      {!items.length ? <button type="button" onClick={() => setSearchOpen(true)} className="mt-3 flex min-h-[104px] w-full flex-col items-center justify-center rounded-[18px] border border-dashed border-blue/20 bg-white/38 text-center active:bg-white/62"><span className="flex size-10 items-center justify-center rounded-2xl bg-blue/10 text-blue"><Plus size={18} /></span><span className="mt-2 text-xs font-semibold text-slate-700">还没有自选板块</span><span className="mt-1 text-[10px] text-slate-400">点右上角＋，输入板块名称即可添加</span></button> : null}
-
-      {items.length ? <div className="mt-3 space-y-2">{items.map((item) => { const q = quoteMap.get(item.code); const open = openCode === item.code; return <article key={item.code} className="overflow-hidden rounded-[18px] border border-white/80 bg-white/58 shadow-[0_8px_24px_rgba(38,78,112,.045)]">
-        <button type="button" onClick={() => setOpenCode(open ? null : item.code)} className="flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-white/55"><span className="flex size-9 shrink-0 items-center justify-center rounded-2xl bg-white/78 text-lg shadow-sm">{item.icon}</span><span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-semibold text-slate-900">{item.name}</span><span className="mt-0.5 block text-[9px] text-slate-400">{item.code} · {q?.marketDate || "等待行情"}</span></span><span className={`shrink-0 text-[20px] font-bold tabular-nums ${tone(q?.pct ?? null)}`}>{q?.pct == null ? "—" : fmtPctShort(q.pct)}</span><ChevronRight size={15} className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-90" : ""}`} /></button>
-        {open ? <div className="border-t border-white/75 px-3.5 pb-3 pt-2.5">
+      {items.length ? <div className="mt-3 grid grid-cols-2 gap-2">{items.map((item) => { const q = quoteMap.get(item.code); const open = openCode === item.code; return <article key={item.code} className="overflow-hidden rounded-[18px] border border-white/80 bg-white/58 shadow-[0_8px_24px_rgba(38,78,112,.045)]">
+        <button type="button" onClick={() => setOpenCode(open ? null : item.code)} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left active:bg-white/55"><span className="flex size-8 shrink-0 items-center justify-center rounded-2xl bg-white/78 text-base shadow-sm">{item.icon}</span><span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-semibold text-slate-900">{item.name}</span><span className="mt-0.5 block text-[8px] text-slate-400">{item.code}</span></span><span className={`shrink-0 text-[18px] font-bold tabular-nums ${tone(q?.pct ?? null)}`}>{q?.pct == null ? "—" : fmtPctShort(q.pct)}</span><ChevronRight size={13} className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-90" : ""}`} /></button>
+        {open ? <div className="border-t border-white/75 px-3 pb-3 pt-2.5">
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-[14px] bg-white/66 px-3 py-2"><div className="text-[9px] text-slate-400">板块涨跌</div><div className={`mt-1 text-[15px] font-bold ${tone(q?.pct ?? null)}`}>{q?.pct == null ? "暂无可靠数据" : fmtPctShort(q.pct)}</div></div>
             <div className="rounded-[14px] bg-white/66 px-3 py-2"><div className="text-[9px] text-slate-400">主力净流向</div><div className={`mt-1 text-[15px] font-bold ${tone(q?.mainFlow ?? null)}`}>{formatFlow(q?.mainFlow ?? null)}</div><div className={`mt-0.5 text-[9px] ${tone(q?.mainFlow ?? null)}`}>{flowLabel(q?.mainFlow ?? null)}</div></div>
           </div>
           <div className="mt-2 rounded-[14px] bg-slate-50/75 px-3 py-2.5 ring-1 ring-white/70">
             <div className="flex items-center justify-between"><span className="text-[9px] font-medium text-slate-400">资金分档</span><span className="text-[9px] text-slate-400">东财板块资金口径</span></div>
-            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
-              <FlowRow label="超大单" value={q?.superFlow ?? null} />
-              <FlowRow label="大单" value={q?.largeFlow ?? null} />
-              <FlowRow label="中单" value={q?.midFlow ?? null} />
-              <FlowRow label="小单" value={q?.smallFlow ?? null} />
-            </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]"><FlowRow label="超大单" value={q?.superFlow ?? null} /><FlowRow label="大单" value={q?.largeFlow ?? null} /><FlowRow label="中单" value={q?.midFlow ?? null} /><FlowRow label="小单" value={q?.smallFlow ?? null} /></div>
           </div>
           <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-slate-400"><span className="truncate">{q?.source || (loading ? "正在更新行情…" : "当前暂无可靠行情")}</span><button type="button" onClick={() => remove(item.code)} className="rounded-full bg-white/75 px-2.5 py-1 text-slate-500"><X size={10} className="inline mr-1"/>移除</button></div>
         </div> : null}
