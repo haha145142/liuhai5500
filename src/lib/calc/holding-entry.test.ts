@@ -29,12 +29,12 @@ test("missing quote never invents market value", () => {
   assert.equal(preview.pnlPct, null);
 });
 
-test("trading time prefers estimate, otherwise official nav", () => {
+test("trading time prefers estimate, while a dated stale NAV stays historical", () => {
   const live = quoteFromFundState({ estimate: 3.31, estimatePct: 1.5, nav: 3.2, dayPct: 1.1, tradeTime: true });
   assert.equal(live.mode, "live_estimate");
   assert.equal(live.price, 3.31);
 
   const closed = quoteFromFundState({ estimate: 3.31, estimatePct: 1.5, nav: 3.2, dayPct: 1.1, navDate: "2026-08-31", tradeTime: false });
-  assert.equal(closed.mode, "official_today");
+  assert.equal(closed.mode, "latest_official");
   assert.equal(closed.price, 3.2);
 });
