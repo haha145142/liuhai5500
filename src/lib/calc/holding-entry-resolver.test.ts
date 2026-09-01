@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveHoldingEntryPreview } from "./holding-entry-resolver";
+import { resolveHoldingEntryPreview } from "./holding-entry-resolver.ts";
 
 const fund = {
   code: "000001",
