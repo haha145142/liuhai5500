@@ -21,6 +21,19 @@ function cleanCode(v: unknown) {
   return /^\d{6}$/.test(s) ? s : "";
 }
 
+function chinaDateKey() {
+  const d = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+function isIntradayTimestamp(value: string | null, today = chinaDateKey()) {
+  if (!value) return false;
+  const s = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10) === today;
+  if (/^\d{8}/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` === today;
+  return /^\d{1,2}:\d{2}(:\d{2})?$/.test(s);
+}
+
 function scan(value: unknown, code: string, depth = 0): LiveFundQuote | null {
   if (depth > 7 || value == null) return null;
   if (Array.isArray(value)) {
@@ -90,10 +103,23 @@ export async function getLiveFundQuote(code: string): Promise<LiveFundQuote | nu
     [`https://web.ifzq.gtimg.cn/fund/newfund/fundSsgz/getSsgz?app=web&symbol=jj${encodeURIComponent(code)}&_=${Date.now()}`, "腾讯基金分时估值"],
   ];
   const [type, ...rest] = await Promise.all([getFundType(code), ...urls.map(([url, source]) => tryJson(url, code, source))]);
+  const today = chinaDateKey();
   const valid = rest.filter((x): x is LiveFundQuote => !!x && (x.estimate != null || x.pct != null));
   if (!valid.length) return null;
-  const best = valid.find((x) => x.estimate != null && x.pct != null) ?? valid[0];
-  return { ...best, type: best.type || type };
+
+  const fresh = valid.filter((x) => isIntradayTimestamp(x.time, today));
+  const pool = fresh.length ? fresh : valid;
+  const complete = pool.filter((x) => x.estimate != null && x.pct != null);
+  if (!complete.length) {
+    const fallback = pool[0];
+    return fallback ? { ...fallback, type: fallback.type || type } : null;
+  }
+
+  const consensus = complete.filter((x) => complete.every((y) => Math.abs((x.pct as number) - (y.pct as number)) <= 0.15));
+  const source = consensus.length >= 2 ? "多源实时估值一致" : complete.length >= 2 ? "多源实时估值" : complete[0].source;
+  const chosen = consensus.length ? consensus[0] : complete[0];
+  if (chosen.time == null && chosen.date != null && !isIntradayTimestamp(chosen.date, today)) return null;
+  return { ...chosen, source, type: chosen.type || type };
 }
 
 export async function getLiveFundQuotes(codes: string[]): Promise<Map<string, LiveFundQuote>> {
