@@ -1,5 +1,5 @@
-import { cnTime } from "./format";
-import { isAshareTradingDay } from "./data/trading-day";
+import { cnTime } from "./format.ts";
+import { isAshareTradingDay } from "./data/trading-day.ts";
 
 export type MarketPhase = "preopen" | "morning" | "lunch" | "afternoon" | "postclose" | "weekend";
 
