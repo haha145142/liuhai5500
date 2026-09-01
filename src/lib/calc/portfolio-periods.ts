@@ -1,5 +1,5 @@
 import type { FundQuote, Holding } from "../types";
-import { calcHoldingReturn } from "./portfolio-returns";
+import { calcHoldingReturn } from "./portfolio-returns.ts";
 
 type HistoryPoint = { date: string; nav: number };
 
@@ -67,11 +67,6 @@ export type FundPeriodReturn = {
   currentDate: string | null;
 };
 
-/**
- * Rolling fund return used by individual fund cards.
- * Base date is the latest official NAV on or before the rolling calendar boundary.
- * Current price comes from the same unified quote selector used by portfolio totals.
- */
 export function calcFundPeriodReturn(
   period: FundPeriodId,
   holding: Holding,
@@ -119,7 +114,6 @@ function periodStart(id: PeriodId, now = new Date()): string {
   return `${shifted.getUTCFullYear()}-01-01`;
 }
 
-/** Portfolio rolling-period return for the shared summary header. */
 export function calcPortfolioPeriodReturn(
   period: PeriodId,
   holdings: Holding[],
@@ -147,7 +141,6 @@ export function calcPortfolioPeriodReturn(
     baseDates.add(base.date);
   }
 
-  // Keep period results atomic: never show a partial multi-fund period calculation.
   const complete = holdings.length > 0 && pricedCount === holdings.length && eligibleCount === holdings.length;
   return {
     id: period,
@@ -162,7 +155,6 @@ export function calcPortfolioPeriodReturn(
 
 export type DailyPnl = { amount: number | null; coveredFunds: number; totalFunds: number };
 
-/** Historical calendar cells use official NAV pairs only. */
 export function calcDailyPortfolioPnl(dateKey: string, holdings: Holding[], funds: Record<string, FundQuote>): DailyPnl {
   let amount = 0;
   let coveredFunds = 0;
@@ -177,9 +169,5 @@ export function calcDailyPortfolioPnl(dateKey: string, holdings: Holding[], fund
       coveredFunds += 1;
     }
   }
-  return {
-    amount: coveredFunds > 0 ? amount : null,
-    coveredFunds,
-    totalFunds: holdings.length,
-  };
+  return { amount: coveredFunds > 0 ? amount : null, coveredFunds, totalFunds: holdings.length };
 }
