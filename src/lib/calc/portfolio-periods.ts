@@ -147,7 +147,7 @@ export function calcPortfolioPeriodReturn(
     baseDates.add(base.date);
   }
 
-  // Do not present a partial portfolio period return as the result for the full portfolio.
+  // Keep period results atomic: never show a partial multi-fund period calculation.
   const complete = holdings.length > 0 && pricedCount === holdings.length && eligibleCount === holdings.length;
   return {
     id: period,
