@@ -1,11 +1,8 @@
 name: Vercel Production Deploy
 
-# Deploy production from main through GitHub Actions so a main push does not
-# depend on Vercel's native Git webhook delivery. Quality checks remain in the
-# separate Quality Gate workflow; they must not block a production deploy.
+# 生产部署改为手动触发，避免每次开发提交都消耗 Vercel 免费部署次数。
+# 代码质量由独立 Quality Gate workflow 在 push/PR 上检查。
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
