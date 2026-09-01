@@ -53,6 +53,7 @@ try {
         cost: 1,
       }));
       localStorage.setItem("fund_ai_pro_portfolio_v3", JSON.stringify(holdings));
+      localStorage.setItem("fund_ai_pro_board_watch_v7", JSON.stringify({ items: [] }));
       localStorage.setItem("fund_ai_pro_board_watch_v6", JSON.stringify({ items: [] }));
     });
 
@@ -60,6 +61,15 @@ try {
     await waitForText(page, "我的组合", `${viewport.label} homepage`);
     if ((await page.locator("body").innerText()).trim().length < 80) throw new Error(`${viewport.label}: homepage rendered blank/minimal content`);
     await assertNoHorizontalOverflow(page, `${viewport.label} homepage`);
+
+    const addSectorButton = page.getByRole("button", { name: "添加板块" });
+    await addSectorButton.waitFor({ state: "visible", timeout: 15_000 });
+    await addSectorButton.scrollIntoViewIfNeeded();
+    await addSectorButton.click({ force: true });
+    const sectorInput = page.locator('input[aria-label="板块搜索"]');
+    await sectorInput.waitFor({ state: "visible", timeout: 8_000 });
+    await sectorInput.fill("半导体");
+    await assertNoHorizontalOverflow(page, `${viewport.label} sector search`);
 
     await page.goto(`${baseURL}/portfolio`, { waitUntil: "domcontentloaded" });
     await waitForText(page, "我的持仓", `${viewport.label} portfolio`);
@@ -71,7 +81,8 @@ try {
     }
     await assertNoHorizontalOverflow(page, `${viewport.label} portfolio`);
 
-    await page.locator('input[aria-label="基金代码"]').fill("123456");
+    const addFundInput = page.locator('input[aria-label="基金代码"]');
+    await addFundInput.fill("123456");
     await page.locator('input[aria-label="持有份额"]').fill("100");
     await page.locator('input[aria-label="成本价"]').fill("1.23");
     await page.getByRole("button", { name: /添加$/ }).click();
@@ -79,13 +90,6 @@ try {
     if (!Array.isArray(stored) || !stored.some((x) => x.code === "123456" && x.shares === 100 && x.cost === 1.23)) {
       throw new Error(`${viewport.label}: add-fund interaction did not persist holding`);
     }
-
-    await page.goto(`${baseURL}/`, { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: "添加板块" }).click();
-    const sectorInput = page.locator('input[placeholder*="半导体"]');
-    await sectorInput.waitFor({ state: "visible", timeout: 5_000 });
-    await sectorInput.fill("半导体");
-    await assertNoHorizontalOverflow(page, `${viewport.label} sector search`);
 
     await page.close();
   }
