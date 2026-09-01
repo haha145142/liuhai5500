@@ -1,0 +1,187 @@
+/* Fund AI Pro unified visual system — single source of truth for light iOS-style UI. */
+:root {
+  /* Surface */
+  --fap-bg: #eef3f9;
+  --fap-surface: rgba(255,255,255,.64);
+  --fap-surface-strong: rgba(255,255,255,.72);
+  --fap-surface-soft: rgba(255,255,255,.48);
+  --fap-inner: rgba(255,255,255,.54);
+  --fap-border: rgba(255,255,255,.86);
+  --fap-border-soft: rgba(255,255,255,.62);
+  --fap-highlight: rgba(255,255,255,.92);
+
+  /* Brand — medium, calm blue: visible but never fluorescent. */
+  --fap-blue: #4f8fe8;
+  --fap-blue-soft: rgba(79,143,232,.11);
+  --fap-blue-border: rgba(79,143,232,.20);
+  --fap-blue-strong: #3f7fd8;
+
+  /* Financial tones: Chinese convention, restrained saturation. */
+  --fap-up: #d9565d;
+  --fap-up-soft: rgba(217,86,93,.10);
+  --fap-down: #2f9b72;
+  --fap-down-soft: rgba(47,155,114,.10);
+  --fap-warn: #b96b24;
+
+  /* Typography */
+  --fap-text: #1c2735;
+  --fap-muted: #667587;
+  --fap-subtle: #96a3b1;
+
+  /* Shape / spacing */
+  --fap-radius-card: 22px;
+  --fap-radius-inner: 16px;
+  --fap-radius-pill: 999px;
+  --fap-gap-section: 10px;
+
+  /* Glass: enough depth to read as glass, not fog. */
+  --fap-shadow: 0 16px 42px rgba(44,72,101,.075), inset 0 1px 0 rgba(255,255,255,.94);
+  --fap-shadow-soft: 0 8px 22px rgba(44,72,101,.045), inset 0 1px 0 rgba(255,255,255,.78);
+  --fap-blur: 22px;
+  --fap-saturate: 155%;
+
+  color-scheme: light;
+}
+
+html, body {
+  background: var(--fap-bg) !important;
+  color: var(--fap-text) !important;
+}
+
+body {
+  background:
+    radial-gradient(34rem 24rem at 8% -10%, rgba(104,171,238,.12), transparent 70%),
+    radial-gradient(30rem 22rem at 95% 8%, rgba(129,202,180,.09), transparent 72%),
+    linear-gradient(180deg, #f7faff 0%, #eef3f9 55%, #f6f8fb 100%) !important;
+}
+
+.app-shell {
+  background: transparent !important;
+}
+
+/* One neutral glass recipe for the whole product. */
+.glass,
+.glass-tight,
+.app-header-card,
+.home-primary-card,
+.home-market-strip,
+.portfolio-shell,
+.market-data-card,
+.market-cockpit,
+.market-panorama-card,
+.fund-sector-liquid,
+.fund-sector-card,
+.fund-card-v6,
+.launcher-card,
+.tabbar {
+  border-color: var(--fap-border) !important;
+  background: linear-gradient(145deg, var(--fap-surface-strong), var(--fap-surface-soft)) !important;
+  box-shadow: var(--fap-shadow-soft) !important;
+  backdrop-filter: blur(var(--fap-blur)) saturate(var(--fap-saturate)) !important;
+  -webkit-backdrop-filter: blur(var(--fap-blur)) saturate(var(--fap-saturate)) !important;
+}
+
+.glass,
+.home-primary-card,
+.portfolio-shell,
+.fund-card-v6,
+.fund-sector-liquid {
+  box-shadow: var(--fap-shadow) !important;
+}
+
+.glass::before,
+.glass-tight::before,
+.app-header-card::before,
+.home-primary-card::before,
+.home-market-strip::before,
+.fund-card-v6::before,
+.fund-sector-liquid::before,
+.fund-sector-card::before,
+.launcher-card::before,
+.market-cockpit::before,
+.market-panorama-card::before {
+  background: linear-gradient(120deg, rgba(255,255,255,.30), rgba(255,255,255,0) 42%, rgba(154,205,246,.06)) !important;
+}
+
+/* Typography hierarchy: compact, readable, never oversized on mobile. */
+body { font-family: var(--font-sans); }
+.text-fg, .text-slate-900 { color: var(--fap-text) !important; }
+.text-muted, .text-slate-500, .text-slate-400 { color: var(--fap-muted) !important; }
+.text-subtle { color: var(--fap-subtle) !important; }
+
+/* Semantic colors are centralized too. */
+.text-up, .tone-up, .tone-up * { color: var(--fap-up) !important; }
+.text-down, .tone-down, .tone-down * { color: var(--fap-down) !important; }
+.tone-flat { color: var(--fap-muted) !important; }
+
+/* Blue controls: no neon #0a84ff blocks. */
+.bg-blue-500,
+.bg-accent,
+.bg-blue { background-color: var(--fap-blue) !important; }
+.text-blue,
+.text-accent { color: var(--fap-blue) !important; }
+.bg-blue\/10 { background-color: var(--fap-blue-soft) !important; }
+
+.home-hero-action,
+.home-status-pill {
+  background: var(--fap-blue-soft) !important;
+  border-color: var(--fap-blue-border) !important;
+  color: var(--fap-blue) !important;
+}
+
+/* Inner cards stay quieter than their parent. */
+.glass .bg-bg-elevated,
+.glass article .bg-bg-elevated,
+.home-primary-card .home-impact,
+.fund-card-v6 .bg-bg-elevated {
+  background: var(--fap-inner) !important;
+  border-color: var(--fap-border-soft) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.72) !important;
+}
+
+/* Portfolio remains the most information-dense screen. */
+.portfolio-shell { border-radius: 24px !important; }
+.fund-card-v6 { border-radius: 19px !important; }
+.fund-card-v6 .bg-blue-500,
+.portfolio-shell .bg-blue-500 {
+  background: var(--fap-blue) !important;
+  box-shadow: 0 7px 18px rgba(79,143,232,.18) !important;
+}
+
+/* Compact launcher, no giant tiles. */
+.launcher-card { min-height: 116px !important; border-radius: 19px !important; }
+.launcher-icon { width: 48px !important; height: 48px !important; border-radius: 16px !important; }
+.launcher-title { font-size: 12px !important; }
+.launcher-sub { font-size: 9px !important; }
+
+/* Compact header — preserve hierarchy without wasting the first screen. */
+.app-header-card { min-height: 104px !important; padding: 18px 16px !important; border-radius: 24px !important; }
+.app-header-title { font-size: 24px !important; }
+.app-header-meta { font-size: 13px !important; margin-top: 6px !important; }
+.app-refresh-button { width: 56px !important; height: 56px !important; }
+
+/* Compact section rhythm. */
+.home-block { margin-top: var(--fap-gap-section) !important; }
+.home-section-heading { margin-top: 8px !important; margin-bottom: 6px !important; }
+
+/* User preference: data first, glass second. */
+.fund-sector-card,
+.fund-sector-liquid { box-shadow: var(--fap-shadow-soft) !important; }
+
+@media (max-width: 430px) {
+  .app-main { padding-left: 12px !important; padding-right: 12px !important; }
+  .app-header { padding-left: 12px !important; padding-right: 12px !important; }
+  .home-primary-card { padding: 14px !important; }
+  .home-value { font-size: 30px !important; }
+  .launcher-grid { gap: 7px !important; }
+  .launcher-card { min-height: 104px !important; padding: 10px 5px !important; }
+  .launcher-icon { width: 44px !important; height: 44px !important; }
+  .fund-sector-card { border-radius: 16px !important; }
+}
+
+@media (max-width: 360px) {
+  .app-header-card { min-height: 96px !important; padding: 15px !important; }
+  .app-header-title { font-size: 22px !important; }
+  .app-refresh-button { width: 50px !important; height: 50px !important; }
+  .launcher-card { min-height: 96px !important; }
+}
