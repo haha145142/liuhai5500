@@ -8,6 +8,17 @@ function ema(series: number[], period: number): number | null {
   return e;
 }
 
+function pctChange(series: number[], lookback: number): number | null {
+  if (series.length <= lookback) return null;
+  const base = series[series.length - 1 - lookback];
+  const last = series[series.length - 1];
+  return base > 0 ? ((last - base) / base) * 100 : null;
+}
+
+function clamp(v: number, lo = 0, hi = 100) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
 export function calcIndicators(c: number[]): FundMetrics | null {
   if (c.length < 35) return null;
   const last = c[c.length - 1];
@@ -39,6 +50,7 @@ export function calcIndicators(c: number[]): FundMetrics | null {
   }
   const dea = ema(signalSeries, 9) || 0;
   const macd = (dif - dea) * 2;
+
   let bandScore = 50;
   if (rsi < 30) bandScore += 18;
   if (rsi > 70) bandScore -= 18;
@@ -49,24 +61,35 @@ export function calcIndicators(c: number[]): FundMetrics | null {
   if (macd > 0 && dif > dea) bandScore += 5;
   if (macd < 0 && dif < dea) bandScore -= 5;
   bandScore = Math.max(0, Math.min(100, Math.round(bandScore)));
+
   let band = "震荡";
   let bandTone: FundMetrics["bandTone"] = "neutral";
   if (bandScore >= 70) { band = "低位区"; bandTone = "low"; }
   else if (bandScore >= 55) { band = "偏低"; bandTone = "low"; }
   else if (bandScore <= 30) { band = "高位区"; bandTone = "high"; }
   else if (bandScore <= 45) { band = "偏高"; bandTone = "high"; }
-  let trendScore = 50;
-  if (ma5 && ma20) trendScore += ((ma5 - ma20) / ma20) * 450;
-  trendScore += dif > 0 ? 15 : -15;
-  if (ma20 && ma60 != null) trendScore += ma20 > ma60 ? 10 : -10;
-  trendScore += macd > 0 ? 8 : -8;
-  trendScore = Math.max(0, Math.min(100, Math.round(trendScore)));
+
+  // Multi-horizon trend model:
+  // short/medium/long return, MA alignment and slope all contribute.
+  // Unlike the former score, no single MACD/MA crossover can dominate the signal.
+  const r5 = pctChange(c, 5) ?? 0;
+  const r20 = pctChange(c, 20) ?? 0;
+  const r60 = pctChange(c, 60) ?? r20;
+  const maGapShort = ma5 != null && ma20 != null && ma20 > 0 ? ((ma5 - ma20) / ma20) * 100 : 0;
+  const maGapLong = ma20 != null && ma60 != null && ma60 > 0 ? ((ma20 - ma60) / ma60) * 100 : 0;
+  const momentumScore = clamp(50 + r5 * 3 + r20 * 1.5 + r60 * 0.75, 0, 100);
+  const alignmentScore = clamp(50 + maGapShort * 5 + maGapLong * 3, 0, 100);
+  const positionScore = clamp(50 + bias * 2.2, 0, 100);
+  const macdScore = clamp(50 + (dif > dea ? 8 : -8) + (macd > 0 ? 5 : -5), 0, 100);
+  const trendScore = Math.round(momentumScore * 0.40 + alignmentScore * 0.30 + positionScore * 0.20 + macdScore * 0.10);
+
   let trend: string;
   if (trendScore >= 75) trend = "强势";
   else if (trendScore >= 60) trend = "偏强";
   else if (trendScore >= 40) trend = "震荡";
   else if (trendScore >= 25) trend = "偏弱";
   else trend = "弱势";
+
   let combo = "震荡观望";
   if (bandScore >= 55 && trendScore >= 60) combo = "超跌后的反转观察区";
   else if (bandScore >= 55 && trendScore < 40) combo = "下跌趋势中的超跌，不要盲目抄底";
@@ -74,15 +97,20 @@ export function calcIndicators(c: number[]): FundMetrics | null {
   else if (bandScore <= 45 && trendScore < 40) combo = "注意回撤压力";
   else if (trendScore >= 60) combo = "趋势等待确认";
   else if (trendScore < 40) combo = "观望";
+
   let conf: FundMetrics["conf"] = "中";
-  if (c.length >= 60 && Math.abs(bandScore - 50) > 20) conf = "高";
+  const horizons = [r5, r20, r60].filter((v) => Number.isFinite(v));
+  const directionAgreement = horizons.length >= 2 && horizons.every((v) => v >= 0) || horizons.length >= 2 && horizons.every((v) => v <= 0);
+  if (c.length >= 60 && Math.abs(trendScore - 50) > 22 && directionAgreement) conf = "高";
   if (c.length < 40) conf = "低";
+
   let sigStrength = 0;
   const sigConds: string[] = [];
   if (rsi < 30 || rsi > 70) { sigStrength += 25; sigConds.push("RSI极值"); }
-  if ((dif > dea && macd > 0) || (dif < dea && macd < 0)) { sigStrength += 25; sigConds.push("MACD趋势"); }
-  if (last <= lower || last >= upper) { sigStrength += 25; sigConds.push("BOLL轨道"); }
-  if (Math.abs(bias) >= 5) { sigStrength += 25; sigConds.push("BIAS偏离"); }
+  if (directionAgreement) { sigStrength += 25; sigConds.push("多周期同向"); }
+  if (last <= lower || last >= upper) { sigStrength += 25; sigConds.push("BOLL位置"); }
+  if (Math.abs(bias) >= 5) { sigStrength += 25; sigConds.push("MA偏离"); }
+
   return { last, ma5, ma10, ma20, ma60, rsi, bias, upper, lower, macd, dif, dea, band, bandTone, trend, bandScore, trendScore, combo, conf, sigStrength, sigConds };
 }
 
