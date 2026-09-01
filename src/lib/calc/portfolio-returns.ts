@@ -1,5 +1,5 @@
 import type { FundQuote, Holding } from "../types";
-import { isChinaTradingSession } from "../data/market-session";
+import { isChinaTradingSession } from "../data/market-session.ts";
 
 type ReturnQuote={price:number|null;mode:"live_estimate"|"official_today"|"latest_official"|"none"};
 export type HoldingReturn={costValue:number;marketValue:number|null;holdingPnl:number|null;holdingPnlPct:number|null;todayPnl:number|null;todayPnlPct:number|null;previousOfficialNav:number|null;price:number|null;quoteMode:ReturnQuote["mode"]};
