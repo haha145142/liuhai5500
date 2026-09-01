@@ -1,3 +1,4 @@
+import { createServerFn } from "@tanstack/react-start";
 import { fetchText, n, parseMaybeJsonp } from "./fetch-util";
 import { SECTOR_RULES, type SectorRule } from "./sectors";
 
@@ -74,16 +75,18 @@ function scoreFund(row: SectorFundRow, rule: SectorRule) {
   return { score, reason: hits.slice(0, 2).join(" · ") || rule.name };
 }
 
-export async function getSectorFunds(code: string): Promise<SectorFundRow[]> {
-  const rule = getRule(code);
-  if (!rule) return [];
-  const universe = await fetchFundUniverse();
-  return universe
-    .map((row) => {
-      const hit = scoreFund(row, rule);
-      return hit.score ? { ...row, matchScore: hit.score, matchReason: hit.reason } : null;
-    })
-    .filter((x): x is SectorFundRow => !!x)
-    .sort((a, b) => (b.matchScore - a.matchScore) || ((b.day ?? -999) - (a.day ?? -999)))
-    .slice(0, 40);
-}
+export const getSectorFunds = createServerFn({ method: "POST" })
+  .validator((input: { code: string }) => input)
+  .handler(async ({ data }): Promise<SectorFundRow[]> => {
+    const rule = getRule(String(data.code ?? "").trim());
+    if (!rule) return [];
+    const universe = await fetchFundUniverse();
+    return universe
+      .map((row) => {
+        const hit = scoreFund(row, rule);
+        return hit.score ? { ...row, matchScore: hit.score, matchReason: hit.reason } : null;
+      })
+      .filter((x): x is SectorFundRow => !!x)
+      .sort((a, b) => (b.matchScore - a.matchScore) || ((b.day ?? -999) - (a.day ?? -999)))
+      .slice(0, 40);
+  });
