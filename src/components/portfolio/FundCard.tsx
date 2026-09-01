@@ -3,25 +3,12 @@ import { Tone } from "@/components/ui/Glass";
 import { calcSixFactor } from "@/lib/calc/six-factor";
 import { calcSwingTrade } from "@/lib/calc/indicators";
 import { calcHoldingReturn } from "@/lib/calc/portfolio-returns";
+import { calcFundPeriodReturn, type FundPeriodId } from "@/lib/calc/portfolio-periods";
 import { matchFundSector } from "@/lib/data/sectors";
-import { fmtMoney, fmtPctShort, fmtPrice, cnTime } from "@/lib/format";
+import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
 import type { FundQuote, Holding, SectorQuote } from "@/lib/types";
 
-type Period = "week" | "month" | "quarter" | "half" | "year";
-function points(fund?: FundQuote) { return [...(fund?.historyPoints || [])].filter((p) => Number.isFinite(p.nav) && p.nav > 0 && p.date).sort((a, b) => a.date.localeCompare(b.date)); }
-function periodReturn(fund: FundQuote | undefined, period: Period, current: number | null, shares: number) {
-  if (!fund || current == null) return { amount: null as number | null, pct: null as number | null };
-  const list = points(fund); const days = period === "week" ? 5 : period === "month" ? 20 : period === "quarter" ? 60 : period === "half" ? 120 : 250;
-  if (list.length <= days) return { amount: null, pct: null };
-  const base = list[list.length - 1 - days]?.nav ?? null;
-  return base && base > 0 ? { amount: (current - base) * shares, pct: ((current - base) / base) * 100 } : { amount: null, pct: null };
-}
-function isOfficialToday(fund?: FundQuote) {
-  if (!fund?.navDate || fund.officialNavPublished !== true) return false;
-  const now = cnTime();
-  const [y, m, d] = fund.navDate.split(/[-/]/).map(Number);
-  return y === now.getUTCFullYear() && m === now.getUTCMonth() + 1 && d === now.getUTCDate();
-}
+type Period = FundPeriodId;
 
 export function FundCard({ holding, fund, sector, benchPct, totalMarketValue, onRemove, onUpdate }: { holding: Holding; fund?: FundQuote; sector?: SectorQuote; benchPct: number | null; totalMarketValue: number; onRemove: () => void; onUpdate: (patch: Partial<Holding>) => void }) {
   const [period, setPeriod] = useState<Period>("week");
@@ -31,23 +18,24 @@ export function FundCard({ holding, fund, sector, benchPct, totalMarketValue, on
   const [shares, setShares] = useState(String(holding.shares));
   const [cost, setCost] = useState(String(holding.cost));
   const name = fund?.name || holding.name || holding.code;
-  const officialToday = isOfficialToday(fund);
   const ret = calcHoldingReturn(holding, fund);
   const useEstimate = ret.quoteMode === "live_estimate";
   const hasReliableQuote = ret.marketValue != null;
   const px = ret.price;
   const displayPct = ret.todayPnlPct;
-  const mapped = matchFundSector(name); const six = sector && sector.available ? calcSixFactor(sector, benchPct) : null;
+  const mapped = matchFundSector(name);
+  const six = sector && sector.available ? calcSixFactor(sector, benchPct) : null;
   const swing = calcSwingTrade(fund?.metrics ?? null, holding.cost, px || 0);
-  const selected = useMemo(() => periodReturn(fund, period, px, holding.shares), [fund, period, px, holding.shares]);
+  const selected = useMemo(() => calcFundPeriodReturn(period, holding, fund), [fund, holding, period]);
   const selectedLabel = period === "week" ? "近1周收益" : period === "month" ? "近1月收益" : period === "quarter" ? "近3月收益" : period === "half" ? "近6月收益" : "近1年收益";
   const holdingPct = ret.marketValue != null && totalMarketValue > 0 ? (ret.marketValue / totalMarketValue) * 100 : null;
-  const score = fund?.metrics?.trendScore ?? null; const trend = fund?.metrics?.trend ?? "—";
+  const score = fund?.metrics?.trendScore ?? null;
+  const trend = fund?.metrics?.trend ?? "—";
   const quoteDate = useEstimate ? (fund?.estimateTime || "") : (fund?.navDate || "");
-  const statusText = officialToday
-    ? `今日官方净值 · ${quoteDate || "已发布"}`
-    : useEstimate
-      ? `盘中实时估值 · ${quoteDate || "当前"}`
+  const statusText = useEstimate
+    ? `盘中实时估值 · ${quoteDate || "当前"}`
+    : fund?.officialNavPublished === true && fund.valuationStatus === "official_nav"
+      ? `今日官方净值 · ${quoteDate || "已发布"}`
       : fund?.nav != null
         ? `最近官方净值 · ${quoteDate || "未知日期"}`
         : "暂无可靠净值";
@@ -64,7 +52,7 @@ export function FundCard({ holding, fund, sector, benchPct, totalMarketValue, on
           </div>
           <div className="shrink-0 text-right">
             <Tone v={displayPct} className="text-[24px] font-bold leading-none">{displayPct == null ? "—" : fmtPctShort(displayPct)}</Tone>
-            <div className="mt-1 text-[9px] text-muted">{officialToday ? "官方" : useEstimate ? "盘中" : hasReliableQuote ? "参考净值" : "行情待更新"}</div>
+            <div className="mt-1 text-[9px] text-muted">{useEstimate ? "盘中" : fund?.officialNavPublished === true && fund?.valuationStatus === "official_nav" ? "官方" : hasReliableQuote ? "参考净值" : "行情待更新"}</div>
           </div>
         </div>
         <div className="mt-2 flex items-center gap-2">
