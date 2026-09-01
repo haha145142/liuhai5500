@@ -141,7 +141,10 @@ async function enrichValuationTrust(rows: SectorFundRow[]) {
     const trust = trustFromQuote(result.value as TrustQuote);
     if (trust) byCode.set(targets[index].code, trust);
   });
-  return rows.map((row) => { const valuationTrust = byCode.get(row.code); return valuationTrust ? { ...row, valuationTrust } : row; });
+  return rows.map((row) => {
+    const valuationTrust = byCode.get(row.code);
+    return valuationTrust ? { ...row, valuationTrust, matchReason: `${row.matchReason} · 估值可信度 ${valuationTrust.score}/100·${valuationTrust.label}` } : row;
+  });
 }
 
 async function fallbackRepresentativeFund(rule: SectorRule): Promise<SectorFundRow[]> {
