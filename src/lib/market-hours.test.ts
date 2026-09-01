@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getMarketPhase } from "./market-hours";
+import { getMarketPhase } from "./market-hours.ts";
 
 function cst(s: string) { return new Date(`${s}+08:00`); }
 
