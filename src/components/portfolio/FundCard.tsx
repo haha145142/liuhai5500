@@ -5,7 +5,6 @@ import { calcSwingTrade } from "@/lib/calc/indicators";
 import { calcHoldingReturn } from "@/lib/calc/portfolio-returns";
 import { matchFundSector } from "@/lib/data/sectors";
 import { fmtMoney, fmtPctShort, fmtPrice, cnTime } from "@/lib/format";
-import { isTradeTime } from "@/lib/market-hours";
 import type { FundQuote, Holding, SectorQuote } from "@/lib/types";
 
 type Period = "week" | "month" | "quarter" | "half" | "year";
@@ -32,13 +31,12 @@ export function FundCard({ holding, fund, sector, benchPct, totalMarketValue, on
   const [shares, setShares] = useState(String(holding.shares));
   const [cost, setCost] = useState(String(holding.cost));
   const name = fund?.name || holding.name || holding.code;
-  const live = isTradeTime();
   const officialToday = isOfficialToday(fund);
-  const useEstimate = !officialToday && live && fund?.estimate != null && fund?.valuationStatus === "estimate";
-  const hasReliableQuote = officialToday || useEstimate || (fund?.nav != null && fund?.navDate != null);
-  const px = useEstimate ? fund.estimate! : (fund?.nav ?? null);
-  const day = useEstimate ? (fund?.estimatePct ?? null) : (officialToday ? (fund?.dayPct ?? null) : null);
   const ret = calcHoldingReturn(holding, fund);
+  const useEstimate = ret.quoteMode === "live_estimate";
+  const hasReliableQuote = ret.marketValue != null;
+  const px = ret.price;
+  const displayPct = ret.todayPnlPct;
   const mapped = matchFundSector(name); const six = sector && sector.available ? calcSixFactor(sector, benchPct) : null;
   const swing = calcSwingTrade(fund?.metrics ?? null, holding.cost, px || 0);
   const selected = useMemo(() => periodReturn(fund, period, px, holding.shares), [fund, period, px, holding.shares]);
@@ -53,7 +51,6 @@ export function FundCard({ holding, fund, sector, benchPct, totalMarketValue, on
       : fund?.nav != null
         ? `最近官方净值 · ${quoteDate || "未知日期"}`
         : "暂无可靠净值";
-  const displayPct = hasReliableQuote ? day : null;
   const saveEdit = () => { const s = Number(shares); const c = Number(cost); if (s > 0 && c > 0) { onUpdate({ shares: s, cost: c }); setEditing(false); } };
   const toggleExpand = () => { setExpanded((v) => !v); setWhyOpen(false); };
 
@@ -67,7 +64,7 @@ export function FundCard({ holding, fund, sector, benchPct, totalMarketValue, on
           </div>
           <div className="shrink-0 text-right">
             <Tone v={displayPct} className="text-[24px] font-bold leading-none">{displayPct == null ? "—" : fmtPctShort(displayPct)}</Tone>
-            <div className="mt-1 text-[9px] text-muted">{officialToday ? "官方" : useEstimate ? "盘中" : "行情待更新"}</div>
+            <div className="mt-1 text-[9px] text-muted">{officialToday ? "官方" : useEstimate ? "盘中" : hasReliableQuote ? "参考净值" : "行情待更新"}</div>
           </div>
         </div>
         <div className="mt-2 flex items-center gap-2">
