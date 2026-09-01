@@ -115,8 +115,8 @@ export function quoteFromFundState(input: {
     };
   }
 
-  // During an open trading session, stale NAV is not a current quote.
-  // Never let the holding-entry preview silently fall back to yesterday's NAV.
+  // During trading hours, never present a stale official NAV as the current quote.
+  // An estimate is the only acceptable live quote; otherwise keep the quote empty.
   if (input.tradeTime) {
     return { price: null, pct: null, label: "暂无可靠行情", mode: "none" };
   }
