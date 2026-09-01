@@ -10,6 +10,7 @@ const fund = {
   dayPct: 0.8,
   estimate: null,
   estimatePct: null,
+  officialNavPublished: false,
 } as any;
 
 test("trading mode never falls back to stale NAV", () => {
@@ -33,6 +34,19 @@ test("closed mode labels stale NAV as latest available data", () => {
   );
 
   assert.equal(result.marketLabel, "最近可用数据");
+  assert.equal(result.price, 1.2);
+  assert.equal(result.marketValue, 1200);
+  assert.equal(result.pnl, 100);
+});
+
+test("closed mode labels explicitly published official NAV", () => {
+  const result = resolveHoldingEntryPreview(
+    { code: "000001", shares: 1000, cost: 1.1 },
+    { "000001": { ...fund, navDate: "2026-09-01", officialNavPublished: true } },
+    false,
+  );
+
+  assert.equal(result.marketLabel, "今日官方净值");
   assert.equal(result.price, 1.2);
   assert.equal(result.marketValue, 1200);
   assert.equal(result.pnl, 100);
