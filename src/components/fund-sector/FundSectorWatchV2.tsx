@@ -7,10 +7,13 @@ import { fmtPctShort, fmtPrice } from "@/lib/format";
 
 type Selection = { code: string; name: string; icon: string };
 type State = { items: Selection[] };
+type FundFilter = "all" | "active" | "etf";
+type FundSort = "day" | "month" | "drawdown";
 
 const KEY = "fund_ai_pro_board_watch_v8";
 const PREVIOUS_KEY = "fund_ai_pro_board_watch_v7";
 const LEGACY_KEY = "fund_ai_pro_board_watch_v6";
+const CANDIDATE_KEY = "fund_ai_pro_fund_candidates_v1";
 const LEGACY_DEFAULT_CODES = new Set(["BK0917", "BK1134", "BK1128", "BK1137", "BK1059", "BK1650", "BK1129", "BK0890"]);
 
 function normalizeItems(value: unknown): Selection[] {
@@ -43,6 +46,16 @@ function readState(): State {
     }
   } catch {}
   return { items: [] };
+}
+
+function readCandidates(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = JSON.parse(localStorage.getItem(CANDIDATE_KEY) || "[]");
+    return new Set(Array.isArray(raw) ? raw.map((x) => String(x?.code ?? "")).filter(Boolean) : []);
+  } catch {
+    return new Set();
+  }
 }
 
 function tone(v: number | null) {
@@ -110,7 +123,20 @@ function fetchBoardQuotesJsonp(codes: string[]): Promise<BoardWatchQuote[]> {
   });
 }
 
-function FundRow({ row, index }: { row: SectorFundRow; index: number }) {
+function fundKind(row: SectorFundRow): "etf" | "active" {
+  const hay = `${row.type} ${row.name}`.toLowerCase();
+  return /(etf|交易型开放式|指数)/i.test(hay) ? "etf" : "active";
+}
+
+function sortFunds(rows: SectorFundRow[], sort: FundSort): SectorFundRow[] {
+  return [...rows].sort((a, b) => {
+    if (sort === "month") return (b.month ?? -Infinity) - (a.month ?? -Infinity);
+    if (sort === "drawdown") return 0;
+    return (b.day ?? -Infinity) - (a.day ?? -Infinity);
+  });
+}
+
+function FundRow({ row, index, candidate, onToggleCandidate }: { row: SectorFundRow; index: number; candidate: boolean; onToggleCandidate: (row: SectorFundRow) => void }) {
   return <div className="rounded-[15px] bg-white/72 px-3 py-2.5 ring-1 ring-white/70">
     <div className="flex items-center gap-2.5">
       <div className="w-5 shrink-0 text-center text-[10px] font-semibold text-slate-400">{index + 1}</div>
@@ -127,6 +153,9 @@ function FundRow({ row, index }: { row: SectorFundRow; index: number }) {
       <Period label="6月" value={row.sixMonth} />
       <Period label="1年" value={row.oneYear} />
     </div>
+    <button type="button" onClick={() => onToggleCandidate(row)} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-[11px] bg-blue/8 px-2 py-1.5 text-[9px] font-medium text-blue ring-1 ring-blue/10">
+      {candidate ? <Check size={12} /> : <Plus size={12} />}{candidate ? "已加入候选" : "加入候选"}
+    </button>
   </div>;
 }
 
@@ -146,11 +175,15 @@ export function FundSectorWatchV2() {
   const [loading, setLoading] = useState(false);
   const [openCode, setOpenCode] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [fundSort, setFundSort] = useState<FundSort>("day");
+  const [fundFilter, setFundFilter] = useState<FundFilter>("all");
+  const [candidateCodes, setCandidateCodes] = useState<Set<string>>(readCandidates);
   const codeList = useMemo(() => items.map((x) => x.code), [items]);
   const quoteMap = useMemo(() => new Map(quotes.map((q) => [q.code, q])), [quotes]);
   const searchQuery = query.trim();
 
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify({ items })); } catch {} }, [items]);
+  useEffect(() => { try { localStorage.setItem(CANDIDATE_KEY, JSON.stringify([...candidateCodes].map((code) => ({ code })))); } catch {} }, [candidateCodes]);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -206,6 +239,14 @@ export function FundSectorWatchV2() {
     }
   };
 
+  const toggleCandidate = (row: SectorFundRow) => {
+    setCandidateCodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(row.code)) next.delete(row.code); else next.add(row.code);
+      return next;
+    });
+  };
+
   const add = (item: BoardCandidate) => {
     setState((prev) => ({ items: [...prev.items, { code: item.code, name: item.name, icon: item.icon }] }));
     setSearchOpen(false); setQuery(""); setSuggestions([]); setOpenCode(item.code); setMessage("");
@@ -228,7 +269,7 @@ export function FundSectorWatchV2() {
 
     {!items.length && !searchOpen ? <div className="mt-3 rounded-[18px] border border-dashed border-slate-200 bg-white/38 px-4 py-5 text-center"><div className="text-[11px] font-medium text-slate-600">还没有关注板块</div><div className="mt-1 text-[9px] text-slate-400">点右上角“＋”，添加你想观察的行业或概念。</div></div> : null}
 
-    {items.length ? <div className="mt-3 space-y-2">{items.map((item) => { const q = quoteMap.get(item.code); const funds = sectorFunds[item.code] || []; const isOpen = openCode === item.code; return <div key={item.code} className="overflow-hidden rounded-[20px] border border-white/80 bg-white/50 ring-1 ring-white/55"><div className="flex items-center gap-2.5 px-3 py-3"><button type="button" onClick={() => toggle(item.code)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left"><span className="flex size-9 shrink-0 items-center justify-center rounded-[14px] bg-white/78 text-base shadow-sm">{item.icon}</span><span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-slate-900">{item.name}</span><span className="mt-0.5 block truncate text-[8px] text-slate-400">{q?.marketDate || "行情日期加载中"} · {q?.source || "等待板块行情"}</span></span><span className={`shrink-0 text-[14px] font-bold tabular-nums ${tone(q?.pct ?? null)}`}>{fmtPctShort(q?.pct ?? null)}</span><ChevronRight className={`size-4 shrink-0 text-slate-300 transition ${isOpen ? "rotate-90" : ""}`} /></button><button type="button" onClick={() => remove(item.code)} className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/72 text-slate-300" aria-label={`删除${item.name}`}><X size={14} /></button></div>{isOpen ? <div className="border-t border-white/75 px-3 pb-3 pt-2.5"><div className="mb-2 flex items-center justify-between"><div><div className="text-[10px] font-semibold text-slate-700">{item.name} · 相关基金</div><div className="text-[8px] text-slate-400">不是你的持仓，是该板块的市场基金池</div></div>{sectorLoading[item.code] ? <Loader2 className="size-4 animate-spin text-slate-400" /> : <Check className="size-4 text-slate-400" />}</div>{funds.length ? <div className="space-y-1.5">{funds.map((row,index) => <FundRow key={row.code} row={row} index={index} />)}</div> : sectorLoading[item.code] ? <div className="rounded-xl bg-white/55 px-3 py-4 text-center text-[9px] text-slate-400">正在读取该板块基金池…</div> : <div className="rounded-xl bg-white/55 px-3 py-4 text-center text-[9px] text-slate-400">暂时没有可靠的相关基金数据，不填充虚假数据。</div>}<div className="mt-2 flex items-center justify-between text-[8px] text-slate-400"><span>{funds.length ? `共 ${funds.length} 只相关基金` : "等待数据源"}</span><span>{q ? `主力 ${formatFlow(q.mainFlow)}` : ""}</span></div></div> : null}</div>; })}</div> : null}
+    {items.length ? <div className="mt-3 space-y-2">{items.map((item) => { const q = quoteMap.get(item.code); const rawFunds = sectorFunds[item.code] || []; const isOpen = openCode === item.code; const filteredFunds = fundFilter === "all" ? rawFunds : rawFunds.filter((row) => fundKind(row) === fundFilter); const funds = sortFunds(filteredFunds, fundSort); return <div key={item.code} className="overflow-hidden rounded-[20px] border border-white/80 bg-white/50 ring-1 ring-white/55"><div className="flex items-center gap-2.5 px-3 py-3"><button type="button" onClick={() => toggle(item.code)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left"><span className="flex size-9 shrink-0 items-center justify-center rounded-[14px] bg-white/78 text-base shadow-sm">{item.icon}</span><span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-slate-900">{item.name}</span><span className="mt-0.5 block truncate text-[8px] text-slate-400">{q?.marketDate || "行情日期加载中"} · {q?.source || "等待板块行情"}</span></span><span className={`shrink-0 text-[14px] font-bold tabular-nums ${tone(q?.pct ?? null)}`}>{fmtPctShort(q?.pct ?? null)}</span><ChevronRight className={`size-4 shrink-0 text-slate-300 transition ${isOpen ? "rotate-90" : ""}`} /></button><button type="button" onClick={() => remove(item.code)} className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/72 text-slate-300" aria-label={`删除${item.name}`}><X size={14} /></button></div>{isOpen ? <div className="border-t border-white/75 px-3 pb-3 pt-2.5"><div className="mb-2 flex items-center justify-between"><div><div className="text-[10px] font-semibold text-slate-700">{item.name} · 相关基金</div><div className="text-[8px] text-slate-400">不是你的持仓，是该板块的市场基金池</div></div>{sectorLoading[item.code] ? <Loader2 className="size-4 animate-spin text-slate-400" /> : <Check className="size-4 text-slate-400" />}</div><div className="mb-2 flex items-center justify-between gap-2"><div className="flex min-w-0 items-center gap-1 overflow-x-auto"><button type="button" onClick={() => setFundSort("day")} className={`shrink-0 rounded-full px-2 py-1 text-[8px] ${fundSort === "day" ? "bg-slate-900 text-white" : "bg-white/70 text-slate-500"}`}>今日</button><button type="button" onClick={() => setFundSort("month")} className={`shrink-0 rounded-full px-2 py-1 text-[8px] ${fundSort === "month" ? "bg-slate-900 text-white" : "bg-white/70 text-slate-500"}`}>近一月</button><button type="button" onClick={() => setFundSort("drawdown")} className={`shrink-0 rounded-full px-2 py-1 text-[8px] ${fundSort === "drawdown" ? "bg-slate-900 text-white" : "bg-white/70 text-slate-500"}`}>回撤</button></div><div className="flex shrink-0 items-center gap-1"><button type="button" onClick={() => setFundFilter("all")} className={`rounded-full px-2 py-1 text-[8px] ${fundFilter === "all" ? "bg-blue/12 text-blue" : "bg-white/70 text-slate-500"}`}>全部</button><button type="button" onClick={() => setFundFilter("active")} className={`rounded-full px-2 py-1 text-[8px] ${fundFilter === "active" ? "bg-blue/12 text-blue" : "bg-white/70 text-slate-500"}`}>主动基金</button><button type="button" onClick={() => setFundFilter("etf")} className={`rounded-full px-2 py-1 text-[8px] ${fundFilter === "etf" ? "bg-blue/12 text-blue" : "bg-white/70 text-slate-500"}`}>ETF</button></div></div>{fundSort === "drawdown" ? <div className="mb-2 rounded-xl bg-white/55 px-3 py-2 text-[8px] text-slate-400">当前基金池数据源暂未提供可靠最大回撤字段，因此不使用伪造的回撤数值；该排序保留入口，待接入可靠历史净值后启用。</div> : null}{funds.length ? <div className="space-y-1.5">{funds.map((row,index) => <FundRow key={row.code} row={row} index={index} candidate={candidateCodes.has(row.code)} onToggleCandidate={toggleCandidate} />)}</div> : sectorLoading[item.code] ? <div className="rounded-xl bg-white/55 px-3 py-4 text-center text-[9px] text-slate-400">正在读取该板块基金池…</div> : <div className="rounded-xl bg-white/55 px-3 py-4 text-center text-[9px] text-slate-400">暂时没有可靠的相关基金数据，不填充虚假数据。</div>}<div className="mt-2 flex items-center justify-between text-[8px] text-slate-400"><span>{funds.length ? `共 ${funds.length} 只相关基金` : "等待数据源"}</span><span>{q ? `主力 ${formatFlow(q.mainFlow)}` : ""}</span></div></div> : null}</div>; })}</div> : null}
 
     {message ? <div className="mt-2 px-1 text-[8px] text-slate-400">{message}</div> : null}
   </section>;
