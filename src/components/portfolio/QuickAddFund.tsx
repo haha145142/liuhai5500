@@ -21,7 +21,6 @@ export function QuickAddFund() {
 
   const cached = /^\d{6}$/.test(code) ? funds[code] : undefined;
   const quote = remoteQuote?.code === code ? remoteQuote : cached;
-  const canSave = /^\d{6}$/.test(code) && Number(shares) > 0 && Number(cost) > 0;
 
   useEffect(() => {
     if (!/^\d{6}$/.test(code)) {
@@ -65,7 +64,7 @@ export function QuickAddFund() {
         <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="基金代码（如 008888）" aria-label="基金代码" />
         <input value={shares} onChange={(e) => setShares(e.target.value)} inputMode="decimal" placeholder="持有份额" aria-label="持有份额" />
         <input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" placeholder="成本价" aria-label="成本价" />
-        <button type="button" onClick={save} disabled={!canSave}><Plus size={16} />添加</button>
+        <button type="button" onClick={save}><Plus size={16} />添加</button>
       </div>
       {(message || quote?.name || loading) ? <div className={`quick-add-status ${message === "已添加" ? "ok" : ""}`}>{message || (quote?.name ? `${quote.name}${loading ? " · 正在更新" : ""}` : "正在读取基金数据…")}</div> : null}
     </div>
