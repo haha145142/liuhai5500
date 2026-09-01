@@ -1,4 +1,5 @@
 import { fetchText, n, parseMaybeJsonp } from "./fetch-util";
+import { isChinaTradingSession } from "./market-session";
 
 export type LiveFundQuote = {
   code: string;
@@ -107,7 +108,9 @@ export async function getLiveFundQuote(code: string): Promise<LiveFundQuote | nu
   const valid = rest.filter((x): x is LiveFundQuote => !!x && (x.estimate != null || x.pct != null));
   if (!valid.length) return null;
 
-  const fresh = valid.filter((x) => isIntradayTimestamp(x.time, today));
+  const fresh = valid.filter((x) => isIntradayTimestamp(x.time, today) || isIntradayTimestamp(x.date, today));
+  const inSession = isChinaTradingSession();
+  if (inSession && !fresh.length) return null;
   const pool = fresh.length ? fresh : valid;
   const complete = pool.filter((x) => x.estimate != null && x.pct != null);
   if (!complete.length) {
