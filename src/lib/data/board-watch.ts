@@ -11,7 +11,8 @@ export type BoardWatchQuote = {
 };
 
 const UT = "fa5fd1943c7b386f172d6893dbfba10b";
-const FIELDS = "f12,f14,f3,f62,f66,f69,f72,f75,f6";
+// Eastmoney clist money fields: f62 main, f66 super-large, f72 large, f78 medium, f84 small.
+const FIELDS = "f12,f14,f3,f62,f66,f72,f78,f84,f6";
 const LIMIT = 1200;
 const KNOWN = new Map(SECTOR_RULES.map((s) => [s.bkCode, s]));
 
@@ -43,9 +44,9 @@ function iconFor(name: string) {
 }
 function typeFor(code: string): BoardCandidate["type"] { return KNOWN.has(code) ? KNOWN.get(code)!.prefer : "industry"; }
 function score(name: string, q: string) {
-  const n = name.toLowerCase(); const x = q.toLowerCase().trim();
-  if (!x) return 0; if (n === x) return 100; if (n.startsWith(x)) return 90; if (n.includes(x)) return 70;
-  const rule = SECTOR_RULES.find((s) => s.searchKeys.some((k) => k.toLowerCase() === x || k.toLowerCase().includes(x)));
+  const lowerName = name.toLowerCase(); const lowerQuery = q.toLowerCase().trim();
+  if (!lowerQuery) return 0; if (lowerName === lowerQuery) return 100; if (lowerName.startsWith(lowerQuery)) return 90; if (lowerName.includes(lowerQuery)) return 70;
+  const rule = SECTOR_RULES.find((s) => s.searchKeys.some((k) => k.toLowerCase() === lowerQuery || k.toLowerCase().includes(lowerQuery)));
   return rule && (name.includes(rule.name) || rule.searchKeys.some((k) => name.includes(k))) ? 60 : 0;
 }
 
@@ -69,7 +70,21 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
   const result = codes.map((code): BoardWatchQuote => {
     const row = byCode.get(code); const pct = row ? n(row.f3) : null;
     if (!row) return { code, name: code, icon: "📈", pct: null, mainFlow: null, superFlow: null, largeFlow: null, midFlow: null, smallFlow: null, turnover: null, marketDate: date, source: "当前暂无可靠板块行情", validation: "unavailable" };
-    return { code, name: rowName(row) || code, icon: iconFor(rowName(row)), pct, mainFlow: n(row.f62), superFlow: n(row.f66), largeFlow: n(row.f69), midFlow: n(row.f72), smallFlow: n(row.f75), turnover: n(row.f6), marketDate: date, source: "东方财富实时板块行情", validation: pct != null ? "live" : "unavailable" };
+    return {
+      code,
+      name: rowName(row) || code,
+      icon: iconFor(rowName(row)),
+      pct,
+      mainFlow: n(row.f62),
+      superFlow: n(row.f66),
+      largeFlow: n(row.f72),
+      midFlow: n(row.f78),
+      smallFlow: n(row.f84),
+      turnover: n(row.f6),
+      marketDate: date,
+      source: "东方财富实时板块行情",
+      validation: pct != null ? "live" : "unavailable",
+    };
   });
   return { rows: result, fetchedAt: Date.now(), weekend: closed };
 });
