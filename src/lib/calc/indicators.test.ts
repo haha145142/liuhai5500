@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calcIndicators, calcSwingTrade } from "./indicators";
+import { calcIndicators, calcSwingTrade } from "./indicators.ts";
 
 function series(n: number, step: number, wobble = 0.12) {
   return Array.from({ length: n }, (_, i) => 1 + i * step + Math.sin(i / 3) * wobble);
