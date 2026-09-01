@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { valuationDisplay } from "./valuation-status";
+import { valuationDisplay } from "./valuation-status.ts";
 
 test("official NAV wins once published", () => {
   const r = valuationDisplay({ officialNavPublished: true, estimatePct: 1.4, coveragePct: 90, validation: "一致", hasNav: true });
