@@ -23,6 +23,15 @@ function finitePositive(value: number | null | undefined) {
 
 function selectReturnQuote(fund: FundQuote | undefined): ReturnQuote {
   if (!fund) return { price: null, mode: "none" };
+
+  // After today's official NAV is published, it is authoritative. Do not let
+  // an older intraday estimate from a cache override it.
+  const officialToday =
+    finitePositive(fund.nav) != null &&
+    fund.officialNavPublished === true &&
+    fund.valuationStatus === "official_nav";
+  if (officialToday) return { price: finitePositive(fund.nav), mode: "official_today" };
+
   const estimateIsCurrent =
     fund.estimate != null &&
     (fund.valuationStatus === "estimate" || fund.valuationStatus === "live_estimate") &&
@@ -31,23 +40,10 @@ function selectReturnQuote(fund: FundQuote | undefined): ReturnQuote {
   if (estimate != null) return { price: estimate, mode: "live_estimate" };
 
   const nav = finitePositive(fund.nav);
-  if (nav != null) {
-    return {
-      price: nav,
-      mode: fund.officialNavPublished === true && fund.valuationStatus === "official_nav"
-        ? "official_today"
-        : "latest_official",
-    };
-  }
+  if (nav != null) return { price: nav, mode: "latest_official" };
   return { price: null, mode: "none" };
 }
 
-/**
- * Return the latest official NAV that precedes the current intraday quote.
- * During the session, `fund.nav` is the latest published official NAV and is
- * therefore the correct previous-day baseline. The historical array is only
- * used as a fallback when that NAV is unavailable.
- */
 function previousOfficialNav(fund: FundQuote | undefined, currentPrice: number | null) {
   if (!fund || currentPrice == null) return null;
   const latestNav = finitePositive(fund.nav);
@@ -65,9 +61,6 @@ function previousOfficialNav(fund: FundQuote | undefined, currentPrice: number |
   return latest;
 }
 
-/**
- * Single-source return calculation used by fund cards and portfolio summaries.
- */
 export function calcHoldingReturn(holding: Holding, fund?: FundQuote): HoldingReturn {
   const shares = Number(holding.shares);
   const cost = Number(holding.cost);
@@ -86,17 +79,7 @@ export function calcHoldingReturn(holding: Holding, fund?: FundQuote): HoldingRe
   const todayPnl = canCalculateToday ? (quote.price! - previousNav!) * safeShares : null;
   const todayPnlPct = canCalculateToday && previousNav! > 0 ? ((quote.price! - previousNav!) / previousNav!) * 100 : null;
 
-  return {
-    costValue,
-    marketValue,
-    holdingPnl,
-    holdingPnlPct,
-    todayPnl,
-    todayPnlPct,
-    previousOfficialNav: previousNav,
-    price: quote.price,
-    quoteMode: quote.mode,
-  };
+  return { costValue, marketValue, holdingPnl, holdingPnlPct, todayPnl, todayPnlPct, previousOfficialNav: previousNav, price: quote.price, quoteMode: quote.mode };
 }
 
 export function calcPortfolioReturn(holdings: Holding[], funds: Record<string, FundQuote>): {
