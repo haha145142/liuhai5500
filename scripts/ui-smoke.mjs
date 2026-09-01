@@ -35,6 +35,13 @@ async function waitForText(page, text, label, timeout = 15_000) {
   });
 }
 
+async function waitForHydration(page, label) {
+  await page.waitForFunction(() => document.readyState === "complete", null, { timeout: 10_000 }).catch(() => {
+    throw new Error(`${label}: document did not reach complete state`);
+  });
+  await page.waitForTimeout(700);
+}
+
 try {
   await waitForServer();
   const browser = await chromium.launch({ headless: true });
@@ -53,12 +60,13 @@ try {
         cost: 1,
       }));
       localStorage.setItem("fund_ai_pro_portfolio_v3", JSON.stringify(holdings));
-      localStorage.setItem("fund_ai_pro_board_watch_v7", JSON.stringify({ items: [] }));
+      localStorage.removeItem("fund_ai_pro_board_watch_v7");
       localStorage.setItem("fund_ai_pro_board_watch_v6", JSON.stringify({ items: [] }));
     });
 
     await page.goto(`${baseURL}/`, { waitUntil: "domcontentloaded" });
     await waitForText(page, "我的组合", `${viewport.label} homepage`);
+    await waitForHydration(page, `${viewport.label} homepage`);
     if ((await page.locator("body").innerText()).trim().length < 80) throw new Error(`${viewport.label}: homepage rendered blank/minimal content`);
     await assertNoHorizontalOverflow(page, `${viewport.label} homepage`);
 
@@ -73,6 +81,7 @@ try {
 
     await page.goto(`${baseURL}/portfolio`, { waitUntil: "domcontentloaded" });
     await waitForText(page, "我的持仓", `${viewport.label} portfolio`);
+    await waitForHydration(page, `${viewport.label} portfolio`);
     await waitForText(page, "000020", `${viewport.label} 20-holding render`, 15_000);
     const bodyText = await page.locator("body").innerText();
     if (!bodyText.includes("20只")) throw new Error(`${viewport.label}: 20-holding portfolio summary missing after holdings rendered`);
