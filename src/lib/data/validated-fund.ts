@@ -2,67 +2,46 @@ import { createServerFn } from "@tanstack/react-start";
 import { getCalculatedFund } from "./live-valuation-v2";
 import { getMultiSourceQuote, type MultiSourceQuote } from "./multi-source-quotes";
 import { tradingDateLabel } from "./trading-day";
-import { getMarketPhase } from "../market-hours";
 import type { FundQuote } from "../types";
 
 type LiveHolding = { code: string; name: string; weight: number; price?: number | null; pct?: number | null; source?: string; quoteStatus?: string };
 type AuditStats = { three:number; two:number; single:number; disputed:number; unavailable:number; usableWeight:number; weightedHealth:number; weightedAgreement:number };
+
+const LINKED_ETF_MAP: Record<string, { etf: string; name: string }> = {
+  "008888": { etf: "159995", name: "华夏国证半导体芯片ETF" },
+};
+
 function canUse(q:MultiSourceQuote){return q.pct!=null&&["three_source","two_source","single_source"].includes(q.agreement);}
 function healthScore(q:MultiSourceQuote){return q.health.length?q.health.reduce((s,h)=>s+h.score,0)/q.health.length:0;}
 function agreementScore(q:MultiSourceQuote){return q.agreement==="three_source"?100:q.agreement==="two_source"?80:q.agreement==="single_source"?55:q.agreement==="disputed"?20:0;}
 function confidenceFrom(s:AuditStats):"high"|"medium"|"low"{if(s.usableWeight>=60&&s.weightedAgreement>=85&&s.weightedHealth>=80)return"high";if(s.usableWeight>=35&&s.weightedAgreement>=65&&s.weightedHealth>=65)return"medium";return"low";}
 
-const LINKED_ETF_MAP: Record<string,string> = {
-  "008887": "159995",
-  "008888": "159995",
-};
-
-function isIntradayPhase(phase: ReturnType<typeof getMarketPhase>) {
-  return phase === "morning" || phase === "afternoon" || phase === "lunch";
-}
-
-function linkedEtfConfidence(q: MultiSourceQuote): "high"|"medium"|"low" {
-  if (q.agreement === "three_source" || q.agreement === "two_source") return "high";
-  if (q.agreement === "single_source") return "medium";
-  return "low";
-}
-
 export const getValidatedFund=createServerFn({method:"POST"}).validator((input:{code:string})=>input).handler(async({data}):Promise<FundQuote>=>{
-  const code = data.code.trim();
-  const base=await getCalculatedFund({data:{code}});
+  const base=await getCalculatedFund({data:{code:data.code}});
   const latestTradingDate=tradingDateLabel();
   const isCurrentOfficial = base.nav != null && base.navDate === latestTradingDate && base.officialNavPublished === true;
   const normalizedBase: FundQuote = isCurrentOfficial
     ? { ...base, officialNavPublished: true, valuationStatus: "official_nav", estimate: null, estimatePct: null, estimateTime: null, estimateConfidence: "high" }
     : { ...base, officialNavPublished: false, valuationStatus: base.estimate != null ? base.valuationStatus : (base.nav != null ? "waiting_official_nav" : "unavailable") };
 
-  if (normalizedBase.nav != null && !isCurrentOfficial && isIntradayPhase(getMarketPhase())) {
-    const linkedEtf = LINKED_ETF_MAP[code];
-    if (linkedEtf) {
-      try {
-        const etfQuote = await getMultiSourceQuote(linkedEtf);
-        if (canUse(etfQuote)) {
-          const pct = etfQuote.pct as number;
-          const confidence = linkedEtfConfidence(etfQuote);
-          const agreementLabel = etfQuote.agreement === "three_source" ? "三源一致" : etfQuote.agreement === "two_source" ? "双源一致" : "单源实时";
-          return {
-            ...normalizedBase,
-            estimate: normalizedBase.nav * (1 + pct / 100),
-            estimatePct: pct,
-            estimateTime: new Date().toISOString(),
-            estimateConfidence: confidence,
-            estimateCoverage: 100,
-            usableWeight: 100,
-            valuationStatus: "estimate",
-            officialNavPublished: false,
-            dayPct: pct,
-            source: `关联ETF ${linkedEtf} 盘中实时估值 · ${agreementLabel}`,
-            estimateValidation: `联接基金 ${code} → 华夏国证半导体芯片ETF ${linkedEtf} · ${agreementLabel} · 实时涨跌 ${pct.toFixed(2)}%`,
-          } as FundQuote;
-        }
-      } catch {
-        // Fall through to disclosed-holdings penetration when linked ETF quote is unavailable.
-      }
+  const linked = LINKED_ETF_MAP[data.code.trim()];
+  if (linked && normalizedBase.nav != null && !isCurrentOfficial) {
+    const q = await getMultiSourceQuote(linked.etf);
+    if (q.pct != null && ["three_source","two_source","single_source"].includes(q.agreement)) {
+      const agreement = q.agreement === "three_source" ? "三源一致" : q.agreement === "two_source" ? "双源一致" : "单源实时";
+      return {
+        ...normalizedBase,
+        estimate: normalizedBase.nav * (1 + q.pct / 100),
+        estimatePct: q.pct,
+        estimateTime: new Date().toISOString(),
+        estimateConfidence: q.agreement === "three_source" ? "high" : q.agreement === "two_source" ? "medium" : "low",
+        estimateCoverage: 100,
+        usableWeight: 100,
+        valuationStatus: "estimate",
+        source: `联接ETF实时估值 · ${linked.etf} ${linked.name} · ${agreement}`,
+        estimateMethod: `优先使用对应ETF ${linked.etf} 盘中实时涨跌，直接估算联接基金；不得用上一交易日涨跌冒充今日盘中数据`,
+        estimateValidation: `对应ETF ${linked.etf} · ${agreement} · 偏差 ${q.deviationPct == null ? "—" : q.deviationPct.toFixed(2) + "%"}`,
+      };
     }
   }
 
