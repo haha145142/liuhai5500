@@ -5,7 +5,7 @@ type HistoryPoint = { date: string; nav: number };
 
 function pointsFor(fund: FundQuote | undefined): HistoryPoint[] {
   return (fund?.historyPoints ?? [])
-    .filter((p) => p && typeof p.date === "string" && Number.isFinite(p.nav) && p.nav > 0)
+    .filter((p) => p && typeof p.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(p.date) && Number.isFinite(p.nav) && p.nav > 0)
     .map((p) => ({ date: p.date, nav: p.nav }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -19,11 +19,24 @@ function atOrBefore(points: HistoryPoint[], dateKey: string): HistoryPoint | nul
   return found;
 }
 
-function localDateKey(date = new Date()): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+function chinaDateKey(date = new Date()): string {
+  const shifted = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
+}
+
+function dateKeyFromParts(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function subtractCalendarMonths(date: Date, months: number): Date {
+  const y = date.getUTCFullYear();
+  const m = date.getUTCMonth();
+  const d = date.getUTCDate();
+  const targetMonth = m - months;
+  const target = new Date(Date.UTC(y, targetMonth, 1));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(d, lastDay));
+  return target;
 }
 
 export type PeriodId = "week" | "month" | "quarter" | "year";
@@ -38,22 +51,23 @@ export type PeriodReturn = {
 };
 
 function periodStart(id: PeriodId, now = new Date()): string {
-  if (id === "year") return `${now.getFullYear()}-01-01`;
-  if (id === "month") return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-  if (id === "quarter") {
-    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
-    return `${now.getFullYear()}-${String(quarterStartMonth + 1).padStart(2, "0")}-01`;
-  }
-  const day = now.getDay();
+  const shifted = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  if (id === "year") return `${shifted.getUTCFullYear()}-01-01`;
+  if (id === "month") return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  if (id === "quarter") return dateKeyFromParts(subtractCalendarMonths(shifted, 3));
+  const day = shifted.getUTCDay();
   const delta = day === 0 ? 6 : day - 1;
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - delta);
-  return localDateKey(monday);
+  const monday = new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate() - delta));
+  return dateKeyFromParts(monday);
 }
 
 /**
- * Calendar-period return, based on the first available official NAV on or before
- * the period start. The current price still comes from the same quote selector
- * used by the portfolio return core, so no second pricing rule is introduced.
+ * Portfolio period return.
+ * - week/month/year use calendar period boundaries.
+ * - quarter is a rolling three-calendar-month window, matching the UI label "近三个月".
+ * The current price uses the same quote selector as the portfolio-return core, so
+ * an intraday estimate can flow into the headline while the base is always an
+ * historical official NAV on or before the period start.
  */
 export function calcPortfolioPeriodReturn(
   period: PeriodId,
