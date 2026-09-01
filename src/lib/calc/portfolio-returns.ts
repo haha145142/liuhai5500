@@ -44,7 +44,6 @@ function selectReturnQuote(fund: FundQuote | undefined): ReturnQuote {
 
 /**
  * Return the previous trading day's official NAV from the chronological history.
- * History is stored oldest -> newest; the last item is the latest NAV.
  */
 function previousOfficialNav(fund: FundQuote | undefined, currentPrice: number | null) {
   if (!fund || currentPrice == null) return null;
@@ -61,14 +60,6 @@ function previousOfficialNav(fund: FundQuote | undefined, currentPrice: number |
 
 /**
  * Single-source return calculation used by fund cards and portfolio summaries.
- *
- * - Holding P&L: current reliable price × shares - cost value.
- * - Today's P&L: (current reliable price - previous official NAV) × shares.
- * - A stale/latest official NAV cannot be presented as today's return unless
- *   the quote is explicitly the current official NAV.
- * - An estimate is accepted only when its valuation status explicitly says it
- *   is a current intraday estimate; arbitrary populated estimate fields are
- *   never treated as live prices.
  */
 export function calcHoldingReturn(holding: Holding, fund?: FundQuote): HoldingReturn {
   const shares = Number(holding.shares);
