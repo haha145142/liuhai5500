@@ -1,4 +1,5 @@
 import type { FundQuote, Holding, SectorQuote } from "../types";
+import { calcHoldingReturn } from "./portfolio-returns";
 
 export type PortfolioHoldingRow = {
   code: string;
@@ -31,22 +32,21 @@ export type PortfolioAnalysis = {
   notes: string[];
 };
 
-function pickPrice(f?: FundQuote): number | null {
-  if (!f) return null;
-  const estimateUsable = f.estimate != null && f.valuationStatus !== "official_nav" && f.valuationStatus !== "unavailable";
-  return estimateUsable ? f.estimate! : f.nav ?? null;
-}
-
 export function calcPortfolioAnalysis(holdings: Holding[], funds: FundQuote[], sectors: SectorQuote[]): PortfolioAnalysis {
   const rows: PortfolioHoldingRow[] = holdings.map((h) => {
     const f = funds.find((x) => x.code === h.code);
-    const price = pickPrice(f);
-    const cost = h.cost * h.shares;
-    const value = price != null && Number.isFinite(price) && price > 0 ? price * h.shares : null;
-    const pnl = value != null ? value - cost : null;
-    const dayPct = f?.dayPct != null && Number.isFinite(f.dayPct) ? f.dayPct : null;
-    const dayPnl = value != null && dayPct != null ? value * (dayPct / 100) : null;
-    return { code: h.code, name: f?.name || h.name || h.code, value, cost, pnl, dayPct, dayPnl };
+    const ret = calcHoldingReturn(h, f);
+    const dayPct = ret.todayPnlPct;
+    const dayPnl = ret.todayPnl;
+    return {
+      code: h.code,
+      name: f?.name || h.name || h.code,
+      value: ret.marketValue,
+      cost: ret.costValue,
+      pnl: ret.holdingPnl,
+      dayPct,
+      dayPnl,
+    };
   });
 
   const totalCost = rows.reduce((s, r) => s + r.cost, 0);
@@ -58,11 +58,13 @@ export function calcPortfolioAnalysis(holdings: Holding[], funds: FundQuote[], s
   const concentrationTop1Pct = marketValue > 0 && covered[0]?.value != null ? (covered[0].value / marketValue) * 100 : 0;
   const concentrationTop3Pct = marketValue > 0 ? (covered.slice(0, 3).reduce((s, r) => s + (r.value ?? 0), 0) / marketValue) * 100 : 0;
 
-  const dayKnown = rows.filter((r) => r.value != null && r.dayPct != null);
-  const dayBase = dayKnown.reduce((s, r) => s + (r.value ?? 0), 0);
-  const dayPnl = dayKnown.length ? dayKnown.reduce((s, r) => s + (r.dayPnl ?? 0), 0) : null;
-  const avgDayPct = dayBase > 0 ? dayKnown.reduce((s, r) => s + (r.value ?? 0) * (r.dayPct ?? 0), 0) / dayBase : null;
-  const dayPct = marketValue > 0 && dayPnl != null ? (dayPnl / marketValue) * 100 : null;
+  const dayKnown = rows.filter((r) => r.value != null && r.dayPnl != null && r.dayPct != null);
+  const dayBase = dayKnown.reduce((s, r) => s + (r.value ?? 0) - (r.dayPnl ?? 0), 0);
+  const dayPnl = dayKnown.length === holdings.length && holdings.length > 0
+    ? dayKnown.reduce((s, r) => s + (r.dayPnl ?? 0), 0)
+    : null;
+  const avgDayPct = dayBase > 0 && dayPnl != null ? (dayPnl / dayBase) * 100 : null;
+  const dayPct = dayPnl != null && dayBase > 0 ? (dayPnl / dayBase) * 100 : null;
 
   const contributors = dayKnown.slice().sort((a, b) => (b.dayPnl ?? -Infinity) - (a.dayPnl ?? -Infinity));
   const topContributor = contributors[0]?.dayPnl != null && contributors[0].dayPnl > 0 ? contributors[0] : null;
