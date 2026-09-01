@@ -4,6 +4,22 @@ import { Glass, Tone, DataStatus } from "@/components/ui/Glass";
 import { buildEvidence } from "@/lib/calc/evidence";
 import { useApp } from "@/lib/store";
 
+function actionFor(verdict: string, confidence: string, weekend: boolean) {
+  if (weekend) return "周一再确认";
+  if (verdict === "偏利好" && confidence !== "低" && confidence !== "偏低") return "分批布局";
+  if (verdict === "温和偏多") return "建议观察";
+  if (verdict === "温和偏空") return "控制仓位";
+  if (verdict === "偏利空") return "控制仓位";
+  return "保持观望";
+}
+
+function signalFromStep(body: string | undefined, positive: RegExp, negative: RegExp) {
+  if (!body) return "暂无可靠数据";
+  if (positive.test(body) && !negative.test(body)) return "偏强";
+  if (negative.test(body) && !positive.test(body)) return "偏弱";
+  return "中性";
+}
+
 export function TodayAssessment() {
   const snapshot = useApp((s) => s.snapshot);
   const news = useApp((s) => s.news);
@@ -14,6 +30,15 @@ export function TodayAssessment() {
   const scoreTone = score == null ? 0 : score - 50;
   const coverage = snapshot ? `${result?.verdict === "证据不足" ? "证据不足" : `${result?.confidence || "一般"} · 覆盖${result ? `${result.steps.length}/7` : "—"}`}` : "等待行情数据";
   const step7 = result?.steps?.find((x) => x.id === "7");
+  const step2 = result?.steps?.find((x) => x.id === "2");
+  const step3 = result?.steps?.find((x) => x.id === "3");
+  const step4 = result?.steps?.find((x) => x.id === "4");
+  const step6 = result?.steps?.find((x) => x.id === "6");
+  const action = actionFor(result?.verdict || "", result?.confidence || "低", result?.verdict === "周末观望");
+  const sectorSignal = signalFromStep(step2?.body, /明显反应|上涨|价量同向/, /偏冷|下跌|走弱/);
+  const capitalSignal = signalFromStep(step3?.body, /净流入|共振/, /净流出/);
+  const sentimentSignal = signalFromStep(step4?.body, /积极|利好|上涨|支持/, /谨慎|利空|下跌|风险/);
+  const globalSignal = signalFromStep(step6?.body, /偏强|涨/, /偏弱|跌/);
 
   return (
     <section className="mt-3" aria-label="今日评估">
@@ -48,8 +73,18 @@ export function TodayAssessment() {
         </div>
 
         <div className="mt-2.5 rounded-[18px] bg-white/50 px-3 py-2.5">
-          <div className="text-[11px] font-semibold text-fg">今天怎么看</div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[11px] font-semibold text-fg">今天怎么做</div>
+            <span className="rounded-full bg-blue-500/10 px-2.5 py-1 text-[9px] font-semibold text-blue-700">{action}</span>
+          </div>
           <p className="mt-1 text-[10px] leading-[1.55] text-muted">{result?.summary || "等待可靠行情、资金、新闻与政策数据后生成今日评估。"}</p>
+        </div>
+
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <Signal label="主力" value={capitalSignal} />
+          <Signal label="板块" value={sectorSignal} />
+          <Signal label="情绪" value={sentimentSignal} />
+          <Signal label="外围" value={globalSignal} />
         </div>
 
         {step7 ? <div className="mt-2 rounded-[16px] border border-blue-200/70 bg-blue-50/45 p-2.5"><div className="text-[10px] font-semibold text-blue-700">综合判断</div><p className="mt-1 text-[9px] leading-[1.5] text-muted">{step7.body}</p></div> : null}
@@ -64,10 +99,14 @@ export function TodayAssessment() {
         </div>
 
         <div className="mt-2.5 flex items-center justify-between gap-2 text-[8px] text-subtle">
-          <span>单日评分只反映当前证据，不代表后市确定方向。</span>
+          <span>评分只反映当前证据；证据不足时不会强行给方向。</span>
           <Link to="/ai" className="shrink-0 rounded-full border border-blue-200/70 bg-white/55 px-2.5 py-1 text-[9px] font-medium text-blue-600">看完整证据链 →</Link>
         </div>
       </Glass>
     </section>
   );
+}
+
+function Signal({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-[14px] bg-white/54 px-2.5 py-2 ring-1 ring-white/70"><div className="text-[8px] text-subtle">{label}</div><div className="mt-0.5 text-[10px] font-semibold text-fg">{value}</div></div>;
 }
