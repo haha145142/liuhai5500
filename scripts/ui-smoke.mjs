@@ -78,9 +78,12 @@ async function testQuickAdd(browser, viewport) {
   });
   try {
     await page.addInitScript(() => {
-      localStorage.setItem("fund_ai_pro_portfolio_v3", "[]");
-      localStorage.removeItem("fund_ai_pro_board_watch_v7");
-      localStorage.removeItem("fund_ai_pro_board_watch_v8");
+      if (!sessionStorage.getItem("fap_quick_add_test_initialized")) {
+        localStorage.setItem("fund_ai_pro_portfolio_v3", "[]");
+        localStorage.removeItem("fund_ai_pro_board_watch_v7");
+        localStorage.removeItem("fund_ai_pro_board_watch_v8");
+        sessionStorage.setItem("fap_quick_add_test_initialized", "1");
+      }
     });
 
     await page.goto(`${baseURL}/portfolio`, { waitUntil: "domcontentloaded" });
