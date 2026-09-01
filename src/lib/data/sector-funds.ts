@@ -75,6 +75,30 @@ function scoreFund(row: SectorFundRow, rule: SectorRule) {
   return { score, reason: hits.slice(0, 2).join(" · ") || rule.name };
 }
 
+function deriveTrend(row: SectorFundRow) {
+  const values = [row.week, row.month, row.threeMonth, row.sixMonth, row.oneYear].filter((v): v is number => v != null && Number.isFinite(v));
+  if (values.length < 3) return { label: "趋势数据不足", score: null as number | null };
+  const weights = [1, 2, 3, 2, 1].slice(-values.length);
+  const weighted = values.reduce((sum, value, i) => sum + value * weights[i], 0) / weights.reduce((sum, value) => sum + value, 0);
+  const short = row.week ?? row.month;
+  const long = row.sixMonth ?? row.oneYear;
+  const score = Math.max(0, Math.min(100, Math.round(50 + weighted * 4 + ((short ?? 0) - (long ?? 0)) * 1.5)));
+  const label = score >= 75 ? "趋势强" : score >= 60 ? "趋势偏强" : score >= 40 ? "趋势中性" : score >= 25 ? "趋势偏弱" : "趋势弱";
+  return { label, score };
+}
+
+function deriveBand(row: SectorFundRow) {
+  const day = row.day;
+  const month = row.month;
+  if (day == null || month == null || !Number.isFinite(day) || !Number.isFinite(month)) return "波段数据不足";
+  const spread = day - month / 4;
+  if (spread >= 1.2 && day >= 0) return "短线偏强";
+  if (spread <= -1.2 && day <= 0) return "短线偏弱";
+  if (month >= 8 && day < 0) return "高位震荡";
+  if (month <= -8 && day > 0) return "低位修复";
+  return "波段中性";
+}
+
 export const getSectorFunds = createServerFn({ method: "POST" })
   .validator((input: { code: string }) => input)
   .handler(async ({ data }): Promise<SectorFundRow[]> => {
@@ -84,7 +108,14 @@ export const getSectorFunds = createServerFn({ method: "POST" })
     return universe
       .map((row) => {
         const hit = scoreFund(row, rule);
-        return hit.score ? { ...row, matchScore: hit.score, matchReason: hit.reason } : null;
+        if (!hit.score) return null;
+        const trend = deriveTrend(row);
+        const band = deriveBand(row);
+        return {
+          ...row,
+          matchScore: hit.score,
+          matchReason: `${hit.reason} · ${trend.label} · ${band}`,
+        };
       })
       .filter((x): x is SectorFundRow => !!x)
       .sort((a, b) => (b.matchScore - a.matchScore) || ((b.day ?? -999) - (a.day ?? -999)))
