@@ -9,146 +9,57 @@ import { cnTime } from "../format";
 import { validateMoneyFlow } from "../calc/money-flow-validation";
 
 const EM_UT = "fa5fd1943c7b386f172d6893dbfba10b";
-type Entry<T> = { ts: number; data: T };
-const mem = new Map<string, Entry<unknown>>();
-function cache<T>(key: string, ttl: number, value: T | null): T | null { if (value) mem.set(key, { ts: Date.now(), data: value }); const hit = mem.get(key) as Entry<T> | undefined; return hit && Date.now() - hit.ts < ttl ? hit.data : value; }
-function source(name: string, ok: boolean, note: string): DataSource { return { name, status: ok ? "ok" : "err", note }; }
-async function em(url: string, timeout = 8000) { return parseMaybeJsonp(await fetchText(url, timeout, { Referer: "https://quote.eastmoney.com/" })); }
-function emptyIndices(): IndexQuote[] { return INDEX_DEFS.map(d => ({ name: d.name, code: d.code, secid: d.secid, price: null, pct: null, change: null })); }
-function chinaTodayLabel(date = new Date()) { const t = cnTime(date); return `${t.getUTCFullYear()}-${String(t.getUTCMonth()+1).padStart(2,"0")}-${String(t.getUTCDate()).padStart(2,"0")}`; }
-function finite(v: number | null | undefined) { return typeof v === "number" && Number.isFinite(v) ? v : null; }
-function safePct(v: number | null | undefined) { const x = finite(v); return x != null && Math.abs(x) <= 30 ? x : null; }
-function safeMoney(v: number | null | undefined) { const x = finite(v); return x != null && Math.abs(x) <= 1e14 ? x : null; }
+type Entry<T> = { ts:number; data:T };
+const mem = new Map<string,Entry<unknown>>();
+function cache<T>(key:string,ttl:number,value:T|null):T|null { if(value) mem.set(key,{ts:Date.now(),data:value}); const hit=mem.get(key) as Entry<T>|undefined; return hit&&Date.now()-hit.ts<ttl?hit.data:value; }
+function source(name:string,ok:boolean,note:string):DataSource{return{name,status:ok?"ok":"err",note};}
+async function em(url:string,timeout=8000){return parseMaybeJsonp(await fetchText(url,timeout,{Referer:"https://quote.eastmoney.com/"}));}
+function emptyIndices():IndexQuote[]{return INDEX_DEFS.map(d=>({name:d.name,code:d.code,secid:d.secid,price:null,pct:null,change:null}));}
+function chinaTodayLabel(date=new Date()){const t=cnTime(date);return `${t.getUTCFullYear()}-${String(t.getUTCMonth()+1).padStart(2,"0")}-${String(t.getUTCDate()).padStart(2,"0")}`;}
+function finite(v:number|null|undefined){return typeof v==="number"&&Number.isFinite(v)?v:null;}
+function safePct(v:number|null|undefined){const x=finite(v);return x!=null&&Math.abs(x)<=30?x:null;}
+function safeMoney(v:number|null|undefined){const x=finite(v);return x!=null&&Math.abs(x)<=1e14?x:null;}
 
-async function fetchIndices(): Promise<{ list: IndexQuote[]; source: DataSource; validation: Snapshot["validation"] }> {
-  let emq: IndexQuote[] | null = null, tq: IndexQuote[] | null = null;
-  try {
-    const j = await em(`https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&fields=f12,f14,f2,f3,f4&secids=${INDEX_DEFS.map(x => x.secid).join(",")}&ut=${EM_UT}&_=${Date.now()}`) as any;
-    const arr = asArr(j?.data?.diff);
-    const list = INDEX_DEFS.map(d => { const x = arr.find(v => String(v.f12) === d.code) || {}; return { name: d.name, code: d.code, secid: d.secid, price: safeMoney(n(x.f2)), pct: safePct(n(x.f3)), change: safeMoney(n(x.f4)) }; });
-    if (list.some(x => x.pct != null)) emq = list;
-  } catch {}
-  try {
-    const lines = (await fetchText("https://qt.gtimg.cn/q=sh000001,sz399001,sz399006,sh000688", 8000)).split(";");
-    const list = INDEX_DEFS.map((d, i) => { const m = (lines[i] || "").match(/=\"([^\"]*)\"/); const p = m ? m[1].split("~") : []; return { name: d.name, code: d.code, secid: d.secid, price: safeMoney(n(p[3])), pct: safePct(n(p[32])), change: safeMoney(n(p[31])) }; });
-    if (list.some(x => x.pct != null)) tq = list;
-  } catch {}
-  if (emq && tq) {
-    const ok = emq.every((x, i) => tq?.[i]?.pct != null && Math.abs((x.pct ?? 0) - (tq[i].pct ?? 0)) <= 0.35);
-    return { list: ok ? emq : emq.map((x, i) => tq?.[i]?.pct != null ? tq[i] : x), source: source("指数", true, ok ? "东方财富 + 腾讯财经交叉验证" : "双源有分歧，采用可用值并降级"), validation: ok ? "cross_checked" : "single_source" };
-  }
-  if (emq) return { list: emq, source: source("指数", true, "东方财富实时行情"), validation: "single_source" };
-  if (tq) return { list: tq, source: source("指数", true, "腾讯财经兜底"), validation: "single_source" };
-  return { list: emptyIndices(), source: source("指数", false, "数据源暂不可用"), validation: "cached_latest_trading_day" };
+async function fetchIndices():Promise<{list:IndexQuote[];source:DataSource;validation:Snapshot["validation"]}>{
+  let emq:IndexQuote[]|null=null,tq:IndexQuote[]|null=null;
+  try{const j=await em(`https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&fields=f12,f14,f2,f3,f4&secids=${INDEX_DEFS.map(x=>x.secid).join(",")}&ut=${EM_UT}&_=${Date.now()}`) as any;const arr=asArr(j?.data?.diff);const list=INDEX_DEFS.map(d=>{const x=arr.find(v=>String(v.f12)===d.code)||{};return{name:d.name,code:d.code,secid:d.secid,price:safeMoney(n(x.f2)),pct:safePct(n(x.f3)),change:safeMoney(n(x.f4))};});if(list.some(x=>x.pct!=null))emq=list;}catch{}
+  try{const lines=(await fetchText("https://qt.gtimg.cn/q=sh000001,sz399001,sz399006,sh000688",8000)).split(";");const list=INDEX_DEFS.map((d,i)=>{const m=(lines[i]||"").match(/=\"([^\"]*)\"/);const p=m?m[1].split("~"):[];return{name:d.name,code:d.code,secid:d.secid,price:safeMoney(n(p[3])),pct:safePct(n(p[32])),change:safeMoney(n(p[31]))};});if(list.some(x=>x.pct!=null))tq=list;}catch{}
+  if(emq&&tq){const ok=emq.every((x,i)=>tq?.[i]?.pct!=null&&Math.abs((x.pct??0)-(tq[i].pct??0))<=0.35);return{list:ok?emq:emq.map((x,i)=>tq?.[i]?.pct!=null?tq[i]:x),source:source("指数",true,ok?"东方财富 + 腾讯财经交叉验证":"双源有分歧，采用可用值并降级"),validation:ok?"cross_checked":"single_source"};}
+  if(emq)return{list:emq,source:source("指数",true,"东方财富实时行情"),validation:"single_source"};
+  if(tq)return{list:tq,source:source("指数",true,"腾讯财经兜底"),validation:"single_source"};
+  return{list:emptyIndices(),source:source("指数",false,"数据源暂不可用"),validation:"cached_latest_trading_day"};
 }
 
-async function fetchBoards(): Promise<{ sectors: SectorQuote[]; boards: BoardQuote[]; source: DataSource }> {
-  const fields = "f12,f14,f3,f62,f66,f69,f72,f75,f6";
-  async function clist(fs: string, type: "industry" | "concept") {
-    const j = await em(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=80&po=1&np=1&fltt=2&invt=2&fid=f3&fs=${encodeURIComponent(fs)}&fields=${fields}&ut=${EM_UT}&_=${Date.now()}`, 10000) as any;
-    return asArr(j?.data?.diff).map(x => ({ code: String(x.f12 || ""), name: String(x.f14 || ""), type, change: safePct(n(x.f3)), flow: safeMoney(n(x.f62)), extraLarge: safeMoney(n(x.f66)), large: safeMoney(n(x.f69)), mid: safeMoney(n(x.f72)), small: safeMoney(n(x.f75)), turnover: safeMoney(n(x.f6)) }));
-  }
-  try {
-    const [ind, con] = await Promise.all([clist("m:90+t:2", "industry"), clist("m:90+t:3", "concept")]);
-    const all = [...ind, ...con];
-    const boards = all.filter(x => x.name && x.change != null).map(x => ({ code: x.code, name: x.name, type: x.type, change: x.change, flow: x.flow }));
-    const sectors = SECTOR_RULES.map(r => {
-      const hit = all.find(x => x.code === r.bkCode) || all.find(x => x.name === r.name) || all.find(x => r.searchKeys.some(k => x.name.includes(k)));
-      const flowFields = { flow: hit?.flow ?? null, super: hit?.extraLarge ?? null, large: hit?.large ?? null, mid: hit?.mid ?? null, small: hit?.small ?? null, turnover: hit?.turnover ?? null };
-      return { id: r.id, name: r.name, bkCode: r.bkCode, change: hit?.change ?? null, ...flowFields, available: hit?.change != null, streak: 0, etfCode: r.etf?.code, etfName: r.etf?.name, validation: hit?.change != null ? "single_source" as const : "unavailable" as const };
-    });
-    return { sectors, boards: boards.sort((a, b) => (b.change ?? -999) - (a.change ?? -999)), source: source("板块", sectors.some(x => x.available), "东方财富板块行情 + 资金字段；异常值已过滤") };
-  } catch {
-    return { sectors: SECTOR_RULES.map(r => ({ id: r.id, name: r.name, bkCode: r.bkCode, change: null, flow: null, super: null, large: null, mid: null, small: null, turnover: null, available: false, streak: 0, etfCode: r.etf?.code, etfName: r.etf?.name, validation: "unavailable" as const })), boards: [], source: source("板块", false, "数据源暂不可用") };
-  }
+async function fetchBoards():Promise<{sectors:SectorQuote[];boards:BoardQuote[];source:DataSource}>{
+  const fields="f12,f14,f3,f62,f66,f69,f72,f75,f6";
+  async function clist(fs:string,type:"industry"|"concept"){const j=await em(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=80&po=1&np=1&fltt=2&invt=2&fid=f3&fs=${encodeURIComponent(fs)}&fields=${fields}&ut=${EM_UT}&_=${Date.now()}`,10000) as any;return asArr(j?.data?.diff).map(x=>({code:String(x.f12||""),name:String(x.f14||""),type,change:safePct(n(x.f3)),flow:safeMoney(n(x.f62)),extraLarge:safeMoney(n(x.f66)),large:safeMoney(n(x.f69)),mid:safeMoney(n(x.f72)),small:safeMoney(n(x.f75)),turnover:safeMoney(n(x.f6))}));}
+  try{const[ind,con]=await Promise.all([clist("m:90+t:2","industry"),clist("m:90+t:3","concept")]);const all=[...ind,...con];const boards=all.filter(x=>x.name&&x.change!=null).map(x=>({code:x.code,name:x.name,type:x.type,change:x.change,flow:x.flow}));const sectors=SECTOR_RULES.map(r=>{const hit=all.find(x=>x.code===r.bkCode)||all.find(x=>x.name===r.name)||all.find(x=>r.searchKeys.some(k=>x.name.includes(k)));const flowFields={flow:hit?.flow??null,super:hit?.extraLarge??null,large:hit?.large??null,mid:hit?.mid??null,small:hit?.small??null,turnover:hit?.turnover??null};return{id:r.id,name:r.name,bkCode:r.bkCode,change:hit?.change??null,...flowFields,available:hit?.change!=null,streak:0,etfCode:r.etf?.code,etfName:r.etf?.name,validation:hit?.change!=null?"single_source" as const:"unavailable" as const};});return{sectors,boards:boards.sort((a,b)=>(b.change??-999)-(a.change??-999)),source:source("板块",sectors.some(x=>x.available),"东方财富板块行情 + 资金字段；异常值已过滤")};}catch{return{sectors:SECTOR_RULES.map(r=>({id:r.id,name:r.name,bkCode:r.bkCode,change:null,flow:null,super:null,large:null,mid:null,small:null,turnover:null,available:false,streak:0,etfCode:r.etf?.code,etfName:r.etf?.name,validation:"unavailable" as const})),boards:[],source:source("板块",false,"数据源暂不可用")};}
 }
 
-async function fetchFlow(): Promise<{ flow: MarketOrder | null; source: DataSource }> {
-  try {
-    const j = await em(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=400&po=1&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent("m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23")}&fields=f62,f66,f69,f72,f75&ut=${EM_UT}&_=${Date.now()}`, 10000) as any;
-    const arr = asArr(j?.data?.diff); if (!arr.length) throw new Error("empty");
-    const sumNullable = (key: string) => {
-      let total = 0;
-      for (const row of arr) {
-        const value = safeMoney(n(row[key]));
-        if (value == null) return null;
-        total += value;
-      }
-      return safeMoney(total);
-    };
-    const main = sumNullable("f62");
-    const superFlow = sumNullable("f66");
-    const large = sumNullable("f69");
-    const mid = sumNullable("f72");
-    const small = sumNullable("f75");
-    if ([main, superFlow, large, mid, small].some(v => v == null)) {
-      return { flow: null, source: source("资金", false, "资金分项字段不完整，已保留上一可靠值") };
-    }
-    const flow: MarketOrder = { main, super: superFlow, large, mid, small, count: arr.length, validation: "unreliable", internalDelta: 0, balanceDelta: 0, note: "" };
-    const checked = validateMoneyFlow(flow);
-    return { flow: { ...flow, validation: checked.validation, internalDelta: checked.internalDelta, balanceDelta: checked.balanceDelta, note: checked.reason }, source: source("资金", checked.usableForDirection, `东方财富全A ${arr.length} 只；字段完整；内部校验：${checked.validation}`) };
-  } catch { return { flow: null, source: source("资金", false, "数据源暂不可用") }; }
+async function fetchFlow():Promise<{flow:MarketOrder|null;source:DataSource}>{
+  try{const j=await em(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=400&po=1&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent("m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23")}&fields=f62,f66,f69,f72,f75&ut=${EM_UT}&_=${Date.now()}`,10000) as any;const arr=asArr(j?.data?.diff);if(!arr.length)throw new Error("empty");const sumNullable=(key:string)=>{let total=0;for(const row of arr){const value=safeMoney(n(row[key]));if(value==null)return null;total+=value;}return safeMoney(total);};const main=sumNullable("f62");const superFlow=sumNullable("f66");const large=sumNullable("f69");const mid=sumNullable("f72");const small=sumNullable("f75");if(main==null||superFlow==null||large==null||mid==null||small==null)return{flow:null,source:source("资金",false,"资金分项字段不完整，已保留上一可靠值")};const flow:MarketOrder={main,super:superFlow,large,mid,small,count:arr.length,validation:"unreliable",internalDelta:0,balanceDelta:0,note:""};const checked=validateMoneyFlow(flow);return{flow:{...flow,validation:checked.validation,internalDelta:checked.internalDelta,balanceDelta:checked.balanceDelta,note:checked.reason},source:source("资金",checked.usableForDirection,`东方财富全A ${arr.length} 只；字段完整；内部校验：${checked.validation}`)};}catch{return{flow:null,source:source("资金",false,"数据源暂不可用")};}
 }
 
-async function fetchGlobal(): Promise<{ list: GlobalQuote[]; source: DataSource }> {
-  try {
-    const lines = (await fetchText(`https://qt.gtimg.cn/q=${GLOBAL_DEFS.map(x => x.tencent).join(",")}`, 8000)).split(";");
-    const list = GLOBAL_DEFS.map((d, i) => { const m = (lines[i] || "").match(/=\"([^\"]*)\"/); const p = m ? m[1].split("~") : []; return { name: d.name, price: safeMoney(n(p[3])), pct: safePct(n(p[32]) ?? n(p[31])) }; });
-    const usable = list.filter(x => x.price != null || x.pct != null).length;
-    return { list, source: source("外围", usable > 0, usable > 0 ? `腾讯财经；有效 ${usable}/${list.length}` : "腾讯财经无有效数据") };
-  } catch { return { list: [], source: source("外围", false, "数据源暂不可用") }; }
+async function fetchGlobal():Promise<{list:GlobalQuote[];source:DataSource}>{
+  try{const lines=(await fetchText(`https://qt.gtimg.cn/q=${GLOBAL_DEFS.map(x=>x.tencent).join(",")}`,8000)).split(";");const list=GLOBAL_DEFS.map((d,i)=>{const m=(lines[i]||"").match(/=\"([^\"]*)\"/);const p=m?m[1].split("~"):[];return{name:d.name,price:safeMoney(n(p[3])),pct:safePct(n(p[32])??n(p[31]))};});const usable=list.filter(x=>x.price!=null||x.pct!=null).length;return{list,source:source("外围",usable>0,usable>0?`腾讯财经；有效 ${usable}/${list.length}`:"腾讯财经无有效数据")};}catch{return{list:[],source:source("外围",false,"数据源暂不可用")};}
 }
 
-export const getSnapshot = createServerFn({ method: "GET" }).handler(async (): Promise<Snapshot> => {
-  const weekend = isWeekend();
-  const cacheDate = weekend ? tradingDateLabel() : chinaTodayLabel();
-  const cacheKey = `snap:${weekend ? "closed" : "trade"}:${cacheDate}`;
-  const ttl = weekend ? 7 * 86400000 : 20000;
-  const hit = cache<Snapshot>(cacheKey, ttl, null);
-  if (hit) return hit;
-  const [idx, bk, fl, gl] = await Promise.all([fetchIndices(), fetchBoards(), fetchFlow(), fetchGlobal()]);
-  const usable = idx.list.some(x => x.pct != null) || bk.sectors.some(x => x.change != null) || !!fl.flow;
-  const marketDate = cacheDate;
-  return cache(cacheKey, ttl, { indices: idx.list, sectors: bk.sectors, boards: bk.boards.slice(0, 40), flow: fl.flow, global: gl.list, sources: [idx.source, bk.source, fl.source, gl.source], fetchedAt: Date.now(), marketDate, validation: weekend ? "cached_latest_trading_day" : (idx.validation || (usable ? "single_source" : "cached_latest_trading_day")) })!;
-});
+export const getSnapshot=createServerFn({method:"GET"}).handler(async():Promise<Snapshot>=>{const weekend=isWeekend();const cacheDate=weekend?tradingDateLabel():chinaTodayLabel();const cacheKey=`snap:${weekend?"closed":"trade"}:${cacheDate}`;const ttl=weekend?7*86400000:20000;const hit=cache<Snapshot>(cacheKey,ttl,null);if(hit)return hit;const[idx,bk,fl,gl]=await Promise.all([fetchIndices(),fetchBoards(),fetchFlow(),fetchGlobal()]);const usable=idx.list.some(x=>x.pct!=null)||bk.sectors.some(x=>x.change!=null)||!!fl.flow;const marketDate=cacheDate;return cache(cacheKey,ttl,{indices:idx.list,sectors:bk.sectors,boards:bk.boards.slice(0,40),flow:fl.flow,global:gl.list,sources:[idx.source,bk.source,fl.source,gl.source],fetchedAt:Date.now(),marketDate,validation:weekend?"cached_latest_trading_day":(idx.validation||(usable?"single_source":"cached_latest_trading_day"))})!;});
 
-function makeId(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return String(h); }
-function published(v: unknown) { if (v == null || v === "") return null; if (typeof v === "number") return v > 1e12 ? v : v > 1e9 ? v * 1000 : null; const d = Date.parse(String(v).replace(/-/g, "/")); return Number.isFinite(d) ? d : null; }
-function toNews(title: string, summary: string, name: string, ts: number | null, url: string, fetchedAt: number): NewsItem | null { const t = safeText(title); if (!t) return null; const category = /政策|国务院|央行|财政部|证监会/.test(t) ? "policy" : /美股|美联储|美元|黄金|原油|港股|恒生/.test(t) ? "global" : /半导体|芯片|白酒|新能源|军工|医药|人工智能|机器人/.test(t) ? "sector" : /A股|上证|深成|创业板|大盘/.test(t) ? "market" : "other"; const sentiment = /涨|新高|流入|利好|突破|反弹|超预期/.test(t) ? "bull" : /跌|跳水|利空|制裁|冲突|暴雷|处罚|下滑/.test(t) ? "bear" : "neutral"; return { id: makeId(name + t), title: t, summary: safeText(summary).slice(0, 180), source: name, url, publishedAt: ts, fetchedAt, category: category as NewsItem["category"], sentiment: sentiment as NewsItem["sentiment"], relatedSectors: [] }; }
-async function newsSource(url: string, name: string, extract: (x: any) => NewsItem | null, fetchedAt: number) { try { const j = await em(url, 9000) as any; const arr = j?.data?.list || j?.data?.fastNewsList || j?.data?.items || j?.re || []; return asArr(arr).map(extract).filter((x): x is NewsItem => !!x); } catch { return []; } }
-export const getNews = createServerFn({ method: "GET" }).handler(async (): Promise<NewsFeed> => {
-  const hit = cache<NewsFeed>("news", 180000, null); if (hit) return hit; const t = Date.now();
-  const [a, b, c] = await Promise.all([
-    newsSource("https://news.10jqka.com.cn/tapp/news/push/stock/?page=1&pagesize=40&track=website", "同花顺", x => toNews(String(x.title || ""), String(x.digest || x.summary || ""), "同花顺", published(x.ctime), String(x.url || ""), t), t),
-    newsSource(`https://np-listapi.eastmoney.com/comm/web/getFastNewsList?client=web&biz=web_724&fastColumn=102&pageSize=30&type=0&_=${Date.now()}`, "东方财富快讯", x => toNews(String(x.title || x.showTitle || ""), String(x.digest || x.summary || ""), "东方财富快讯", published(x.showTime || x.date || x.time), String(x.url || ""), t), t),
-    newsSource("https://api-one-wscn.awtmt.com/apiv1/content/lives?channel=global-channel&client=pc&limit=20", "华尔街见闻", x => toNews(String(x.title || x.content_text || "").slice(0, 80), String(x.content_text || x.content || ""), "华尔街见闻", published(x.display_time || x.created_at), String(x.uri || x.url || ""), t), t),
-  ]);
-  const seen = new Set<string>(), items: NewsItem[] = []; for (const x of [...a, ...b, ...c]) { if (seen.has(x.title)) continue; seen.add(x.title); items.push(x); }
-  items.sort((x, y) => (y.publishedAt ?? 0) - (x.publishedAt ?? 0));
-  return cache("news", 180000, { items: items.slice(0, 100), deep: items.slice(0, 30), sentiment: items.slice(0, 60), sources: [source("同花顺", a.length > 0, "原始发布时间"), source("东方财富快讯", b.length > 0, "原始发布时间"), source("华尔街见闻", c.length > 0, "原始发布时间")], fetchedAt: t, latestPublishedAt: items.find(x => x.publishedAt != null)?.publishedAt ?? null })!;
-});
+function makeId(s:string){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return String(h);}function published(v:unknown){if(v==null||v==="")return null;if(typeof v==="number")return v>1e12?v:v>1e9?v*1000:null;const d=Date.parse(String(v).replace(/-/g,"/"));return Number.isFinite(d)?d:null;}function toNews(title:string,summary:string,name:string,ts:number|null,url:string,fetchedAt:number):NewsItem|null{const t=safeText(title);if(!t)return null;const category=/政策|国务院|央行|财政部|证监会/.test(t)?"policy":/美股|美联储|美元|黄金|原油|港股|恒生/.test(t)?"global":/半导体|芯片|白酒|新能源|军工|医药|人工智能|机器人/.test(t)?"sector":/A股|上证|深成|创业板|大盘/.test(t)?"market":"other";const sentiment=/涨|新高|流入|利好|突破|反弹|超预期/.test(t)?"bull":/跌|跳水|利空|制裁|冲突|暴雷|处罚|下滑/.test(t)?"bear":"neutral";return{id:makeId(name+t),title:t,summary:safeText(summary).slice(0,180),source:name,url,publishedAt:ts,fetchedAt,category:category as NewsItem["category"],sentiment:sentiment as NewsItem["sentiment"],relatedSectors:[]};}
+async function newsSource(url:string,name:string,extract:(x:any)=>NewsItem|null,fetchedAt:number){try{const j=await em(url,9000) as any;const arr=j?.data?.list||j?.data?.fastNewsList||j?.data?.items||j?.re||[];return asArr(arr).map(extract).filter((x):x is NewsItem=>!!x);}catch{return[];}}
+export const getNews=createServerFn({method:"GET"}).handler(async():Promise<NewsFeed>=>{const hit=cache<NewsFeed>("news",180000,null);if(hit)return hit;const t=Date.now();const[a,b,c]=await Promise.all([newsSource("https://news.10jqka.com.cn/tapp/news/push/stock/?page=1&pagesize=40&track=website","同花顺",x=>toNews(String(x.title||""),String(x.digest||x.summary||""),"同花顺",published(x.ctime),String(x.url||""),t),t),newsSource(`https://np-listapi.eastmoney.com/comm/web/getFastNewsList?client=web&biz=web_724&fastColumn=102&pageSize=30&type=0&_=${Date.now()}`,"东方财富快讯",x=>toNews(String(x.title||x.showTitle||""),String(x.digest||x.summary||""),"东方财富快讯",published(x.showTime||x.date||x.time),String(x.url||""),t),t),newsSource("https://api-one-wscn.awtmt.com/apiv1/content/lives?channel=global-channel&client=pc&limit=20","华尔街见闻",x=>toNews(String(x.title||x.content_text||"").slice(0,80),String(x.content_text||x.content||""),"华尔街见闻",published(x.display_time||x.created_at),String(x.uri||x.url||""),t),t)]);const seen=new Set<string>(),items:NewsItem[]=[];for(const x of[...a,...b,...c]){if(seen.has(x.title))continue;seen.add(x.title);items.push(x);}items.sort((x,y)=>(y.publishedAt??0)-(x.publishedAt??0));return cache("news",180000,{items:items.slice(0,100),deep:items.slice(0,30),sentiment:items.slice(0,60),sources:[source("同花顺",a.length>0,"原始发布时间"),source("东方财富快讯",b.length>0,"原始发布时间"),source("华尔街见闻",c.length>0,"原始发布时间")],fetchedAt:t,latestPublishedAt:items.find(x=>x.publishedAt!=null)?.publishedAt??null})!;});
 
-export const getFund = createServerFn({ method: "POST" }).validator((input: { code: string }) => input).handler(async ({ data }): Promise<FundQuote> => {
-  const code = data.code.trim(); const hit = cache<FundQuote>(`fund:${code}`, 20000, null); if (hit) return hit;
-  try {
-    const raw = await fetchText(`https://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`, 8000, { Referer: "https://fund.eastmoney.com/" });
-    const gz = parseMaybeJsonp(raw) as any;
-    const histRaw = await fetchText(`https://api.fund.eastmoney.com/f10/lsjz?fundcode=${code}&pageIndex=1&pageSize=300`, 10000, { Referer: "https://fund.eastmoney.com/" });
-    const hj = parseMaybeJsonp(histRaw) as any;
-    const ordered = (hj?.Data?.LSJZList || []).map((x: any) => ({ date: String(x.FSRQ || ""), nav: n(x.DWJZ) ?? 0, changePct: n(x.JZZL) })).filter((x: any) => x.date && x.nav > 0).reverse();
-    const history = ordered.map((x: any) => x.nav);
-    const latest = ordered[ordered.length - 1];
-    const weekBase = ordered[Math.max(0, ordered.length - 6)];
-    const monthBase = ordered[Math.max(0, ordered.length - 22)];
-    const weekPct = latest && weekBase && weekBase.nav > 0 ? ((latest.nav / weekBase.nav) - 1) * 100 : null;
-    const monthPct = latest && monthBase && monthBase.nav > 0 ? ((latest.nav / monthBase.nav) - 1) * 100 : null;
-    const nav = n(gz?.dwjz), estimate = n(gz?.gsz), estimatePct = n(gz?.gszzl);
-    const officialNav = nav != null;
-    return cache(`fund:${code}`, 20000, { code, name: String(gz?.name || code), type: String(gz?.fundtype || "基金"), nav, navDate: gz?.jzrq ? String(gz.jzrq) : latest?.date ?? null, estimate, estimatePct, estimateTime: gz?.gztime ? String(gz.gztime) : null, dayPct: estimatePct ?? latest?.changePct ?? null, weekPct, monthPct, history, historyPoints: ordered, metrics: calcIndicators(history), source: "天天基金估值 + 东方财富历史净值", officialNavPublished: officialNav, valuationStatus: estimate != null ? "estimate" : officialNav ? "official_nav" : "unavailable", estimateConfidence: estimate != null && nav != null ? "medium" : "low" })!;
-  } catch {
-    return { code, name: code, type: "基金", nav: null, navDate: null, estimate: null, estimatePct: null, estimateTime: null, dayPct: null, weekPct: null, monthPct: null, history: [], historyPoints: [], metrics: null, source: "数据源暂不可用", officialNavPublished: false, valuationStatus: "unavailable", estimateConfidence: "low" };
-  }
-});
+export const getFund=createServerFn({method:"POST"}).validator((input:{code:string})=>input).handler(async({data}):Promise<FundQuote>=>{const code=data.code.trim();const hit=cache<FundQuote>(`fund:${code}`,20000,null);if(hit)return hit;try{const raw=await fetchText(`https://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`,8000,{Referer:"https://fund.eastmoney.com/"});const gz=parseMaybeJsonp(raw) as any;const histRaw=await fetchText(`https://api.fund.eastmoney.com/f10/lsjz?fundcode=${code}&pageIndex=1&pageSize=300`,10000,{Referer:"https://fund.eastmoney.com/"});const hj=parseMaybeJsonp(histRaw) as any;const ordered=(hj?.Data?.LSJZList||[]).map((x:any)=>({date:String(x.FSRQ||""),nav:n(x.DWJZ)??0,changePct:n(x.JZZL)})).filter((x:any)=>x.date&&x.nav>0).reverse();const history=ordered.map((x:any)=>x.nav);
+    const latest=ordered[ordered.length-1];
+    const weekBase=ordered[Math.max(0,ordered.length-6)];
+    const monthBase=ordered[Math.max(0,ordered.length-22)];
+    const weekPct=latest&&weekBase&&weekBase.nav>0?((latest.nav/weekBase.nav)-1)*100:null;
+    const monthPct=latest&&monthBase&&monthBase.nav>0?((latest.nav/monthBase.nav)-1)*100:null;
+    const nav=n(gz?.dwjz),estimate=n(gz?.gsz),estimatePct=n(gz?.gszzl);
+    const officialNav=nav!=null;
+    return cache(`fund:${code}`,20000,{code,name:String(gz?.name||code),type:String(gz?.fundtype||"基金"),nav,navDate:gz?.jzrq?String(gz.jzrq):latest?.date??null,estimate,estimatePct,estimateTime:gz?.gztime?String(gz.gztime):null,dayPct:estimatePct??latest?.changePct??null,weekPct,monthPct,history,historyPoints:ordered,metrics:calcIndicators(history),source:"天天基金估值 + 东方财富历史净值",officialNavPublished:officialNav,valuationStatus:estimate!=null?"estimate":officialNav?"official_nav":"unavailable",estimateConfidence:estimate!=null&&nav!=null?"medium":"low"})!;
+  }catch{return{code,name:code,type:"基金",nav:null,navDate:null,estimate:null,estimatePct:null,estimateTime:null,dayPct:null,weekPct:null,monthPct:null,history:[],historyPoints:[],metrics:null,source:"数据源暂不可用",officialNavPublished:false,valuationStatus:"unavailable",estimateConfidence:"low"};}});
 
-export const getRankings = createServerFn({ method: "GET" }).handler(async (): Promise<RankRow[]> => []);
-export { calcIndicators };
+export const getRankings=createServerFn({method:"GET"}).handler(async():Promise<RankRow[]>=>[]);
+export{calcIndicators};
