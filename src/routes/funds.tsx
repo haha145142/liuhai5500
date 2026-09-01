@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 import { EmptyNote, Glass, SectionTitle, Tone } from "@/components/ui/Glass";
 import { getFundRank } from "@/lib/data/server";
 import { getCalculatedFund } from "@/lib/data/live-valuation";
@@ -24,7 +24,6 @@ const MAX_COMPARE = 4;
 
 type RankCache = { savedAt: number; rows: RankRow[]; source: string };
 type RankDataWindow = Window & { rankData?: { datas?: string[] } };
-type CompareMetric = { value: number | null; label: string; better: "high" | "low" };
 type CompareFund = {
   row: RankRow;
   quote: FundQuote | null;
@@ -119,11 +118,6 @@ function calcDrawdown(history: number[]) {
   return prices.length > 1 ? max * 100 : null;
 }
 
-function formatMetric(metric: CompareMetric) {
-  if (metric.value == null || !Number.isFinite(metric.value)) return "—";
-  return metric.label === "回撤" || metric.label === "波动" ? `${metric.value.toFixed(2)}%` : metric.value.toFixed(2);
-}
-
 function bestCodes(funds: CompareFund[], getter: (fund: CompareFund) => number | null, better: "high" | "low") {
   const values = funds.map(getter).filter((v): v is number => v != null && Number.isFinite(v));
   if (!values.length) return new Set<string>();
@@ -155,7 +149,7 @@ function ComparePanel({ selectedRows, onRemove, onClear }: { selectedRows: RankR
     return () => { alive = false; };
   }, [selectedRows]);
 
-  const bestReturn = useMemo(() => bestCodes(funds, (f) => f.row.oneYear, "high"), [funds]);
+  const bestReturn = useMemo(() => bestCodes(funds, (f) => f.row.oneYear ?? null, "high"), [funds]);
   const bestDrawdown = useMemo(() => bestCodes(funds, (f) => f.drawdown, "high"), [funds]);
   const bestVol = useMemo(() => bestCodes(funds, (f) => f.volatility, "low"), [funds]);
   const bestSharpe = useMemo(() => bestCodes(funds, (f) => f.sharpe, "high"), [funds]);
@@ -166,7 +160,7 @@ function ComparePanel({ selectedRows, onRemove, onClear }: { selectedRows: RankR
     <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">{selectedRows.map((row) => <button key={row.code} type="button" onClick={() => onRemove(row.code)} className="shrink-0 rounded-full bg-blue-500/10 px-2.5 py-1 text-[9px] font-medium text-blue-700">{row.name} ×</button>)}</div>
     {loading ? <div className="mt-2 rounded-xl bg-white/55 px-3 py-3 text-center text-[9px] text-muted">正在加载选中基金的收益 / 回撤 / 波动数据…</div> : <div className="mt-2 overflow-x-auto overscroll-x-contain"><div className="min-w-[640px] rounded-[16px] bg-white/45 ring-1 ring-white/70">
       <div className="grid" style={{ gridTemplateColumns: `120px repeat(${funds.length}, minmax(130px,1fr))` }}>{funds.map((fund) => <div key={fund.row.code} className="border-b border-white/70 px-2.5 py-2"><div className="truncate text-[10px] font-semibold text-fg">{fund.row.name}</div><div className="mt-0.5 text-[8px] text-muted">{fund.row.code}</div></div>)}</div>
-      <CompareRow label="近1年" funds={funds} getter={(f) => f.row.oneYear} suffix="%" best={bestReturn} />
+      <CompareRow label="近1年" funds={funds} getter={(f) => f.row.oneYear ?? null} suffix="%" best={bestReturn} />
       <CompareRow label="近1月" funds={funds} getter={(f) => f.row.month} suffix="%" />
       <CompareRow label="最大回撤" funds={funds} getter={(f) => f.drawdown} suffix="%" best={bestDrawdown} />
       <CompareRow label="年化波动" funds={funds} getter={(f) => f.volatility} suffix="%" best={bestVol} />
