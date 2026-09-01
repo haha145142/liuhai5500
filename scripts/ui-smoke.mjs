@@ -19,6 +19,15 @@ async function testSectorFundPool(page, label) {
   const drawdownButton = page.getByRole("button", { name: "回撤" }).first(); await drawdownButton.click(); await waitForText(page, "近1年最大回撤", `${label} drawdown metric`, 15_000); const drawdownState = await page.locator("body").innerText(); if (drawdownState.includes("当前基金池数据源暂未提供可靠最大回撤字段")) throw new Error(`${label}: drawdown control is still using the placeholder implementation`); await assertNoHorizontalOverflow(page, `${label} sector fund pool`);
 }
 async function testFundPk(page, label) {
+  await page.addInitScript(() => {
+    const rows = [
+      { code: "000001", name: "测试基金A", nav: 1.01, day: 1.2, week: 3.1, month: 5.2, sixMonth: 12.1, oneYear: 20.5, ytd: 15.0 },
+      { code: "000002", name: "测试基金B", nav: 1.02, day: 1.0, week: 2.4, month: 4.8, sixMonth: 11.5, oneYear: 18.9, ytd: 13.4 },
+      { code: "000003", name: "测试基金C", nav: 1.03, day: 0.8, week: 1.9, month: 4.1, sixMonth: 10.8, oneYear: 17.2, ytd: 12.0 },
+      { code: "000004", name: "测试基金D", nav: 1.04, day: 0.6, week: 1.2, month: 3.7, sixMonth: 9.6, oneYear: 15.7, ytd: 10.5 },
+    ];
+    localStorage.setItem("fund_ai_pro_rank_cache_v2_r", JSON.stringify({ savedAt: Date.now(), rows, source: "UI smoke seed" }));
+  });
   await page.goto(`${baseURL}/funds`, { waitUntil: "domcontentloaded" }); await waitForText(page, "基金排行", `${label} fund ranking`, 15_000); await waitForHydration(page, `${label} fund ranking`); await page.waitForFunction(() => document.querySelectorAll('button[aria-label^="比较"]').length >= 4, { timeout: 15_000 }); const pkButtons = page.locator('button[aria-label^="比较"]'); for (let i = 0; i < 4; i += 1) await pkButtons.nth(i).click(); await waitForText(page, "四基金 PK", `${label} four fund PK`, 15_000); await waitForText(page, "最多 4 只", `${label} PK max count`); await waitForText(page, "最大回撤", `${label} PK drawdown`); await waitForText(page, "夏普", `${label} PK sharpe`); await waitForText(page, "趋势", `${label} PK trend`); await waitForText(page, "波段", `${label} PK band`); const selectedText = await page.locator("body").innerText(); if (!selectedText.includes("已选 4/4")) throw new Error(`${label}: four-fund selection did not reach 4/4`); await assertNoHorizontalOverflow(page, `${label} four fund PK`);
 }
 async function testIndexValuation(page, label) {
