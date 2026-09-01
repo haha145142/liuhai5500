@@ -68,8 +68,22 @@ body {
 .home-page .home-index-block { display: none; }
 .home-page .home-index-block + .home-block { margin-top: 10px !important; }
 
-.fund-sector-liquid { border-radius: 20px !important; padding: 12px !important; }
+.fund-sector-liquid { border-radius: 20px !important; padding: 11px !important; }
 .fund-sector-card { border-radius: 16px !important; }
+.fund-sector-liquid h2 { font-size: 15px !important; }
+.fund-sector-liquid > div:first-child p { margin-top: 2px !important; font-size: 9px !important; }
+.fund-sector-liquid > div:first-child button { width: 34px !important; height: 34px !important; }
+.fund-sector-liquid > button { min-height: 74px !important; margin-top: 8px !important; border-radius: 15px !important; }
+.fund-sector-liquid > button .size-10 { width: 32px !important; height: 32px !important; }
+.fund-sector-liquid > .mt-3 { margin-top: 8px !important; }
+.fund-sector-liquid > .mt-3.space-y-2 { gap: 6px !important; }
+.fund-sector-liquid article > button { padding: 9px 11px !important; }
+.fund-sector-liquid article > button .size-9 { width: 32px !important; height: 32px !important; }
+.fund-sector-liquid article > button .text-\[14px\] { font-size: 12px !important; }
+.fund-sector-liquid article > button .text-\[20px\] { font-size: 17px !important; }
+.fund-sector-liquid article > div { padding-left: 11px !important; padding-right: 11px !important; }
+.fund-sector-liquid article .grid { gap: 6px !important; }
+.fund-sector-liquid article .rounded-\[14px\] { border-radius: 12px !important; }
 
 .fund-card-v6 {
   border-radius: 17px !important;
@@ -109,6 +123,7 @@ body {
   .home-value { font-size: 30px !important; }
   .home-page .home-index-block { display: none; }
   .fund-card-v6 { padding: 9px !important; }
+  .fund-sector-liquid { padding: 10px !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
