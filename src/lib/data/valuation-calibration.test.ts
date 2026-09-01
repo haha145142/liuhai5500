@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calibrateValuation } from "./valuation-calibration";
+import { calibrateValuation } from "./valuation-calibration.ts";
 
 test("high coverage and small deviation are aligned", () => {
   const r = calibrateValuation(1.2, 1.35, 82);
