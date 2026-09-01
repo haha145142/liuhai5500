@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assessValuationCoverage } from "./valuation-coverage";
+import { assessValuationCoverage } from "./valuation-coverage.ts";
 
 test("high coverage keeps the raw weighted contribution", () => {
   const r = assessValuationCoverage(1.25, 68, 80);
