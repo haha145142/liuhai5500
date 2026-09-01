@@ -28,13 +28,18 @@ export function isOfficialNavToday(fund: FundQuote | undefined, now = new Date()
 }
 
 function hasTodayEstimate(fund: FundQuote, now: Date) {
+  const confidence = fund.estimateConfidence ?? "low";
   return (
     fund.estimate != null &&
     fund.estimatePct != null &&
     sameChinaDate(fund.estimateTime, now) &&
-    fund.estimateConfidence === "high" &&
-    fund.valuationStatus === "estimate"
+    fund.valuationStatus === "estimate" &&
+    ["high", "medium", "low"].includes(confidence)
   );
+}
+
+function estimateConfidence(fund: FundQuote): "high" | "medium" | "low" {
+  return fund.estimateConfidence ?? "low";
 }
 
 function resolveNavPct(fund: FundQuote, navDate: string | null | undefined) {
@@ -64,26 +69,30 @@ export function selectFundDisplayQuote(fund: FundQuote | undefined, now = new Da
   }
 
   if ((phase === "morning" || phase === "afternoon") && hasTodayEstimate(fund, now)) {
+    const confidence = estimateConfidence(fund);
     return {
       mode: "live_estimate",
       price: fund.estimate,
       pct: fund.estimatePct,
-      label: "盘中实时估值 · 双源/三源核验",
+      label: `盘中实时估值 · ${confidence === "high" ? "高" : confidence === "medium" ? "中" : "低"}置信度`,
       dataDate: chinaToday(fund.estimateTime, now) ? chinaTodayLabel(now) : null,
-      confidence: "high",
-      reason: "仅使用已通过可靠性门槛的盘中穿透估值，不使用模拟数据",
+      confidence,
+      reason: "使用当日盘中穿透估值；置信度取决于重仓行情覆盖与多源一致性，不以昨日净值替代",
     };
   }
 
   if ((phase === "lunch" || phase === "postclose") && hasTodayEstimate(fund, now)) {
+    const confidence = estimateConfidence(fund);
     return {
       mode: "live_estimate",
       price: fund.estimate,
       pct: fund.estimatePct,
-      label: phase === "lunch" ? "上午收盘估值 · 午间沿用" : "今日收盘估值 · 等待官方净值",
+      label: phase === "lunch"
+        ? `上午最后估值 · ${confidence === "high" ? "高" : confidence === "medium" ? "中" : "低"}置信度`
+        : `今日收盘估值 · ${confidence === "high" ? "高" : confidence === "medium" ? "中" : "低"}置信度`,
       dataDate: chinaToday(fund.estimateTime, now) ? chinaTodayLabel(now) : null,
-      confidence: "high",
-      reason: phase === "lunch" ? "午间休市，沿用上午最后可靠估值" : "官方净值尚未明确发布，暂沿用今日最后可靠估值",
+      confidence,
+      reason: phase === "lunch" ? "午间休市，沿用今日上午最后可用盘中估值" : "等待官方净值发布，优先展示今日盘中估值",
     };
   }
 
@@ -96,7 +105,7 @@ export function selectFundDisplayQuote(fund: FundQuote | undefined, now = new Da
       label: `最近官方净值 · ${fund.navDate}`,
       dataDate: fund.navDate,
       confidence: "high",
-      reason: knownOfficialOnly ? "该基金类型不适用A股盘中穿透估值" : "当前没有已确认的今日官方净值或可靠盘中估值",
+      reason: knownOfficialOnly ? "该基金类型不适用A股盘中穿透估值" : "当前没有当日可验证盘中估值，明确标记为最近官方净值",
     };
   }
 
