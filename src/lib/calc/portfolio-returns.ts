@@ -23,8 +23,13 @@ function finitePositive(value: number | null | undefined) {
 
 function selectReturnQuote(fund: FundQuote | undefined): ReturnQuote {
   if (!fund) return { price: null, mode: "none" };
-  const estimate = finitePositive(fund.estimate);
+  const estimateIsCurrent =
+    fund.estimate != null &&
+    (fund.valuationStatus === "estimate" || fund.valuationStatus === "live_estimate") &&
+    fund.officialNavPublished !== true;
+  const estimate = estimateIsCurrent ? finitePositive(fund.estimate) : null;
   if (estimate != null) return { price: estimate, mode: "live_estimate" };
+
   const nav = finitePositive(fund.nav);
   if (nav != null) {
     return {
@@ -61,6 +66,9 @@ function previousOfficialNav(fund: FundQuote | undefined, currentPrice: number |
  * - Today's P&L: (current reliable price - previous official NAV) × shares.
  * - A stale/latest official NAV cannot be presented as today's return unless
  *   the quote is explicitly the current official NAV.
+ * - An estimate is accepted only when its valuation status explicitly says it
+ *   is a current intraday estimate; arbitrary populated estimate fields are
+ *   never treated as live prices.
  */
 export function calcHoldingReturn(holding: Holding, fund?: FundQuote): HoldingReturn {
   const shares = Number(holding.shares);
