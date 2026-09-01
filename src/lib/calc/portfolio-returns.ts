@@ -1,5 +1,5 @@
 import type { FundQuote, Holding } from "../types";
-import { isChinaTradingSession } from "@/lib/data/market-session";
+import { isChinaTradingSession } from "../data/market-session";
 
 type ReturnQuote={price:number|null;mode:"live_estimate"|"official_today"|"latest_official"|"none"};
 export type HoldingReturn={costValue:number;marketValue:number|null;holdingPnl:number|null;holdingPnlPct:number|null;todayPnl:number|null;todayPnlPct:number|null;previousOfficialNav:number|null;price:number|null;quoteMode:ReturnQuote["mode"]};
@@ -10,8 +10,6 @@ function selectReturnQuote(fund:FundQuote|undefined):ReturnQuote{
   if(official)return{price:finitePositive(fund.nav),mode:"official_today"};
   const current=finitePositive(fund.estimate);
   if(current!=null&&(fund.valuationStatus==="estimate"||fund.valuationStatus==="live_estimate")&&fund.officialNavPublished!==true)return{price:current,mode:"live_estimate"};
-  // During a trading session, never calculate a holding from yesterday's NAV when
-  // no current verified estimate exists. This is the same safety rule as entry preview.
   if(isChinaTradingSession())return{price:null,mode:"none"};
   const nav=finitePositive(fund.nav);
   if(nav!=null)return{price:nav,mode:"latest_official"};
