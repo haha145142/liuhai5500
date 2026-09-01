@@ -198,7 +198,7 @@ export function FundSectorWatchV2() {
     if (sectorLoading[code] || sectorFunds[code]) return;
     setSectorLoading((prev) => ({ ...prev, [code]: true }));
     try {
-      const rows = await getSectorFunds(code);
+      const rows = await getSectorFunds({ data: { code } });
       setSectorFunds((prev) => ({ ...prev, [code]: rows }));
     } finally {
       setSectorLoading((prev) => ({ ...prev, [code]: false }));
@@ -223,40 +223,12 @@ export function FundSectorWatchV2() {
       <button type="button" onClick={() => setSearchOpen((v) => !v)} className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-[0_6px_18px_rgba(15,23,42,.18)] active:scale-95" aria-label="添加板块">{searchOpen ? <X size={17} /> : <Plus size={17} />}</button>
     </div>
 
-    {searchOpen ? <div className="mt-3 rounded-[18px] border border-white/80 bg-white/75 p-2.5 shadow-[0_8px_24px_rgba(38,78,112,.05)]"><div className="flex items-center gap-2 rounded-[14px] border border-slate-200/75 bg-white px-3 py-2.5"><Search size={15} className="shrink-0 text-slate-400" /><input aria-label="板块搜索" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="输入：半导体、机器人、银行、光伏……" className="min-w-0 flex-1 bg-transparent text-[13px] text-slate-900 outline-none placeholder:text-slate-400" />{searching ? <span className="text-[9px] text-slate-400">搜索中</span> : null}</div><div className="mt-2 max-h-52 space-y-1 overflow-y-auto">{suggestions.map((item) => <button key={item.code} type="button" onClick={() => add(item)} className="flex w-full items-center gap-2 rounded-[12px] bg-white px-3 py-2.5 text-left shadow-sm active:bg-blue-50"><span className="flex size-7 items-center justify-center rounded-xl bg-blue/10 text-sm">{item.icon}</span><span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-medium text-slate-800">{item.name}</span><span className="block text-[9px] text-slate-400">{item.code} · {item.type === "industry" ? "行业" : "概念"}</span></span><Plus size={14} className="text-blue" /></button>)}{query.trim() && !searching && !suggestions.length ? <div className="px-2 py-4 text-center text-[10px] text-slate-400">没有匹配到板块</div> : null}</div></div> : null}
+    {searchOpen ? <div className="mt-3 rounded-[18px] border border-white/80 bg-white/75 p-2.5 shadow-[0_8px_24px_rgba(38,78,112,.05)]"><div className="flex items-center gap-2 rounded-[14px] border border-slate-200/75 bg-white px-3 py-2.5"><Search size={15} className="shrink-0 text-slate-400" /><input aria-label="板块搜索" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="输入：半导体、机器人、银行、光伏……" className="..." /></div>{searching ? <div className="px-2 py-2 text-[10px] text-slate-400">搜索中…</div> : null}{suggestions.length ? <div className="mt-2 space-y-1.5">{suggestions.map((item) => <button key={item.code} type="button" onClick={() => add(item)} className="flex w-full items-center gap-2 rounded-[14px] bg-white px-3 py-2.5 text-left ring-1 ring-white/80 active:bg-slate-50"><span className="text-base">{item.icon}</span><span className="min-w-0 flex-1"><span className="block text-[11px] font-semibold text-slate-800">{item.name}</span><span className="block text-[8px] text-slate-400">{item.type === "concept" ? "概念板块" : "行业板块"} · {item.code}</span></span><Plus className="size-4 text-slate-400" /></button>)}</div> : q ? <div className="px-2 py-2 text-[10px] text-slate-400">没有找到匹配板块</div> : null}</div> : null}
 
-    {items.length ? <div className="mt-3 space-y-2.5">{items.map((item) => {
-      const q = quoteMap.get(item.code);
-      const open = openCode === item.code;
-      const rows = sectorFunds[item.code] || [];
-      const waiting = !!sectorLoading[item.code];
-      return <article key={item.code} className="overflow-hidden rounded-[20px] border border-white/80 bg-white/60 shadow-[0_8px_24px_rgba(38,78,112,.045)]">
-        <button type="button" onClick={() => toggle(item.code)} className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left active:bg-white/55">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-2xl bg-white/78 text-base shadow-sm">{item.icon}</span>
-          <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-slate-900">{item.name}</span><span className="mt-0.5 block text-[8px] text-slate-400">{item.code} · {q?.marketDate || "等待行情"} · {rows.length ? `相关基金 ${rows.length} 只` : waiting ? "正在读取基金池" : "点击展开查看相关基金"}</span></span>
-          <span className={`shrink-0 text-[19px] font-bold tabular-nums ${tone(q?.pct ?? null)}`}>{q?.pct == null ? "—" : fmtPctShort(q.pct)}</span>
-          <ChevronRight size={13} className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-90" : ""}`} />
-        </button>
+    {!items.length && !searchOpen ? <div className="mt-3 rounded-[18px] border border-dashed border-slate-200 bg-white/38 px-4 py-5 text-center"><div className="text-[11px] font-medium text-slate-600">还没有关注板块</div><div className="mt-1 text-[9px] text-slate-400">点右上角“＋”，添加你想观察的行业或概念。</div></div> : null}
 
-        {open ? <div className="border-t border-white/75 px-3.5 pb-3.5 pt-2.5">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-[15px] bg-white/68 px-3 py-2.5"><div className="text-[9px] text-slate-400">整个板块今日</div><div className={`mt-1 text-[19px] font-bold tabular-nums ${tone(q?.pct ?? null)}`}>{q?.pct == null ? "暂无可靠数据" : fmtPctShort(q.pct)}</div><div className="mt-0.5 text-[8px] text-slate-400">东方财富板块实时口径</div></div>
-            <div className="rounded-[15px] bg-white/68 px-3 py-2.5"><div className="text-[9px] text-slate-400">主力净流向</div><div className={`mt-1 text-[15px] font-bold tabular-nums ${tone(q?.mainFlow ?? null)}`}>{formatFlow(q?.mainFlow ?? null)}</div><div className="mt-0.5 text-[8px] text-slate-400">东方财富资金口径</div></div>
-          </div>
+    {items.length ? <div className="mt-3 space-y-2">{items.map((item) => { const q = quoteMap.get(item.code); const funds = sectorFunds[item.code] || []; const isOpen = openCode === item.code; return <div key={item.code} className="overflow-hidden rounded-[20px] border border-white/80 bg-white/50 ring-1 ring-white/55"><div className="flex items-center gap-2.5 px-3 py-3"><button type="button" onClick={() => toggle(item.code)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left"><span className="flex size-9 shrink-0 items-center justify-center rounded-[14px] bg-white/78 text-base shadow-sm">{item.icon}</span><span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-slate-900">{item.name}</span><span className="mt-0.5 block truncate text-[8px] text-slate-400">{q?.marketDate || "行情日期加载中"} · {q?.source || "等待板块行情"}</span></span><span className={`shrink-0 text-[14px] font-bold tabular-nums ${tone(q?.pct ?? null)}`}>{fmtPctShort(q?.pct ?? null)}</span><ChevronRight className={`size-4 shrink-0 text-slate-300 transition ${isOpen ? "rotate-90" : ""}`} /></button><button type="button" onClick={() => remove(item.code)} className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/72 text-slate-300" aria-label={`删除${item.name}`}><X size={14} /></button></div>{isOpen ? <div className="border-t border-white/75 px-3 pb-3 pt-2.5"><div className="mb-2 flex items-center justify-between"><div><div className="text-[10px] font-semibold text-slate-700">{item.name} · 相关基金</div><div className="text-[8px] text-slate-400">不是你的持仓，是该板块的市场基金池</div></div>{sectorLoading[item.code] ? <Loader2 className="size-4 animate-spin text-slate-400" /> : <Check className="size-4 text-slate-400" />}</div>{funds.length ? <div className="space-y-1.5">{funds.map((row,index) => <FundRow key={row.code} row={row} index={index} />)}</div> : sectorLoading[item.code] ? <div className="rounded-xl bg-white/55 px-3 py-4 text-center text-[9px] text-slate-400">正在读取该板块基金池…</div> : <div className="rounded-xl bg-white/55 px-3 py-4 text-center text-[9px] text-slate-400">暂时没有可靠的相关基金数据，不填充虚假数据。</div>}<div className="mt-2 flex items-center justify-between text-[8px] text-slate-400"><span>{funds.length ? `共 ${funds.length} 只相关基金` : "等待数据源"}</span><span>{q ? `主力 ${formatFlow(q.mainFlow)}` : ""}</span></div></div> : null}</div>; })}</div> : null}
 
-          <div className="mt-2.5 rounded-[16px] bg-white/54 p-2.5 ring-1 ring-white/70">
-            <div className="flex items-center justify-between"><div><span className="text-[10px] font-semibold text-slate-700">本板块相关基金</span><span className="ml-2 text-[8px] text-slate-400">全市场候选池</span></div><span className="text-[8px] text-slate-400">按相关度 + 近期表现排序</span></div>
-            {waiting && !rows.length ? <div className="flex items-center justify-center gap-2 py-6 text-[9px] text-slate-400"><Loader2 className="size-3 animate-spin" />正在读取相关基金</div> : null}
-            {!waiting && !rows.length ? <div className="rounded-[13px] bg-white/62 px-3 py-4 text-center text-[9px] text-slate-400">当前没有取到可靠的全市场基金候选数据。</div> : null}
-            {rows.length ? <div className="mt-2 space-y-1.5">{rows.map((row, index) => <FundRow key={row.code} row={row} index={index} />)}</div> : null}
-          </div>
-
-          <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-slate-400"><span className="truncate">{q?.source || (loading ? "正在更新板块行情…" : "当前暂无可靠板块行情")}</span><button type="button" onClick={() => remove(item.code)} className="rounded-full bg-white/75 px-2.5 py-1 text-slate-500"><X size={10} className="mr-1 inline"/>移除板块</button></div>
-        </div> : null}
-      </article>;
-    })}</div> : <div className="mt-3 rounded-[18px] border border-dashed border-slate-300/70 bg-white/35 px-3 py-4 text-center text-[10px] text-slate-400">还没有自选板块，点右上角 + 添加你要研究的板块。</div>}
-
-    {message ? <div className="mt-2 px-1 text-[9px] text-slate-400">{message}</div> : null}
-    {items.length ? <div className="mt-2 flex items-center justify-between px-1 text-[9px] text-slate-400"><span>已选 {items.length} 个板块</span><span className="inline-flex items-center gap-1"><Check size={10}/> 自动保存 · 板块行情30秒刷新</span></div> : null}
+    {message ? <div className="mt-2 px-1 text-[8px] text-slate-400">{message}</div> : null}
   </section>;
 }
