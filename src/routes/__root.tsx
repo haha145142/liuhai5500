@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
@@ -15,6 +16,13 @@ import finalIos26Css from "../ios26-final-override.css?url";
 import designSystemCss from "../fund-ai-pro-design-system.css?url";
 
 const APP_NAME = "Fund AI Pro";
+
+function HydrationMarker() {
+  useEffect(() => {
+    document.body.dataset.fapHydrated = "true";
+  }, []);
+  return null;
+}
 
 export const Route = createRootRoute({
   head: () => ({
@@ -51,6 +59,7 @@ export const Route = createRootRoute({
         <PreviewHostBridge />
         <AuthProvider>
           <AppErrorBoundary>
+            <HydrationMarker />
             <AppShell><Outlet /></AppShell>
           </AppErrorBoundary>
         </AuthProvider>
