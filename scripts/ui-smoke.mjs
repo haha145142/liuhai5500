@@ -1,16 +1,212 @@
 import { spawn } from "node:child_process";
 import { chromium } from "playwright";
-const port=8080; const baseURL=`http://127.0.0.1:${port}`; const server=spawn("npm",["run","dev"],{stdio:"inherit",env:{...process.env,PORT:String(port)}});
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function waitForServer(){const deadline=Date.now()+30_000;while(Date.now()<deadline){try{const r=await fetch(baseURL);if(r.ok)return;}catch{}await sleep(500);}throw new Error("dev server did not become ready");}
-async function waitForText(page,text,label,timeout=15_000){await page.getByText(text,{exact:false}).first().waitFor({state:"visible",timeout}).catch(()=>{throw new Error(`${label}: expected text not rendered: ${text}`);});}
-async function waitForHydration(page,label){try{await page.locator('body[data-fap-hydrated="true"]').waitFor({state:"attached",timeout:15_000});}catch{throw new Error(`${label}: client hydration marker not observed`);}}
-async function assertNoHorizontalOverflow(page,label){const x=await page.evaluate(()=>({width:window.innerWidth,scrollWidth:document.documentElement.scrollWidth}));if(x.scrollWidth>x.width+1)throw new Error(`${label}: horizontal overflow ${x.scrollWidth} > ${x.width}`);}
-async function waitForHolding(page,label,timeout=10_000){try{await page.waitForFunction(()=>{try{const stored=JSON.parse(localStorage.getItem("fund_ai_pro_portfolio_v3")||"[]");return Array.isArray(stored)&&stored.some(x=>x.code==="123456"&&x.shares===100&&x.cost===1.23);}catch{return false;}},{timeout});}catch{throw new Error(`${label}: added holding was not persisted`);}}
-try{await waitForServer();const browser=await chromium.launch({headless:true});for(const viewport of [{width:390,height:844,label:"390x844"},{width:430,height:932,label:"430x932"}]){const page=await browser.newPage({viewport:{width:viewport.width,height:viewport.height}});await page.addInitScript(()=>{const holdings=Array.from({length:20},(_,i)=>({code:String(i+1).padStart(6,"0"),name:`测试基金${i+1}`,shares:100,cost:1}));localStorage.setItem("fund_ai_pro_portfolio_v3",JSON.stringify(holdings));localStorage.removeItem("fund_ai_pro_board_watch_v7");localStorage.removeItem("fund_ai_pro_board_watch_v8");});
-await page.goto(`${baseURL}/`,{waitUntil:"domcontentloaded"});await waitForText(page,"我的基金",`${viewport.label} homepage`);await waitForHydration(page,`${viewport.label} homepage`);await waitForText(page,"今日评估",`${viewport.label} daily assessment`);await waitForText(page,"今日市场评分",`${viewport.label} daily score`);if((await page.locator("body").innerText()).trim().length<80)throw new Error(`${viewport.label}: homepage rendered blank/minimal content`);await assertNoHorizontalOverflow(page,`${viewport.label} homepage`);
-const addSectorButton=page.getByRole("button",{name:"添加板块"});await addSectorButton.waitFor({state:"visible",timeout:15_000});await addSectorButton.scrollIntoViewIfNeeded();await addSectorButton.click();const sectorInput=page.locator('input[aria-label="板块搜索"]');await sectorInput.waitFor({state:"visible",timeout:8_000});await sectorInput.fill("半导体");await waitForText(page,"半导体",`${viewport.label} sector suggestion`);await assertNoHorizontalOverflow(page,`${viewport.label} sector search`);
-await page.goto(`${baseURL}/portfolio`,{waitUntil:"domcontentloaded"});await waitForText(page,"我的持仓",`${viewport.label} portfolio`);await waitForHydration(page,`${viewport.label} portfolio`);await waitForText(page,"000020",`${viewport.label} 20-holding render`,15_000);await waitForText(page,"组合体检",`${viewport.label} portfolio insight`);await waitForText(page,"持仓重复度分析",`${viewport.label} overlap`);const bodyText=await page.locator("body").innerText();if(!bodyText.includes("20只"))throw new Error(`${viewport.label}: 20-holding portfolio summary missing after holdings rendered`);for(const code of ["000001","000010","000020"]){if(!bodyText.includes(code))throw new Error(`${viewport.label}: expected holding ${code} not rendered`);}await assertNoHorizontalOverflow(page,`${viewport.label} portfolio`);
-await page.goto(`${baseURL}/band`,{waitUntil:"domcontentloaded"});await waitForText(page,"波段信号",`${viewport.label} band signal`);await waitForText(page,"趋势强弱",`${viewport.label} trend strength`);await waitForText(page,"卖出提示 · 做T/波段",`${viewport.label} swing trade plan`);await assertNoHorizontalOverflow(page,`${viewport.label} band`);
-await page.goto(`${baseURL}/market`,{waitUntil:"domcontentloaded"});await waitForText(page,"操作建议",`${viewport.label} operation advice`);await waitForText(page,"外围市场",`${viewport.label} market data`);await assertNoHorizontalOverflow(page,`${viewport.label} market`);
-await page.goto(`${baseURL}/portfolio`,{waitUntil:"domcontentloaded"});const addFundInput=page.locator('input[aria-label="基金代码"]');await addFundInput.fill("123456");await page.locator('input[aria-label="持有份额"]').fill("100");await page.locator('input[aria-label="成本价"]').fill("1.23");const addFundButton=page.locator('.quick-add-inputs button');await addFundButton.waitFor({state:"visible",timeout:8_000});await addFundButton.click({timeout:8_000});await waitForHolding(page,`${viewport.label} quick add`);await page.close();}await browser.close();console.log("UI smoke checks passed");}finally{server.kill("SIGTERM");}
+
+const port = 8080;
+const baseURL = `http://127.0.0.1:${port}`;
+const server = spawn("npm", ["run", "dev"], {
+  stdio: "inherit",
+  env: { ...process.env, PORT: String(port) },
+});
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function waitForServer() {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(baseURL);
+      if (response.ok) return;
+    } catch {}
+    await sleep(500);
+  }
+  throw new Error("dev server did not become ready");
+}
+
+async function waitForText(page, text, label, timeout = 15_000) {
+  await page
+    .getByText(text, { exact: false })
+    .first()
+    .waitFor({ state: "visible", timeout })
+    .catch(() => {
+      throw new Error(`${label}: expected text not rendered: ${text}`);
+    });
+}
+
+async function waitForHydration(page, label) {
+  await page
+    .locator('body[data-fap-hydrated="true"]')
+    .waitFor({ state: "attached", timeout: 15_000 })
+    .catch(() => {
+      throw new Error(`${label}: client hydration marker not observed`);
+    });
+}
+
+async function assertNoHorizontalOverflow(page, label) {
+  const size = await page.evaluate(() => ({
+    width: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  if (size.scrollWidth > size.width + 1) {
+    throw new Error(`${label}: horizontal overflow ${size.scrollWidth} > ${size.width}`);
+  }
+}
+
+async function waitForHolding(page, label, timeout = 10_000) {
+  await page
+    .waitForFunction(
+      () => {
+        try {
+          const stored = JSON.parse(localStorage.getItem("fund_ai_pro_portfolio_v3") || "[]");
+          return (
+            Array.isArray(stored) &&
+            stored.some((item) => item.code === "123456" && item.shares === 100 && item.cost === 1.23)
+          );
+        } catch {
+          return false;
+        }
+      },
+      { timeout },
+    )
+    .catch(() => {
+      throw new Error(`${label}: added holding was not persisted`);
+    });
+}
+
+async function testQuickAdd(browser, viewport) {
+  const page = await browser.newPage({
+    viewport: { width: viewport.width, height: viewport.height },
+  });
+  try {
+    await page.addInitScript(() => {
+      localStorage.setItem("fund_ai_pro_portfolio_v3", "[]");
+      localStorage.removeItem("fund_ai_pro_board_watch_v7");
+      localStorage.removeItem("fund_ai_pro_board_watch_v8");
+    });
+
+    await page.goto(`${baseURL}/portfolio`, { waitUntil: "domcontentloaded" });
+    await waitForText(page, "我的持仓", `${viewport.label} quick add page`);
+    await waitForHydration(page, `${viewport.label} quick add page`);
+
+    const form = page.locator(".quick-add-fund:visible").first();
+    await form.waitFor({ state: "visible", timeout: 8_000 });
+
+    const codeInput = form.locator('input[aria-label="基金代码"]');
+    const sharesInput = form.locator('input[aria-label="持有份额"]');
+    const costInput = form.locator('input[aria-label="成本价"]');
+
+    await codeInput.fill("123456");
+    await sharesInput.fill("100");
+    await costInput.fill("1.23");
+
+    if (await codeInput.inputValue() !== "123456") {
+      throw new Error(`${viewport.label} quick add: fund code input did not settle`);
+    }
+    if (await sharesInput.inputValue() !== "100") {
+      throw new Error(`${viewport.label} quick add: shares input did not settle`);
+    }
+    if (await costInput.inputValue() !== "1.23") {
+      throw new Error(`${viewport.label} quick add: cost input did not settle`);
+    }
+
+    const button = form.locator(".quick-add-inputs button");
+    await button.waitFor({ state: "visible", timeout: 8_000 });
+    await button.click({ timeout: 8_000 });
+
+    await waitForText(page, "已添加", `${viewport.label} quick add confirmation`, 8_000);
+    await waitForHolding(page, `${viewport.label} quick add`);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForText(page, "我的持仓", `${viewport.label} quick add reload`);
+    await waitForHydration(page, `${viewport.label} quick add reload`);
+    await waitForHolding(page, `${viewport.label} quick add after reload`);
+    await waitForText(page, "123456", `${viewport.label} quick add persisted row`, 10_000);
+    await assertNoHorizontalOverflow(page, `${viewport.label} quick add`);
+  } finally {
+    await page.close();
+  }
+}
+
+try {
+  await waitForServer();
+  const browser = await chromium.launch({ headless: true });
+
+  for (const viewport of [
+    { width: 390, height: 844, label: "390x844" },
+    { width: 430, height: 932, label: "430x932" },
+  ]) {
+    const page = await browser.newPage({
+      viewport: { width: viewport.width, height: viewport.height },
+    });
+
+    try {
+      await page.addInitScript(() => {
+        const holdings = Array.from({ length: 20 }, (_, i) => ({
+          code: String(i + 1).padStart(6, "0"),
+          name: `测试基金${i + 1}`,
+          shares: 100,
+          cost: 1,
+        }));
+        localStorage.setItem("fund_ai_pro_portfolio_v3", JSON.stringify(holdings));
+        localStorage.removeItem("fund_ai_pro_board_watch_v7");
+        localStorage.removeItem("fund_ai_pro_board_watch_v8");
+      });
+
+      await page.goto(`${baseURL}/`, { waitUntil: "domcontentloaded" });
+      await waitForText(page, "我的基金", `${viewport.label} homepage`);
+      await waitForHydration(page, `${viewport.label} homepage`);
+      await waitForText(page, "今日评估", `${viewport.label} daily assessment`);
+      await waitForText(page, "今日市场评分", `${viewport.label} daily score`);
+      if ((await page.locator("body").innerText()).trim().length < 80) {
+        throw new Error(`${viewport.label}: homepage rendered blank/minimal content`);
+      }
+      await assertNoHorizontalOverflow(page, `${viewport.label} homepage`);
+
+      const addSectorButton = page.getByRole("button", { name: "添加板块" });
+      await addSectorButton.waitFor({ state: "visible", timeout: 15_000 });
+      await addSectorButton.scrollIntoViewIfNeeded();
+      await addSectorButton.click();
+      const sectorInput = page.locator('input[aria-label="板块搜索"]');
+      await sectorInput.waitFor({ state: "visible", timeout: 8_000 });
+      await sectorInput.fill("半导体");
+      await waitForText(page, "半导体", `${viewport.label} sector suggestion`);
+      await assertNoHorizontalOverflow(page, `${viewport.label} sector search`);
+
+      await page.goto(`${baseURL}/portfolio`, { waitUntil: "domcontentloaded" });
+      await waitForText(page, "我的持仓", `${viewport.label} portfolio`);
+      await waitForHydration(page, `${viewport.label} portfolio`);
+      await waitForText(page, "000020", `${viewport.label} 20-holding render`, 15_000);
+      await waitForText(page, "组合体检", `${viewport.label} portfolio insight`);
+      await waitForText(page, "持仓重复度分析", `${viewport.label} overlap`);
+      const bodyText = await page.locator("body").innerText();
+      if (!bodyText.includes("20只")) {
+        throw new Error(`${viewport.label}: 20-holding portfolio summary missing after holdings rendered`);
+      }
+      for (const code of ["000001", "000010", "000020"]) {
+        if (!bodyText.includes(code)) {
+          throw new Error(`${viewport.label}: expected holding ${code} not rendered`);
+        }
+      }
+      await assertNoHorizontalOverflow(page, `${viewport.label} portfolio`);
+
+      await page.goto(`${baseURL}/band`, { waitUntil: "domcontentloaded" });
+      await waitForText(page, "波段信号", `${viewport.label} band signal`);
+      await waitForText(page, "趋势强弱", `${viewport.label} trend strength`);
+      await waitForText(page, "卖出提示 · 做T/波段", `${viewport.label} swing trade plan`);
+      await assertNoHorizontalOverflow(page, `${viewport.label} band`);
+
+      await page.goto(`${baseURL}/market`, { waitUntil: "domcontentloaded" });
+      await waitForText(page, "操作建议", `${viewport.label} operation advice`);
+      await waitForText(page, "外围市场", `${viewport.label} market data`);
+      await assertNoHorizontalOverflow(page, `${viewport.label} market`);
+    } finally {
+      await page.close();
+    }
+
+    await testQuickAdd(browser, viewport);
+  }
+
+  await browser.close();
+  console.log("UI smoke checks passed");
+} finally {
+  server.kill("SIGTERM");
+}
