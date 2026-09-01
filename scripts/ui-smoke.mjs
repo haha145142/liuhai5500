@@ -101,6 +101,14 @@ async function testSectorFundPool(page, label) {
     }
   });
   if (!candidateState) throw new Error(`${label}: candidate action was not persisted`);
+
+  const drawdownButton = page.getByRole("button", { name: "回撤" }).first();
+  await drawdownButton.click();
+  await waitForText(page, "近1年最大回撤", `${label} drawdown metric`, 15_000);
+  const drawdownState = await page.locator("body").innerText();
+  if (drawdownState.includes("当前基金池数据源暂未提供可靠最大回撤字段")) {
+    throw new Error(`${label}: drawdown control is still using the placeholder implementation`);
+  }
   await assertNoHorizontalOverflow(page, `${label} sector fund pool`);
 }
 
