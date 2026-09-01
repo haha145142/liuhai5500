@@ -1,10 +1,8 @@
 name: Vercel Production Deploy
 
-# 生产部署默认手动；仅允许带 [deploy-once] 的 main 提交执行一次自动部署。
+# 生产部署改为手动触发，避免每次开发提交都消耗 Vercel 免费部署次数。
+# 代码质量由独立 Quality Gate workflow 在 push/PR 上检查。
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -12,7 +10,6 @@ permissions:
 
 jobs:
   deploy-production:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy-once]')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
