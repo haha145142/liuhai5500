@@ -106,13 +106,19 @@ export function quoteFromFundState(input: {
   historyPoints?: Array<{ date: string; changePct: number | null }>;
   tradeTime: boolean;
 }): HoldingEntryQuote {
-  if (input.tradeTime && input.estimate != null && Number.isFinite(input.estimate) && input.estimate > 0) {
-    return {
-      price: input.estimate,
-      pct: input.estimatePct ?? input.dayPct ?? null,
-      label: input.estimateTime ? `盘中自算估值 · ${input.estimateTime}` : "盘中自算估值",
-      mode: "live_estimate",
-    };
+  // During trading, never downgrade a live preview to an older official NAV.
+  // An absent/unreliable estimate must remain explicitly unavailable.
+  if (input.tradeTime) {
+    if (input.estimate != null && Number.isFinite(input.estimate) && input.estimate > 0) {
+      return {
+        price: input.estimate,
+        pct: input.estimatePct ?? input.dayPct ?? null,
+        label: input.estimateTime ? `盘中自算估值 · ${input.estimateTime}` : "盘中自算估值",
+        mode: "live_estimate",
+      };
+    }
+
+    return { price: null, pct: null, label: "暂无可靠行情", mode: "none" };
   }
 
   if (input.nav != null && Number.isFinite(input.nav) && input.nav > 0) {
