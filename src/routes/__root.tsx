@@ -12,6 +12,7 @@ import lightThemeCss from "../light-theme-v2.css?url";
 import mobilePerformanceCss from "../mobile-performance-v6.css?url";
 import fundAiProV6Css from "../fund-ai-pro-v6.css?url";
 import finalIos26Css from "../ios26-final-override.css?url";
+import designSystemCss from "../fund-ai-pro-design-system.css?url";
 
 const APP_NAME = "Fund AI Pro";
 
@@ -38,6 +39,7 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: mobilePerformanceCss },
       { rel: "stylesheet", href: fundAiProV6Css },
       { rel: "stylesheet", href: finalIos26Css },
+      { rel: "stylesheet", href: designSystemCss },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
