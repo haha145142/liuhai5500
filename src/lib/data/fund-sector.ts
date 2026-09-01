@@ -3,46 +3,12 @@ import { getCalculatedFund } from "./live-valuation";
 import { FUND_SECTORS, DEFAULT_FUND_SECTOR_IDS } from "./fund-sectors";
 import { fetchText, n, parseMaybeJsonp } from "./fetch-util";
 import { isExchangeClosed, tradingDateLabel } from "./trading-day";
-
-export type FundSectorFundQuote = {
-  code:string; name:string; pct:number|null; nav:number|null; estimate:number|null;
-  time:string|null; date:string|null;
-  validation:"cross_checked"|"single_source"|"unavailable";
-  source:string;
-};
-
-export type FundSectorQuote = {
-  id:string; name:string; icon:string;
-  pct:number|null; up:number; down:number; flat:number;
-  validCount:number; totalCount:number;
-  leader:FundSectorFundQuote|null; weakest:FundSectorFundQuote|null;
-  funds:FundSectorFundQuote[]; marketDate:string|null; source:string;
-  validation:"cross_checked"|"single_source"|"cached_latest_trading_day"|"unavailable";
-  coveragePct:number; crossCheckedPct:number; crossCheckedCount:number;
-  marketPct:number|null; mainFlow:number|null; superFlow:number|null; largeFlow:number|null;
-  midFlow:number|null; smallFlow:number|null; turnover:number|null;
-  flowSignal:"inflow"|"outflow"|"mixed"|"neutral"|"unavailable";
-  flowValidation:"live"|"cached"|"unavailable";
-};
-
-const EM="https://fundcomapi.eastmoney.com/mm/newCore/FundValuationLast";
-const TT="https://fundcomapi.tiantianfunds.com/mm/newCore/FundValuationLast";
-const FIELDS="FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE";
-const EM_UT="fa5fd1943c7b386f172d6893dbfba10b";
-const BOARD_FIELDS="f12,f14,f3,f62,f66,f69,f72,f75,f6";
-const CACHE_TTL=20_000;
-const CLOSED_CACHE_TTL=24*60*60*1000;
-const STALE_CACHE_TTL=7*24*60*60*1000;
-let cache:{key:string;ts:number;data:FundSectorQuote[]}|null=null;
-let lastGood:{key:string;ts:number;data:FundSectorQuote[]}|null=null;
-
-type BoardFlow = { code:string; name:string; change:number|null; flow:number|null; super:number|null; large:number|null; mid:number|null; small:number|null; turnover:number|null; };
-function chunk<T>(arr:T[],size:number){const out:T[][]=[];for(let i=0;i<arr.length;i+=size)out.push(arr.slice(i,i+size));return out;}
-function pct(v:unknown){const x=n(v);return x!=null&&Number.isFinite(x)&&Math.abs(x)<=30?x:null;}
-function money(v:unknown){const x=n(v);return x!=null&&Number.isFinite(x)&&Math.abs(x)<=1e14?x:null;}
-function parseRows(payload:unknown){const j=parseMaybeJsonp(String(payload??"")) as any;const rows=j?.Data||j?.data||j?.Datas||j?.data?.list||[];return Array.isArray(rows)?rows:rows&&typeof rows==="object"?Object.values(rows) as Record<string,unknown>[]:[];}
-async function fetchProvider(base:string,codes:string[]){try{return parseRows(await fetchText(`${base}?FCODES=${encodeURIComponent(codes.join(","))}&FIELDS=${encodeURIComponent(FIELDS)}&_=${Date.now()}`,9000,{Referer:"https://fund.eastmoney.com/"}));}catch{return[];}}
-async function fetchBoardFlows():Promise<Map<string,BoardFlow>>{try{const j=parseMaybeJsonp(await fetchText(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=1200&po=1&np=1&fltt=2&invt=2&fid=f3&fs=${encodeURIComponent("m:90+t:2,m:90+t:3")}&fields=${BOARD_FIELDS}&ut=${EM_UT}&_=${Date.now()}`,10000,{Referer:"https://data.eastmoney.com/bkzj/"})) as any;const arr=Array.isArray(j?.data?.diff)?j.data.diff:[];return new Map(arr.map((x:any)=>[String(x.f12||""),{code:String(x.f12||""),name:String(x.f14||""),change:pct(x.f3),flow:money(x.f62),super:money(x.f66),large:money(x.f69),mid:money(x.f72),small:money(x.f75),turnover:money(x.f6)} as BoardFlow]).filter(([code])=>!!code));}catch{return new Map();}}
+export type FundSectorFundQuote={code:string;name:string;pct:number|null;nav:number|null;estimate:number|null;time:string|null;date:string|null;validation:"cross_checked"|"single_source"|"unavailable";source:string;};
+export type FundSectorQuote={id:string;name:string;icon:string;pct:number|null;up:number;down:number;flat:number;validCount:number;totalCount:number;leader:FundSectorFundQuote|null;weakest:FundSectorFundQuote|null;funds:FundSectorFundQuote[];marketDate:string|null;source:string;validation:"cross_checked"|"single_source"|"cached_latest_trading_day"|"unavailable";coveragePct:number;crossCheckedPct:number;crossCheckedCount:number;marketPct:number|null;mainFlow:number|null;superFlow:number|null;largeFlow:number|null;midFlow:number|null;smallFlow:number|null;turnover:number|null;flowSignal:"inflow"|"outflow"|"mixed"|"neutral"|"unavailable";flowValidation:"live"|"cached"|"unavailable";};
+const EM="https://fundcomapi.eastmoney.com/mm/newCore/FundValuationLast";const TT="https://fundcomapi.tiantianfunds.com/mm/newCore/FundValuationLast";const FIELDS="FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE";const EM_UT="fa5fd1943c7b386f172d6893dbfba10b";const BOARD_FIELDS="f12,f14,f3,f62,f66,f69,f72,f75,f6";const CACHE_TTL=20_000;const CLOSED_CACHE_TTL=24*60*60*1000;const STALE_CACHE_TTL=7*24*60*60*1000;let cache:{key:string;ts:number;data:FundSectorQuote[]}|null=null;let lastGood:{key:string;ts:number;data:FundSectorQuote[]}|null=null;
+type BoardFlow={code:string;name:string;change:number|null;flow:number|null;super:number|null;large:number|null;mid:number|null;small:number|null;turnover:number|null;};
+function chunk<T>(arr:T[],size:number){const out:T[][]=[];for(let i=0;i<arr.length;i+=size)out.push(arr.slice(i,i+size));return out;}function pct(v:unknown){const x=n(v);return x!=null&&Number.isFinite(x)&&Math.abs(x)<=30?x:null;}function money(v:unknown){const x=n(v);return x!=null&&Number.isFinite(x)&&Math.abs(x)<=1e14?x:null;}function parseRows(payload:unknown){const j=parseMaybeJsonp(String(payload??"")) as any;const rows=j?.Data||j?.data||j?.Datas||j?.data?.list||[];return Array.isArray(rows)?rows:rows&&typeof rows==="object"?Object.values(rows) as Record<string,unknown>[]:[];}async function fetchProvider(base:string,codes:string[]){try{return parseRows(await fetchText(`${base}?FCODES=${encodeURIComponent(codes.join(","))}&FIELDS=${encodeURIComponent(FIELDS)}&_=${Date.now()}`,9000,{Referer:"https://fund.eastmoney.com/"}));}catch{return[];}}
+async function fetchBoardFlows():Promise<Map<string,BoardFlow>>{try{const j=parseMaybeJsonp(await fetchText(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=1200&po=1&np=1&fltt=2&invt=2&fid=f3&fs=${encodeURIComponent("m:90+t:2,m:90+t:3")}&fields=${BOARD_FIELDS}&ut=${EM_UT}&_=${Date.now()}`,10000,{Referer:"https://data.eastmoney.com/bkzj/"})) as any;const arr=Array.isArray(j?.data?.diff)?j.data.diff:[];const entries:[string,BoardFlow][] = arr.map((x:any)=>[String(x.f12||""),{code:String(x.f12||""),name:String(x.f14||""),change:pct(x.f3),flow:money(x.f62),super:money(x.f66),large:money(x.f69),mid:money(x.f72),small:money(x.f75),turnover:money(x.f6)} as BoardFlow]).filter((entry:[string,BoardFlow])=>!!entry[0]);return new Map<string,BoardFlow>(entries);}catch{return new Map();}}
 function flowSignal(change:number|null,flow:number|null):FundSectorQuote["flowSignal"]{if(change==null||flow==null)return "unavailable";if(Math.abs(flow)<1)return "neutral";if(change<0&&flow<0)return "outflow";if(change>0&&flow>0)return "inflow";return "mixed";}
 function mergeQuote(primary:ReturnType<typeof pick>|null,secondary:ReturnType<typeof pick>|null,own:Awaited<ReturnType<typeof getCalculatedFund>>|null,code:string,fallbackName:string):FundSectorFundQuote{const providerPct=primary?.pct!=null&&secondary?.pct!=null?Math.abs(primary.pct-secondary.pct)<=0.15?((primary.pct+secondary.pct)/2):null:null;const hasProviderConsensus=providerPct!=null;const ownPct=own?.estimatePct??own?.dayPct??null;const effectivePct=hasProviderConsensus?providerPct:ownPct;if(effectivePct!=null||own?.nav!=null||primary?.nav!=null||secondary?.nav!=null){const useOwnEstimate=ownPct!=null;const validated=hasProviderConsensus||(useOwnEstimate&&((own?.quoteCrossCheckedWeight??0)>0));return{code,name:own?.name||primary?.name||secondary?.name||fallbackName,pct:effectivePct,nav:own?.nav??primary?.nav??secondary?.nav??null,estimate:useOwnEstimate?own?.estimate??null:primary?.estimate??secondary?.estimate??null,time:own?.estimateTime??primary?.time??secondary?.time??null,date:own?.navDate??primary?.date??secondary?.date??null,validation:validated?"cross_checked":"single_source",source:hasProviderConsensus?(useOwnEstimate?"Fund AI Pro 自算 + 天天基金 + 东方财富交叉验证":"天天基金 + 东方财富交叉验证"):(useOwnEstimate?"Fund AI Pro 自算穿透估值":"最近官方净值")};}return{code,name:fallbackName,pct:null,nav:null,estimate:null,time:null,date:null,validation:"unavailable",source:"当前暂无新数据"};}
 async function getOwnQuotes(codes:string[]){const out=new Map<string,Awaited<ReturnType<typeof getCalculatedFund>>>();const queue=codes.slice();const workers=Array.from({length:Math.min(4,Math.max(1,queue.length))},async()=>{while(queue.length){const code=queue.shift();if(!code)return;try{out.set(code,await getCalculatedFund({data:{code}}));}catch{out.set(code,null as any);}}});await Promise.all(workers);return out;}
