@@ -25,14 +25,14 @@ test("trading mode never falls back to stale NAV", () => {
   assert.equal(result.pnl, null);
 });
 
-test("closed mode uses official NAV", () => {
+test("closed mode labels stale NAV as latest available data", () => {
   const result = resolveHoldingEntryPreview(
     { code: "000001", shares: 1000, cost: 1.1 },
     { "000001": fund },
     false,
   );
 
-  assert.equal(result.marketLabel, "今日官方净值");
+  assert.equal(result.marketLabel, "最近可用数据");
   assert.equal(result.price, 1.2);
   assert.equal(result.marketValue, 1200);
   assert.equal(result.pnl, 100);
