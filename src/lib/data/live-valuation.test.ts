@@ -44,5 +44,5 @@ test("missing constituent quotes reduce usable coverage but do not become fake z
 test("external estimate is validation-only", () => {
   const r = calc(1, [{ weight: 50, pct: 4 }], 1.8);
   assert.equal(r.pct, 2);
-  assert.equal(r.deviation, 0.2);
+  assert.ok(Math.abs((r.deviation ?? 0) - 0.2) < 1e-12);
 });
