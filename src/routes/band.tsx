@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { EmptyNote, Glass, SectionTitle, Tone, DataStatus } from "@/components/ui/Glass";
+import { EmptyNote, Glass, SectionTitle, DataStatus } from "@/components/ui/Glass";
 import { calcSwingTrade } from "@/lib/calc/indicators";
 import { fmtPctShort, fmtPrice } from "@/lib/format";
 import { selectFundDisplayQuote } from "@/lib/data/quote-mode";
@@ -27,7 +27,7 @@ function BandPage() {
       <Glass className="mb-0 px-4 py-3">
         <SectionTitle title="📊 波段信号 · 趋势强弱" hint="一眼判断" />
         <p className="mt-[-4px] text-[11px] leading-[1.45] text-muted">
-          上面看波段位置，下面看趋势方向；颜色和分数只服务于一个问题：现在到底是在变强还是变弱。
+          上面看波段位置，下面看趋势方向；颜色保持低饱和，只突出位置与强弱。
         </p>
       </Glass>
 
@@ -62,21 +62,17 @@ function FundSignalGroup({ holding, fund }: { holding: HoldingLike; fund: any })
 
   return (
     <section>
-      <div className="mb-2 px-1">
+      <div className="mb-1.5 px-1">
         <div className="flex items-end justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="truncate text-[15px] font-semibold tracking-tight text-fg">
-              {fund?.name || holding.name}
-            </h3>
+            <h3 className="truncate text-[14px] font-semibold tracking-tight text-fg">{fund?.name || holding.name}</h3>
             <div className="mt-0.5 flex items-center gap-1.5 text-[9px] text-muted">
               <span>{holding.code}</span>
               <span>·</span>
               <DataStatus mode={statusMode} detail={quote.dataDate || undefined} />
             </div>
           </div>
-          <Tone v={quote.pct} className="shrink-0 text-[18px] font-bold leading-none">
-            {fmtPctShort(quote.pct)}
-          </Tone>
+          <span className={toneText(quote.pct)}>{fmtPctShort(quote.pct)}</span>
         </div>
       </div>
 
@@ -87,16 +83,14 @@ function FundSignalGroup({ holding, fund }: { holding: HoldingLike; fund: any })
           score={bandScore}
           tone={metrics?.bandTone ?? "neutral"}
           subtitle={bandSubtitle(metrics?.bandTone, bandLabel)}
-          markerText={bandScore == null ? "—" : `${bandScore}/100`}
           compact="波段位置"
         />
         <SignalCard
           title="趋势强弱"
           label={trendLabel}
           score={trendScore}
-          tone={trendTone(trendScore)}
+          tone="neutral"
           subtitle={trendSubtitle(trendScore, trendLabel)}
-          markerText={trendScore == null ? "—" : `${trendScore}/100`}
           compact="趋势方向"
         />
       </div>
@@ -111,16 +105,16 @@ function FundSignalGroup({ holding, fund }: { holding: HoldingLike; fund: any })
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-[12px] font-semibold text-fg">组合判断</div>
-              <p className="mt-0.5 text-[10.5px] leading-[1.45] text-muted">
+              <p className="mt-0.5 text-[10px] leading-[1.4] text-muted">
                 {metrics?.combo || "暂无可靠组合判断"}
               </p>
             </div>
-            <span className="mt-0.5 shrink-0 rounded-full bg-white/55 px-2 py-0.5 text-[9px] font-semibold text-muted">
-              {expanded ? "收起详情" : "指标详情"} {expanded ? "⌃" : "⌄"}
+            <span className="mt-0.5 shrink-0 rounded-full bg-white/52 px-2 py-0.5 text-[9px] font-semibold text-muted">
+              {expanded ? "收起" : "指标详情"} {expanded ? "⌃" : "⌄"}
             </span>
           </div>
 
-          <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-subtle">
+          <div className="mt-1.5 flex items-center justify-between gap-2 text-[8.5px] text-subtle">
             <span>
               RSI {formatMetric(metrics?.rsi, 1)} · BIAS {formatMetric(metrics?.bias, 2)}% · MACD {formatMetric(metrics?.macd, 3)}
             </span>
@@ -172,7 +166,6 @@ function SignalCard({
   score,
   tone,
   subtitle,
-  markerText,
   compact,
 }: {
   title: string;
@@ -180,70 +173,67 @@ function SignalCard({
   score: number | null;
   tone: "low" | "high" | "neutral";
   subtitle: string;
-  markerText: string;
   compact: string;
 }) {
   const pct = score == null ? 50 : Math.max(0, Math.min(100, score));
   const toneClass =
     tone === "low"
-      ? "border-sky-200/80 bg-white/72"
+      ? "border-[#dbe7ef]/80 bg-white/66"
       : tone === "high"
-        ? "border-orange-200/80 bg-white/72"
-        : "border-white/80 bg-white/68";
+        ? "border-[#eadfd7]/80 bg-white/66"
+        : "border-white/78 bg-white/60";
   const labelClass =
     tone === "low"
-      ? "text-sky-600"
+      ? "text-[#66879e]"
       : tone === "high"
-        ? "text-orange-600"
-        : "text-slate-600";
+        ? "text-[#997d6d]"
+        : "text-[#647588]";
 
   return (
-    <Glass className={`mb-0 min-h-[164px] border px-3 py-3 ${toneClass}`}>
+    <Glass className={`mb-0 min-h-[148px] border px-3 py-3 ${toneClass}`}>
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="text-[10px] font-medium text-muted">{title}</div>
-          <div className={`mt-1 text-[22px] font-bold leading-none ${labelClass}`}>{label}</div>
+        <div className="min-w-0">
+          <div className="text-[9px] font-medium text-muted">{title}</div>
+          <div className={`mt-1 text-[20px] font-bold leading-none ${labelClass}`}>{label}</div>
         </div>
         <div className="text-right">
-          <div className="text-[8px] uppercase tracking-[0.08em] text-subtle">{compact}</div>
-          <div className={`mt-0.5 text-[14px] font-bold tabular-nums ${labelClass}`}>{markerText}</div>
+          <div className="text-[7.5px] tracking-[0.06em] text-subtle">{compact}</div>
+          <div className={`mt-0.5 text-[13px] font-bold tabular-nums ${labelClass}`}>
+            {score == null ? "—" : `${score}/100`}
+          </div>
         </div>
       </div>
 
-      <p className="mt-2 min-h-[28px] text-[9.5px] leading-[1.45] text-muted">{subtitle}</p>
+      <p className="mt-2 min-h-[30px] text-[9px] leading-[1.4] text-muted">{subtitle}</p>
 
-      <div className="mt-3">
+      <div className="mt-2.5">
         <div
-          className="relative h-2.5 overflow-hidden rounded-full"
+          className="relative h-2 overflow-hidden rounded-full"
           style={{
             background:
-              "linear-gradient(90deg,#ef5350 0%,#f6a21a 26%,#8ca1bb 49%,#4d7fd0 72%,#24a67a 100%)",
+              "linear-gradient(90deg,#e8c6c3 0%,#eee0c6 25%,#d5dce4 50%,#c3d0df 70%,#c7ddd8 100%)",
           }}
         >
           <span
-            className="absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border-2 border-slate-700/90 bg-white shadow-[0_2px_8px_rgba(15,23,42,.2)]"
-            style={{ left: `calc(${pct}% - 10px)` }}
+            className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border border-slate-400/70 bg-white/92 shadow-[0_1px_6px_rgba(62,78,96,.16)]"
+            style={{ left: `calc(${pct}% - 8px)` }}
           />
         </div>
-        <div className="mt-1.5 flex items-center justify-between text-[8px] text-subtle">
+        <div className="mt-1 flex items-center justify-between text-[7.5px] text-subtle">
           <span>弱</span>
           <span>中</span>
           <span>强</span>
         </div>
       </div>
-
-      <div className="mt-2 inline-flex rounded-full bg-white/58 px-2 py-0.5 text-[8.5px] font-semibold text-muted shadow-[inset_0_1px_0_rgba(255,255,255,.8)]">
-        {label}
-      </div>
     </Glass>
   );
 }
 
-function trendTone(score: number | null): "low" | "high" | "neutral" {
-  if (score == null) return "neutral";
-  if (score >= 60) return "low";
-  if (score <= 40) return "high";
-  return "neutral";
+function toneText(v: number | null) {
+  if (v == null) return "shrink-0 text-[17px] font-bold text-subtle";
+  if (v > 0) return "shrink-0 text-[17px] font-bold text-[#7e6f6b]";
+  if (v < 0) return "shrink-0 text-[17px] font-bold text-[#6f7d88]";
+  return "shrink-0 text-[17px] font-bold text-subtle";
 }
 
 function trendSubtitle(score: number | null, label: string) {
