@@ -1,5 +1,5 @@
-import { getMarketPhase } from "../market-hours";
-import { isWeekendLike, readCached, writeCached } from "./offline-cache";
+import { getMarketPhase } from "../market-hours.ts";
+import { isWeekendLike, readCached, writeCached } from "./offline-cache.ts";
 
 export type CacheDomain = "ui" | "portfolio" | "fundEstimate" | "index" | "fundSector" | "news" | "officialNav" | "ai";
 
