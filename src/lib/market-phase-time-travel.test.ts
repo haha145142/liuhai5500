@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getMarketPhase } from "./market-hours";
+import { getMarketPhase } from "./market-hours.ts";
 
 const at = (utc: string) => new Date(utc);
 
