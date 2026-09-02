@@ -1,5 +1,4 @@
 import { isWeekendLike, readCached, writeCached } from "./offline-cache";
-import { getMarketPhase } from "../market-hours";
 
 export type CacheDomain = "ui" | "portfolio" | "fundEstimate" | "index" | "fundSector" | "news" | "officialNav" | "ai";
 
@@ -44,9 +43,9 @@ export type MarketDataState = "trading" | "weekend" | "closed_weekday";
 export function classifyMarketDataState(input: { now?: Date; latestTradingDate?: string | null }): MarketDataState {
   const now = input.now ?? new Date();
   const today = chinaDate(now);
-  if (isWeekendLike(now)) return "weekend";
+  const shifted = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  if (isWeekendLike(shifted)) return "weekend";
   if (input.latestTradingDate && input.latestTradingDate !== today) return "closed_weekday";
-  if (getMarketPhase(now) === "postclose") return "closed_weekday";
   return "trading";
 }
 
