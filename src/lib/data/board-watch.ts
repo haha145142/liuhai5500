@@ -5,7 +5,16 @@ import { SECTOR_RULES } from "./sectors";
 import { isExchangeClosed, tradingDateLabel } from "./trading-day";
 
 export type BoardCandidate = { code: string; name: string; type: "industry" | "concept"; icon: string };
-export type BoardWatchQuote = { code: string; name: string; icon: string; pct: number | null; mainFlow: number | null; superFlow: number | null; largeFlow: number | null; midFlow: number | null; smallFlow: number | null; turnover: number | null; marketDate: string; source: string; validation: "live" | "recent" | "unavailable"; flowScore: number | null; flowSignal: "强流入" | "流入" | "中性" | "流出" | "强流出" | "暂无" };
+export type BoardWatchQuote = {
+  code: string; name: string; icon: string; pct: number | null;
+  mainFlow: number | null; superFlow: number | null; largeFlow: number | null; midFlow: number | null; smallFlow: number | null;
+  turnover: number | null; marketDate: string; source: string;
+  validation: "live" | "recent" | "unavailable";
+  priceStatus: "live" | "recent" | "unavailable";
+  flowStatus: "fresh" | "stale" | "unavailable";
+  flowScore: number | null;
+  flowSignal: "强流入" | "流入" | "中性" | "流出" | "强流出" | "暂无";
+};
 
 const UT = "fa5fd1943c7b386f172d6893dbfba10b";
 const FIELDS = "f12,f14,f3,f62,f66,f72,f78,f84,f6";
@@ -44,12 +53,13 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
     const flowFresh = !!ak && !!flowSnapshot?.fetchedAt && Date.now() - Date.parse(flowSnapshot.fetchedAt) <= 10 * 60_000;
     const effectiveFlow = flowFresh ? ak : null;
     const classified = classifyFlow(effectiveFlow, maxAbsMain);
-    const liveQuote = !closed && pct != null;
-    const validation: BoardWatchQuote["validation"] = liveQuote ? "live" : (pct != null || flowFresh ? "recent" : "unavailable");
+    const priceStatus: BoardWatchQuote["priceStatus"] = !closed && pct != null ? "live" : pct != null ? "recent" : "unavailable";
+    const flowStatus: BoardWatchQuote["flowStatus"] = flowFresh ? "fresh" : ak ? "stale" : "unavailable";
+    const validation: BoardWatchQuote["validation"] = priceStatus === "unavailable" && flowStatus === "unavailable" ? "unavailable" : priceStatus === "live" && flowStatus === "fresh" ? "live" : "recent";
     const sourceParts = [row ? (closed ? "东方财富板块行情 · 最近交易日" : "东方财富板块实时行情") : "当前暂无可靠板块行情"];
-    if (flowFresh) sourceParts.push("AKShare资金流交叉源");
+    if (flowFresh) sourceParts.push("AKShare资金流新鲜");
     else if (ak) sourceParts.push("AKShare资金流较旧，仅作参考");
-    return { code, name, icon: iconFor(name), pct, mainFlow: effectiveFlow?.mainNetInflow ?? null, superFlow: effectiveFlow?.superNetInflow ?? null, largeFlow: effectiveFlow?.largeNetInflow ?? null, midFlow: effectiveFlow?.midNetInflow ?? null, smallFlow: effectiveFlow?.smallNetInflow ?? null, turnover: row ? n(row.f6) : null, marketDate, source: sourceParts.join(" · "), validation, flowScore: classified.score, flowSignal: classified.signal };
+    return { code, name, icon: iconFor(name), pct, mainFlow: effectiveFlow?.mainNetInflow ?? null, superFlow: effectiveFlow?.superNetInflow ?? null, largeFlow: effectiveFlow?.largeNetInflow ?? null, midFlow: effectiveFlow?.midNetInflow ?? null, smallFlow: effectiveFlow?.smallNetInflow ?? null, turnover: row ? n(row.f6) : null, marketDate, source: sourceParts.join(" · "), validation, priceStatus, flowStatus, flowScore: classified.score, flowSignal: classified.signal };
   });
   return { rows: result, fetchedAt: Date.now(), weekend: closed };
 });
