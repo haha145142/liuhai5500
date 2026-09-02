@@ -1,5 +1,5 @@
 import type { FundQuote } from "../types";
-import { cnTime } from "../format";
+import { cnTime } from "../format.ts";
 import { getMarketPhase } from "../market-hours";
 
 export type FundQuoteMode = "official_today" | "live_estimate" | "latest_official" | "unavailable";
