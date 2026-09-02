@@ -1,4 +1,4 @@
-import { getFund, getPrewarmFundCodes } from "../src/lib/data/server";
+import { refreshFundQuote, getPrewarmFundCodes } from "../src/lib/data/server";
 import { sharedCacheConfigured } from "../src/lib/data/shared-cache";
 import { getMarketPhase } from "../src/lib/market-hours";
 
@@ -27,20 +27,31 @@ export default async function handler(req: Request, res: Response) {
   if (!sharedCacheConfigured()) return res.status(200).json({ ok: false, skipped: true, reason: "shared-cache-not-configured" });
 
   const phase = getMarketPhase();
-  if (phase === "weekend" || phase === "trading" || phase === "preopen") {
+  if (phase === "weekend" || phase !== "postclose") {
     return res.status(200).json({ ok: true, skipped: true, reason: phase === "weekend" ? "market-closed-weekend" : "official-nav-window-not-active", phase });
   }
 
   const codes = await getPrewarmFundCodes();
   if (!codes.length) return res.status(200).json({ ok: true, skipped: true, reason: "no-fund-codes-registered", phase });
 
-  const settled = await Promise.allSettled(codes.map((code) => getFund({ data: { code } })));
-  const results = settled.map((item, index) => {
-    if (item.status === "rejected") return { code: codes[index], ok: false, official: false, error: item.reason instanceof Error ? item.reason.message : "fund-prewarm-failed" };
-    const quote = item.value;
-    const official = quote.officialNavPublished === true && isToday(quote.navDate);
-    return { code: codes[index], ok: true, official, navDate: quote.navDate ?? null, valuationStatus: quote.valuationStatus ?? "unavailable" };
-  });
+  const results: Array<{ code: string; ok: boolean; official: boolean; navDate?: string | null; valuationStatus?: string; error?: string }> = [];
+  const CONCURRENCY = 8;
+  for (let i = 0; i < codes.length; i += CONCURRENCY) {
+    const batch = codes.slice(i, i + CONCURRENCY);
+    const settled = await Promise.allSettled(batch.map((code) => refreshFundQuote(code)));
+    for (let j = 0; j < settled.length; j += 1) {
+      const item = settled[j];
+      const code = batch[j];
+      if (item.status === "rejected") {
+        results.push({ code, ok: false, official: false, error: item.reason instanceof Error ? item.reason.message : "fund-prewarm-failed" });
+        continue;
+      }
+      const quote = item.value;
+      const official = quote.officialNavPublished === true && isToday(quote.navDate);
+      results.push({ code, ok: true, official, navDate: quote.navDate ?? null, valuationStatus: quote.valuationStatus ?? "unavailable" });
+    }
+  }
+
   const officialCount = results.filter((x) => x.official).length;
   const failedCount = results.filter((x) => !x.ok).length;
   return res.status(failedCount ? 207 : 200).json({ ok: failedCount === 0, phase, scanned: codes.length, officialCount, pendingOfficial: codes.length - officialCount, failedCount, results });
