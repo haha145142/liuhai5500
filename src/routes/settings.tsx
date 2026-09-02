@@ -13,6 +13,11 @@ export const Route = createFileRoute("/settings")({ component: SettingsPage });
 const MIN_MARKET_REFRESH_SEC = 180;
 const MAX_MARKET_REFRESH_SEC = 300;
 
+function formatChinaTime(timestamp: number | null | undefined) {
+  if (!timestamp) return "等待数据";
+  return new Date(timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "Asia/Shanghai" });
+}
+
 function SettingsPage() {
   const snapshot = useApp((s) => s.snapshot);
   const news = useApp((s) => s.news);
@@ -60,7 +65,7 @@ function SettingsPage() {
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
           <div className="rounded-2xl bg-bg-elevated px-3 py-2.5"><div className="text-subtle">市场日期</div><div className="mt-0.5 font-semibold text-fg">{snapshot?.marketDate || tradingDateLabel()}</div></div>
-          <div className="rounded-2xl bg-bg-elevated px-3 py-2.5"><div className="text-subtle">最近刷新</div><div className="mt-0.5 font-semibold text-fg">{snapshot?.fetchedAt ? new Date(snapshot.fetchedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "等待数据"}</div></div>
+          <div className="rounded-2xl bg-bg-elevated px-3 py-2.5"><div className="text-subtle">最近刷新</div><div className="mt-0.5 font-semibold text-fg">{formatChinaTime(snapshot?.fetchedAt)}</div></div>
         </div>
       </Glass>
 
@@ -77,7 +82,7 @@ function SettingsPage() {
           <input type="range" min={MIN_MARKET_REFRESH_SEC} max={MAX_MARKET_REFRESH_SEC} step={60} value={refreshSeconds} onChange={(e) => setSettings({ autoRefreshMs: Number(e.target.value) * 1000 })} className="mt-3 w-full accent-[var(--color-accent)]" />
           <div className="mt-1 flex justify-between text-[9px] text-subtle"><span>3分钟</span><span>5分钟</span></div>
         </div>
-        <p className="mt-2 text-[10px] text-subtle">交易时段最低 3 分钟；非交易时段不做无意义的高频请求。</p>
+        <p className="mt-2 text-[10px] text-subtle">交易时段每 3–5 分钟刷新；非交易时段不做无意义的高频请求。</p>
       </Glass>
 
       <SmartAlerts />
@@ -93,7 +98,7 @@ function SettingsPage() {
 
       <Glass>
         <SectionTitle title="关于 Fund AI Pro" />
-        <div className="space-y-2 text-[11px] leading-relaxed text-muted"><p>持仓估值、基金主题、市场行情、资金验证、新闻证据链统一在同一套数据状态下运行。</p><p>盘中使用经过可靠性门槛的数据；午间沿用上午最后可靠状态；收盘后等待官方净值；周末显示最近交易日。</p><p className="text-subtle">不构成投资建议。没有可靠数据就显示“暂无可靠数据”，不使用假数字。</p></div>
+        <div className="space-y-2 text-[11px] leading-relaxed text-muted"><p>持仓估值、基金主题、市场行情、资金验证、新闻证据链统一在同一套数据状态下运行。</p><p>盘中使用经过可靠性门槛的数据；午间沿用上午最后可靠状态；收盘后等待官方净值，若官方净值尚未发布则保留当日最后可靠盘中估值；周末显示最近交易日官方净值。</p><p className="text-subtle">不构成投资建议。没有可靠数据就显示“暂无可靠数据”，不使用假数字。</p></div>
       </Glass>
     </div>
   );
