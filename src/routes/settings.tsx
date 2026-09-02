@@ -6,6 +6,7 @@ import { testDeepSeek } from "@/lib/data/deepseek";
 import { useApp } from "@/lib/store";
 import { isWeekend, isTradeTime, sessionLabel } from "@/lib/market-hours";
 import { tradingDateLabel } from "@/lib/data/trading-day";
+import { SmartAlerts } from "@/components/settings/SmartAlerts";
 
 export const Route = createFileRoute("/settings")({ component: SettingsPage });
 
@@ -81,6 +82,8 @@ function SettingsPage() {
         </div>
         <p className="mt-2 text-[10px] text-subtle">最低 30 秒；非交易时段不做无意义的高频请求。</p>
       </Glass>
+
+      <SmartAlerts />
 
       <Glass>
         <SectionTitle title="DeepSeek" hint="AI" />
