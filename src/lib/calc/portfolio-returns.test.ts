@@ -57,11 +57,21 @@ test("low-confidence intraday estimate is not displayed while the market is open
   assert.equal(result.quoteMode, "none");
 });
 
-test("medium/high confidence intraday estimate remains eligible", () => {
+test("stale medium/high-confidence estimate is not displayed while the market is open", () => {
+  const result = calcHoldingReturn(
+    { code: "000001", name: "测试基金", shares: 10, cost: 1 },
+    fund({ estimateConfidence: "high", estimateTime: "2026-09-02T01:00:00Z" }),
+    new Date("2026-09-02T02:30:00Z"),
+  );
+  assert.equal(result.marketValue, null);
+  assert.equal(result.quoteMode, "none");
+});
+
+test("medium/high confidence intraday estimate remains eligible when fresh", () => {
   for (const confidence of ["medium", "high"] as const) {
     const result = calcHoldingReturn(
       { code: "000001", name: "测试基金", shares: 10, cost: 1 },
-      fund({ estimateConfidence: confidence, estimateTime: "2026-09-02T02:00:00Z" }),
+      fund({ estimateConfidence: confidence, estimateTime: "2026-09-02T02:20:00Z" }),
       new Date("2026-09-02T02:30:00Z"),
     );
     assert.equal(result.quoteMode, "live_estimate");
