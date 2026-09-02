@@ -7,7 +7,7 @@ on:
 
 jobs:
   prewarm:
-    if: ${{ secrets.PREWARM_URL != '' }}
+    if: ${{ secrets.PREWARM_URL != '' && secrets.CRON_SECRET != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -17,10 +17,6 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
-          if [ -n "${CRON_SECRET}" ]; then
-            curl --fail --silent --show-error --max-time 20 \
-              -H "Authorization: Bearer ${CRON_SECRET}" \
-              "${PREWARM_URL}"
-          else
-            curl --fail --silent --show-error --max-time 20 "${PREWARM_URL}"
-          fi
+          curl --fail --silent --show-error --max-time 20 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PREWARM_URL}"
