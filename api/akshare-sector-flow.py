@@ -25,7 +25,8 @@ def as_number(value: Any) -> float | None:
     try:
         if value is None or value == "":
             return None
-        return float(value)
+        text = str(value).replace(",", "").replace("%", "").strip()
+        return float(text)
     except (TypeError, ValueError):
         return None
 
@@ -53,12 +54,8 @@ def normalize(df: Any) -> list[dict[str, Any]]:
     return rows
 
 
+# This file is itself the Vercel /api/akshare-sector-flow function.
 @app.get("/")
-async def health() -> dict[str, str]:
-    return {"ok": "true", "source": "AKShare"}
-
-
-@app.get("/api/akshare-sector-flow")
 async def sector_flow(
     sector_type: str = Query(default="industry"),
     indicator: str = Query(default="今日"),
