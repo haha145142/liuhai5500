@@ -113,7 +113,14 @@ async function testPortfolioAndBand(page, label) {
 async function seedHoldings(page) {
   await page.addInitScript(() => {
     const holdings = Array.from({ length: 20 }, (_, i) => ({ code: String(i + 1).padStart(6, "0"), name: `测试基金${i + 1}`, shares: 100, cost: 1 }));
+    const rankRows = [
+      { code: "000001", name: "测试排行基金1", nav: 1.01, day: 1.2, week: 4, month: 8, sixMonth: 12, oneYear: 20, ytd: 15 },
+      { code: "000002", name: "测试排行基金2", nav: 1.02, day: 0.8, week: 3, month: 6, sixMonth: 10, oneYear: 16, ytd: 12 },
+      { code: "000003", name: "测试排行基金3", nav: 1.03, day: 0.5, week: 2, month: 5, sixMonth: 8, oneYear: 12, ytd: 9 },
+      { code: "000004", name: "测试排行基金4", nav: 1.04, day: 0.2, week: 1, month: 3, sixMonth: 6, oneYear: 9, ytd: 7 },
+    ];
     localStorage.setItem("fund_ai_pro_portfolio_v3", JSON.stringify(holdings));
+    localStorage.setItem("fund_ai_pro_rank_cache_v2_r", JSON.stringify({ savedAt: Date.now(), rows: rankRows, source: "UI smoke seeded rank" }));
     localStorage.removeItem("fund_ai_pro_board_watch_v7");
     localStorage.removeItem("fund_ai_pro_board_watch_v8");
     localStorage.removeItem("fund_ai_pro_fund_candidates_v1");
