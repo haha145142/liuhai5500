@@ -27,6 +27,9 @@ const fundPending = new Map<string, Promise<FundQuote>>();
 const postCloseEstimate = new Map<string, FundQuote>();
 let snapshotPending: Promise<Snapshot> | null = null;
 
+type SnapshotField<T> = { generation: string; value: T };
+type SnapshotMeta = { generation: string; sources: Snapshot["sources"]; marketDate: string | null; fetchedAt: number; validation: Snapshot["validation"] };
+
 function chinaDateLabel(date = new Date()) {
   const shifted = new Date(date.getTime() + 8 * 60 * 60 * 1000);
   return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
@@ -81,24 +84,32 @@ export const getFund = async ({ data }: { data: { code: string } }): Promise<Fun
 
 const INDEX_CODES = ["000001", "399001", "399006", "000688"] as const;
 async function cacheSnapshotFields(snapshot: Snapshot) {
+  const generation = `${snapshot.fetchedAt}:${snapshot.marketDate ?? "none"}`;
   void Promise.all([
-    sharedCacheSet("fund-ai-pro:snapshot:indices", snapshot.indices, SNAPSHOT_FIELD_TTL.indices),
-    sharedCacheSet("fund-ai-pro:snapshot:sectors", snapshot.sectors, SNAPSHOT_FIELD_TTL.sectors),
-    sharedCacheSet("fund-ai-pro:snapshot:flow", snapshot.flow, SNAPSHOT_FIELD_TTL.flow),
-    sharedCacheSet("fund-ai-pro:snapshot:global", snapshot.global, SNAPSHOT_FIELD_TTL.global),
-    sharedCacheSet("fund-ai-pro:snapshot:meta", { sources: snapshot.sources, marketDate: snapshot.marketDate ?? null, fetchedAt: snapshot.fetchedAt, validation: snapshot.validation }, SNAPSHOT_FIELD_TTL.metadata),
+    sharedCacheSet("fund-ai-pro:snapshot:indices", { generation, value: snapshot.indices } satisfies SnapshotField<Snapshot["indices"]>, SNAPSHOT_FIELD_TTL.indices),
+    sharedCacheSet("fund-ai-pro:snapshot:sectors", { generation, value: snapshot.sectors } satisfies SnapshotField<Snapshot["sectors"]>, SNAPSHOT_FIELD_TTL.sectors),
+    sharedCacheSet("fund-ai-pro:snapshot:flow", { generation, value: snapshot.flow } satisfies SnapshotField<Snapshot["flow"]>, SNAPSHOT_FIELD_TTL.flow),
+    sharedCacheSet("fund-ai-pro:snapshot:global", { generation, value: snapshot.global } satisfies SnapshotField<Snapshot["global"]>, SNAPSHOT_FIELD_TTL.global),
+    sharedCacheSet("fund-ai-pro:snapshot:meta", { generation, sources: snapshot.sources, marketDate: snapshot.marketDate ?? null, fetchedAt: snapshot.fetchedAt, validation: snapshot.validation } satisfies SnapshotMeta, SNAPSHOT_FIELD_TTL.metadata),
   ]).catch(() => {});
 }
 async function readFieldCachedSnapshot(): Promise<Snapshot | null> {
   const [indices, sectors, flow, global, meta] = await Promise.all([
-    sharedCacheGet<Snapshot["indices"]>("fund-ai-pro:snapshot:indices"),
-    sharedCacheGet<Snapshot["sectors"]>("fund-ai-pro:snapshot:sectors"),
-    sharedCacheGet<Snapshot["flow"]>("fund-ai-pro:snapshot:flow"),
-    sharedCacheGet<Snapshot["global"]>("fund-ai-pro:snapshot:global"),
-    sharedCacheGet<{ sources: Snapshot["sources"]; marketDate: string | null; fetchedAt: number; validation: Snapshot["validation"] }>("fund-ai-pro:snapshot:meta"),
+    sharedCacheGet<SnapshotField<Snapshot["indices"]>>("fund-ai-pro:snapshot:indices"),
+    sharedCacheGet<SnapshotField<Snapshot["sectors"]>>("fund-ai-pro:snapshot:sectors"),
+    sharedCacheGet<SnapshotField<Snapshot["flow"]>>("fund-ai-pro:snapshot:flow"),
+    sharedCacheGet<SnapshotField<Snapshot["global"]>>("fund-ai-pro:snapshot:global"),
+    sharedCacheGet<SnapshotMeta>("fund-ai-pro:snapshot:meta"),
   ]);
-  if (!indices?.value && !sectors?.value && !flow?.value && !global?.value && !meta?.value) return null;
-  return { indices: indices?.value ?? [], sectors: sectors?.value ?? [], boards: [], flow: flow?.value ?? null, global: global?.value ?? [], sources: meta?.value?.sources ?? [], fetchedAt: meta?.value?.fetchedAt ?? Date.now(), marketDate: meta?.value?.marketDate ?? null, validation: meta?.value?.validation };
+  if (!meta?.value) return null;
+  const generation = meta.value.generation;
+  const same = (entry: { value?: SnapshotField<unknown> } | null | undefined) => entry?.value?.generation === generation;
+  const coherentIndices = same(indices) ? indices!.value!.value : null;
+  const coherentSectors = same(sectors) ? sectors!.value!.value : null;
+  const coherentFlow = same(flow) ? flow!.value!.value : null;
+  const coherentGlobal = same(global) ? global!.value!.value : null;
+  if (!coherentIndices || !coherentSectors || !meta.value.sources.length) return null;
+  return { indices: coherentIndices, sectors: coherentSectors, boards: [], flow: coherentFlow, global: coherentGlobal ?? [], sources: meta.value.sources, fetchedAt: meta.value.fetchedAt, marketDate: meta.value.marketDate, validation: meta.value.validation };
 }
 async function buildSnapshot(): Promise<Snapshot> {
   const [baseSnapshot, moneyFlow] = await Promise.all([preserveReliableSnapshot(await getStableSnapshot()), getMarketMoneyFlow().catch(() => null)]);
