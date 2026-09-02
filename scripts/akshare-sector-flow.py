@@ -40,6 +40,31 @@ def number(value):
     return value if math.isfinite(value) else None
 
 
+def latest_trade_date(now: datetime) -> str:
+    today = now.date()
+    try:
+        frame = ak.tool_trade_date_hist_sina()
+        candidates = []
+        for value in frame.iloc[:, 0].tolist():
+            text = str(value).strip()[:10]
+            try:
+                day = datetime.fromisoformat(text).date()
+            except ValueError:
+                continue
+            if day <= today:
+                candidates.append(day)
+        if candidates:
+            return max(candidates).isoformat()
+    except Exception:
+        pass
+    # Conservative fallback when the calendar provider is unavailable. Never move
+    # the data date into the future; weekends roll back to the previous Friday.
+    fallback = today
+    while fallback.weekday() >= 5:
+        fallback = fallback.fromordinal(fallback.toordinal() - 1)
+    return fallback.isoformat()
+
+
 def normalize_eastmoney(df, sector_type):
     rows = []
     if df is None:
@@ -93,13 +118,14 @@ def normalize_ths(df, sector_type):
 
 def fetch():
     now = datetime.now(ZoneInfo("Asia/Shanghai"))
+    market_date = latest_trade_date(now)
     payload = {
         "ok": True,
         "source": "AKShare",
         "provider": "akshare",
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "fetchedAt": now.isoformat(),
-        "marketDate": now.date().isoformat(),
+        "marketDate": market_date,
         "rows": [],
         "errors": [],
         "sources": [],
@@ -114,7 +140,7 @@ def fetch():
             )
             rows = normalize_eastmoney(frame, sector_type)
             if rows:
-                payload["sources"].append({"sector_type": sector_type, "provider": "AKShare/EastMoney"})
+                payload["sources"].append({"sector_type": sector_type, "provider": "AKShare/EastMoney", "rowCount": len(rows)})
         except Exception as exc:
             payload["errors"].append(
                 {
@@ -129,7 +155,7 @@ def fetch():
                 frame = ak.stock_fund_flow_industry(symbol="即时")
                 rows = normalize_ths(frame, sector_type)
                 if rows:
-                    payload["sources"].append({"sector_type": sector_type, "provider": "AKShare/THS"})
+                    payload["sources"].append({"sector_type": sector_type, "provider": "AKShare/THS", "rowCount": len(rows)})
             except Exception as exc:
                 payload["errors"].append(
                     {
@@ -144,7 +170,7 @@ def fetch():
                 frame = ak.stock_fund_flow_concept(symbol="即时")
                 rows = normalize_ths(frame, sector_type)
                 if rows:
-                    payload["sources"].append({"sector_type": sector_type, "provider": "AKShare/THS"})
+                    payload["sources"].append({"sector_type": sector_type, "provider": "AKShare/THS", "rowCount": len(rows)})
             except Exception as exc:
                 payload["errors"].append(
                     {
@@ -159,7 +185,8 @@ def fetch():
     if not payload["rows"]:
         raise RuntimeError("AKShare returned no sector-flow rows from any supported source")
 
-    payload["complete"] = len(payload["sources"]) == len(CATEGORIES)
+    source_types = {item["sector_type"] for item in payload["sources"]}
+    payload["complete"] = source_types == set(CATEGORIES)
     payload["rowCount"] = len(payload["rows"])
     return payload
 
@@ -172,6 +199,7 @@ def main():
         encoding="utf-8",
     )
     print(f"wrote {payload['rowCount']} AKShare rows to {OUTPUT}")
+    print(f"marketDate={payload['marketDate']}")
     print(f"sources={payload['sources']}")
     if payload["errors"]:
         print(f"errors={payload['errors']}")
