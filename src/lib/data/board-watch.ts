@@ -1,10 +1,27 @@
 import { createServerFn } from "@tanstack/react-start";
 import { fetchText, n, parseMaybeJsonp } from "./fetch-util";
+import { fetchAkShareSnapshot, type AkShareSectorFlow } from "./akshare-sector-flow";
 import { SECTOR_RULES } from "./sectors";
 import { isExchangeClosed, tradingDateLabel } from "./trading-day";
 
 export type BoardCandidate = { code: string; name: string; type: "industry" | "concept"; icon: string };
-export type BoardWatchQuote = { code: string; name: string; icon: string; pct: number | null; mainFlow: number | null; superFlow: number | null; largeFlow: number | null; midFlow: number | null; smallFlow: number | null; turnover: number | null; marketDate: string; source: string; validation: "live" | "unavailable" };
+export type BoardWatchQuote = {
+  code: string;
+  name: string;
+  icon: string;
+  pct: number | null;
+  mainFlow: number | null;
+  superFlow: number | null;
+  largeFlow: number | null;
+  midFlow: number | null;
+  smallFlow: number | null;
+  turnover: number | null;
+  marketDate: string;
+  source: string;
+  validation: "live" | "unavailable";
+  flowScore: number | null;
+  flowSignal: "强流入" | "流入" | "中性" | "流出" | "强流出" | "暂无";
+};
 
 const UT = "fa5fd1943c7b386f172d6893dbfba10b";
 const FIELDS = "f12,f14,f3,f62,f66,f72,f78,f84,f6";
@@ -37,6 +54,24 @@ function score(name: string, q: string) {
   const rule = SECTOR_RULES.find((s) => s.searchKeys.some((x) => x.toLowerCase() === k || x.toLowerCase().includes(k)));
   return rule && (name.includes(rule.name) || rule.searchKeys.some((x) => name.includes(x))) ? 60 : 0;
 }
+function findAkFlow(name: string, flows: AkShareSectorFlow[]): AkShareSectorFlow | null {
+  const exact = flows.find((row) => row.name === name);
+  if (exact) return exact;
+  const normalized = name.replace(/[（）()\s]/g, "");
+  return flows.find((row) => {
+    const candidate = row.name.replace(/[（）()\s]/g, "");
+    return candidate.includes(normalized) || normalized.includes(candidate);
+  }) ?? null;
+}
+function classifyFlow(row: AkShareSectorFlow | null, maxAbsMain: number): { score: number | null; signal: BoardWatchQuote["flowSignal"] } {
+  if (!row) return { score: null, signal: "暂无" };
+  const main = row.mainNetInflow ?? ((row.superNetInflow ?? 0) + (row.largeNetInflow ?? 0));
+  if (!Number.isFinite(main)) return { score: null, signal: "暂无" };
+  const denominator = Math.max(maxAbsMain, 1);
+  const score = Math.max(-100, Math.min(100, (main / denominator) * 100));
+  const signal = score >= 60 ? "强流入" : score >= 15 ? "流入" : score <= -60 ? "强流出" : score <= -15 ? "流出" : "中性";
+  return { score, signal };
+}
 
 export const searchFundBoards = createServerFn({ method: "POST" }).validator((input: { query?: string }) => input).handler(async ({ data }): Promise<{ items: BoardCandidate[] }> => {
   const q = String(data.query ?? "").trim();
@@ -63,12 +98,55 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
   const codes = [...new Set((data.codes ?? []).map((x) => String(x).trim()).filter(Boolean))].slice(0, 30);
   const closed = isExchangeClosed();
   if (!codes.length) return { rows: [], fetchedAt: Date.now(), weekend: closed };
-  const rows = await fetchBoards(); const byCode = new Map(rows.map((r) => [rowCode(r), r])); const date = tradingDateLabel();
+
+  const [rows, akSnapshot] = await Promise.all([fetchBoards(), fetchAkShareSnapshot()]);
+  const byCode = new Map(rows.map((r) => [rowCode(r), r]));
+  const date = tradingDateLabel();
+  const akFlows = akSnapshot.rows;
+  const maxAbsMain = Math.max(...akFlows.map((row) => Math.abs(row.mainNetInflow ?? 0)), 1);
+
   const result = await Promise.all(codes.map(async (code): Promise<BoardWatchQuote> => {
     const row = byCode.get(code) ?? await fetchBoardByCode(code);
     const pct = row ? n(row.f3) : null;
-    if (!row) return { code, name: code, icon: "📈", pct: null, mainFlow: null, superFlow: null, largeFlow: null, midFlow: null, smallFlow: null, turnover: null, marketDate: date, source: "当前暂无可靠板块行情", validation: "unavailable" };
-    return { code, name: rowName(row) || code, icon: iconFor(rowName(row) || code), pct, mainFlow: n(row.f62), superFlow: n(row.f66), largeFlow: n(row.f72), midFlow: n(row.f78), smallFlow: n(row.f84), turnover: n(row.f6), marketDate: date, source: "东方财富实时板块行情", validation: pct != null ? "live" : "unavailable" };
+    const name = row ? rowName(row) || code : code;
+    const ak = findAkFlow(name, akFlows);
+    const flow = classifyFlow(ak, maxAbsMain);
+    if (!row) {
+      return {
+        code,
+        name,
+        icon: iconFor(name),
+        pct,
+        mainFlow: ak?.mainNetInflow ?? null,
+        superFlow: ak?.superNetInflow ?? null,
+        largeFlow: ak?.largeNetInflow ?? null,
+        midFlow: ak?.midNetInflow ?? null,
+        smallFlow: ak?.smallNetInflow ?? null,
+        turnover: null,
+        marketDate: akSnapshot.marketDate ?? date,
+        source: ak ? "AKShare真实板块资金流" : "当前暂无可靠板块行情",
+        validation: ak ? "live" : "unavailable",
+        flowScore: flow.score,
+        flowSignal: flow.signal,
+      };
+    }
+    return {
+      code,
+      name,
+      icon: iconFor(name),
+      pct,
+      mainFlow: ak?.mainNetInflow ?? n(row.f62),
+      superFlow: ak?.superNetInflow ?? n(row.f66),
+      largeFlow: ak?.largeNetInflow ?? n(row.f72),
+      midFlow: ak?.midNetInflow ?? n(row.f78),
+      smallFlow: ak?.smallNetInflow ?? n(row.f84),
+      turnover: n(row.f6),
+      marketDate: akSnapshot.marketDate ?? date,
+      source: ak ? "AKShare真实板块资金流 + 东方财富实时行情" : "东方财富实时板块行情",
+      validation: pct != null || ak != null ? "live" : "unavailable",
+      flowScore: flow.score,
+      flowSignal: flow.signal,
+    };
   }));
   return { rows: result, fetchedAt: Date.now(), weekend: closed };
 });
