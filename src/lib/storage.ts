@@ -1,5 +1,5 @@
 import type { Holding, FundQuote, NewsFeed, Snapshot } from "./types";
-import { DEFAULT_FUND_SECTOR_IDS, FUND_SECTORS } from "./data/fund-sectors";
+import { DEFAULT_FUND_SECTOR_IDS, FUND_SECTORS } from "./data/fund-sectors.ts";
 
 const PORT_KEYS = ["fund_ai_pro_portfolio_v3", "fund_ai_pro_portfolio_v2", "fund_ai_pro_portfolio"];
 const DS_KEY = "fund_ai_pro_deepseek_key";
