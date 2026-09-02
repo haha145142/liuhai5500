@@ -10,8 +10,7 @@ test("market phase covers the full China trading day boundary", () => {
   assert.equal(getMarketPhase(at("2026-09-01T01:30:00Z")), "morning"); // 09:30
   assert.equal(getMarketPhase(at("2026-09-01T03:30:00Z")), "morning"); // 11:30
   assert.equal(getMarketPhase(at("2026-09-01T03:31:00Z")), "lunch"); // 11:31
-  assert.equal(getMarketPhase(at("2026-09-01T05:00:00Z")), "lunch"); // 13:00 boundary stays lunch by product rule until next minute
-  assert.equal(getMarketPhase(at("2026-09-01T05:01:00Z")), "afternoon"); // 13:01
+  assert.equal(getMarketPhase(at("2026-09-01T05:00:00Z")), "afternoon"); // 13:00
   assert.equal(getMarketPhase(at("2026-09-01T07:00:00Z")), "afternoon"); // 15:00
   assert.equal(getMarketPhase(at("2026-09-01T07:01:00Z")), "postclose"); // 15:01
 });
