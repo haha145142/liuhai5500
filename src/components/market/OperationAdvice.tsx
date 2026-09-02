@@ -29,14 +29,12 @@ function matchRule(code: string, name: string) {
 }
 function matchAk(rows: AkRow[], rule: ReturnType<typeof matchRule>) {
   if (!rule) return undefined;
-  return rows
-    .map((row) => {
-      const name = String(row.name ?? "").toLowerCase();
-      let score = name === rule.name.toLowerCase() ? 100 : 0;
-      for (const key of [...rule.searchKeys, ...rule.keys]) if (name.includes(key.toLowerCase())) score += Math.max(10, key.length * 2);
-      return { row, score };
-    })
-    .sort((a, b) => b.score - a.score)[0]?.row;
+  return rows.map((row) => {
+    const name = String(row.name ?? "").toLowerCase();
+    let score = name === rule.name.toLowerCase() ? 100 : 0;
+    for (const key of [...rule.searchKeys, ...rule.keys]) if (name.includes(key.toLowerCase())) score += Math.max(10, key.length * 2);
+    return { row, score };
+  }).sort((a, b) => b.score - a.score)[0]?.row;
 }
 async function fetchAk(type: "industry" | "concept"): Promise<AkRow[]> {
   try {
@@ -68,9 +66,7 @@ export function OperationAdvice({ sectors, benchPct }:{ sectors:SectorQuote[]; b
 
   useEffect(() => {
     let alive = true;
-    if (!selectedCodes.length) {
-      setQuotes([]); setAkIndustry([]); setAkConcept([]); setAiText(""); return;
-    }
+    if (!selectedCodes.length) { setQuotes([]); setAkIndustry([]); setAkConcept([]); setAiText(""); return; }
     setLoading(true);
     void Promise.all([
       getBoardWatchQuotes({ data: { codes: selectedCodes } }).catch(() => ({ rows: [], fetchedAt: Date.now(), weekend: false })),
@@ -111,12 +107,12 @@ export function OperationAdvice({ sectors, benchPct }:{ sectors:SectorQuote[]; b
       validation: ak ? "cross_checked" : quote.validation === "live" ? "single_source" : "unavailable",
     };
     return { quote, sector, factor: calcSixFactor(sector, benchPct), sourceLabel: ak ? "AKShare" : "东方财富" };
-  }).filter((x): x is AdviceRow => !!x), [adviceRows]);
+  }).filter((x): x is AdviceRow => !!x), [akConcept, akIndustry, benchPct, quotes, sectors, selectedCodes]);
 
   useEffect(() => {
     const key = getDSKey();
     if (!key || !adviceRows.length) return;
-    const facts = adviceRows.map(({ quote, sector, factor, sourceLabel }) => `${sector.name}：涨跌 ${sector.change == null ? "未知" : `${sector.change.toFixed(2)}%`}；主力资金 ${flow(sector.flow)}；趋势 ${factor.trendLabel}；波段 ${factor.band}；规则建议 ${factor.advice}；置信 ${factor.confidence}%；${sourceLabel}`).join("\n");
+    const facts = adviceRows.map(({ sector, factor, sourceLabel }) => `${sector.name}：涨跌 ${sector.change == null ? "未知" : `${sector.change.toFixed(2)}%`}；主力资金 ${flow(sector.flow)}；趋势 ${factor.trendLabel}；波段 ${factor.band}；规则建议 ${factor.advice}；置信 ${factor.confidence}%；${sourceLabel}`).join("\n");
     setAiLoading(true);
     void analyzeDeepSeek({ data: { apiKey: key, model: getDSModel(), prompt: `你是 Fund AI Pro 的解释与评级层。只能基于下面用户自选板块的真实数据和规则结果回答。严禁创造数字、补猜资金、加入未选择板块，也不要修改规则建议。用中文给出 3-6 句，说明资金与趋势是否一致、强弱排序和当前更适合观察/持有/谨慎/规避。\n\n${facts}` } })
       .then((res) => { if (res.ok) setAiText(res.text); })
