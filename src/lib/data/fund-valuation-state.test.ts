@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeFundValuationState, resolveFundValuationState } from "./fund-valuation-state";
+import { normalizeFundValuationState, resolveFundValuationState } from "./fund-valuation-state.ts";
 import type { FundQuote } from "../types";
 
 const day = new Date("2026-09-02T08:00:00Z");
