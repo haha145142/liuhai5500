@@ -7,6 +7,7 @@ import { validateGlobalQuotes } from "./global-quote-validation";
 import { preserveReliableSnapshot } from "./reliable-snapshot";
 import { sharedCacheGet, sharedCacheSet } from "./shared-cache";
 import { getMarketMoneyFlow } from "./market-money-flow";
+import { normalizeFundValuationState } from "./fund-valuation-state";
 import type { FundQuote, Snapshot } from "../types";
 
 export { calcIndicators } from "./server-stable";
@@ -36,7 +37,7 @@ function isSameDayEstimate(quote: FundQuote | null | undefined) { return !!quote
 async function loadFundQuote(code: string): Promise<FundQuote> {
   const phase = getMarketPhase();
   try {
-    const calculated = await getCalculatedFund({ data: { code } });
+    const calculated = normalizeFundValuationState(await getCalculatedFund({ data: { code } }));
     if (isSameDayEstimate(calculated)) postCloseEstimate.set(code, calculated);
     if (usableFundData(calculated) && (calculated.officialNavPublished || calculated.valuationStatus === "estimate" || calculated.estimate != null)) return calculated;
   } catch {}
@@ -44,7 +45,7 @@ async function loadFundQuote(code: string): Promise<FundQuote> {
     const saved = postCloseEstimate.get(code);
     if (isSameDayEstimate(saved)) return saved;
   }
-  return getResilientFund({ data: { code } });
+  return normalizeFundValuationState(await getResilientFund({ data: { code } }));
 }
 
 export const getFund = async ({ data }: { data: { code: string } }): Promise<FundQuote> => {
@@ -52,27 +53,29 @@ export const getFund = async ({ data }: { data: { code: string } }): Promise<Fun
   const phase = getMarketPhase();
   const localTtl = phase === "postclose" ? FUND_POSTCLOSE_TTL_MS : FUND_CACHE_TTL_MS;
   const cached = fundResolved.get(code);
-  if (cached && Date.now() - cached.at < localTtl) return cached.value;
+  if (cached && Date.now() - cached.at < localTtl) return normalizeFundValuationState(cached.value);
   const running = fundPending.get(code);
   if (running) return running;
   const shared = await sharedCacheGet<FundQuote>(`fund-ai-pro:fund:${code}`);
   if (shared?.value && usableFundData(shared.value)) {
-    const sameDayEstimate = isSameDayEstimate(shared.value);
-    const reusable = shared.value.officialNavPublished === true || phase !== "postclose" || sameDayEstimate;
+    const normalized = normalizeFundValuationState(shared.value);
+    const sameDayEstimate = isSameDayEstimate(normalized);
+    const reusable = normalized.officialNavPublished === true || phase !== "postclose" || sameDayEstimate;
     if (reusable) {
-      fundResolved.set(code, { at: Date.now(), value: shared.value });
-      if (sameDayEstimate) postCloseEstimate.set(code, shared.value);
-      return shared.value;
+      fundResolved.set(code, { at: Date.now(), value: normalized });
+      if (sameDayEstimate) postCloseEstimate.set(code, normalized);
+      return normalized;
     }
   }
   const request = loadFundQuote(code)
     .then(async (value) => {
-      if (usableFundData(value)) {
-        fundResolved.set(code, { at: Date.now(), value });
-        if (isSameDayEstimate(value)) postCloseEstimate.set(code, value);
-        await sharedCacheSet(`fund-ai-pro:fund:${code}`, value, isSameDayEstimate(value) ? FUND_ESTIMATE_SHARED_CACHE_TTL_MS : FUND_SHARED_CACHE_TTL_MS);
+      const normalized = normalizeFundValuationState(value);
+      if (usableFundData(normalized)) {
+        fundResolved.set(code, { at: Date.now(), value: normalized });
+        if (isSameDayEstimate(normalized)) postCloseEstimate.set(code, normalized);
+        await sharedCacheSet(`fund-ai-pro:fund:${code}`, normalized, isSameDayEstimate(normalized) ? FUND_ESTIMATE_SHARED_CACHE_TTL_MS : FUND_SHARED_CACHE_TTL_MS);
       }
-      return value;
+      return normalized;
     })
     .finally(() => fundPending.delete(code));
   fundPending.set(code, request);
