@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "source": "AKShare",
+  "provider": "akshare",
+  "schemaVersion": 1,
+  "fetchedAt": null,
+  "marketDate": null,
+  "rows": [],
+  "error": "等待首次 AKShare 采集"
+}
