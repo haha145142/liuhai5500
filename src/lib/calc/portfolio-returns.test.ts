@@ -7,7 +7,7 @@ import type { FundQuote } from "../types";
 function fund(overrides: Partial<FundQuote> = {}): FundQuote {
   const base: FundQuote = {
     code: "000001", name: "测试基金", type: "基金", nav: 1.2, navDate: "2026-09-01",
-    estimate: 1.25, estimatePct: 4.1667, estimateTime: "2026-09-02T07:00:00Z", dayPct: 4.1667,
+    estimate: 1.25, estimatePct: 4.1667, estimateTime: "2026-09-02T01:50:00Z", dayPct: 4.1667,
     weekPct: 0, monthPct: 0, history: [1.1, 1.2], historyPoints: [], metrics: null, source: "test",
     officialNavPublished: false, valuationStatus: "live_estimate", estimateConfidence: "high",
     historyMae20: null, historySample20: 2, historyMaxError: null, historyP95Error: null, historyMae5: null,
