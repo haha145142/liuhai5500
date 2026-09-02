@@ -1,6 +1,6 @@
 import type { FundQuote } from "../types";
 import { cnTime } from "../format.ts";
-import { getMarketPhase } from "../market-hours";
+import { getMarketPhase } from "../market-hours.ts";
 
 export type FundQuoteMode = "official_today" | "live_estimate" | "latest_official" | "unavailable";
 export type FundDisplayQuote = { mode: FundQuoteMode; price: number | null; pct: number | null; label: string; dataDate: string | null; confidence: "high" | "medium" | "low" | "none"; reason?: string };
