@@ -68,6 +68,18 @@ async function loadFundQuote(code: string): Promise<FundQuote> {
   return normalizeFundValuationState(await getResilientFund({ data: { code } }));
 }
 
+export async function refreshFundQuote(code: string): Promise<FundQuote> {
+  const normalizedCode = code.trim();
+  await rememberFundCode(normalizedCode);
+  const value = normalizeFundValuationState(await loadFundQuote(normalizedCode));
+  if (usableFundData(value)) {
+    fundResolved.set(normalizedCode, { at: Date.now(), value });
+    if (isSameDayEstimate(value)) postCloseEstimate.set(normalizedCode, value);
+    await sharedCacheSet(`fund-ai-pro:fund:${normalizedCode}`, value, isSameDayEstimate(value) ? FUND_ESTIMATE_SHARED_CACHE_TTL_MS : FUND_SHARED_CACHE_TTL_MS);
+  }
+  return value;
+}
+
 export const getFund = async ({ data }: { data: { code: string } }): Promise<FundQuote> => {
   const code = data.code.trim();
   void rememberFundCode(code);
