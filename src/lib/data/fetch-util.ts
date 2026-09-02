@@ -1,16 +1,44 @@
+import { providerAllowed, recordProviderFailure, recordProviderSuccess } from "./provider-health";
+
+function providerFor(url: string) {
+  try {
+    const host = new URL(url).host.toLowerCase();
+    if (host.includes("eastmoney")) return "eastmoney";
+    if (host.includes("sina")) return "sina";
+    if (host.includes("gtimg") || host.includes("qq.com")) return "tencent";
+    if (host.includes("akshare")) return "akshare";
+    if (host.includes("cls") || host.includes("cailianpress")) return "cls";
+    if (host.includes("10jqka") || host.includes("ths")) return "ths";
+    return host || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 export async function fetchText(
   url: string,
   timeout = 5000,
   headers: Record<string, string> = {},
 ): Promise<string> {
   const safeTimeout = Math.min(Math.max(1000, timeout), 15_000);
-  const delays = [0, 250, 700];
+  const totalBudget = Math.min(3500, safeTimeout + 400);
+  const provider = providerFor(url);
+  const endpoint = url.split("?")[0];
+
+  if (!providerAllowed(provider, endpoint)) throw new Error(`provider-circuit-open:${provider}`);
+
+  const started = Date.now();
+  const delays = [0, 120, 240];
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < delays.length; attempt += 1) {
     if (delays[attempt] > 0) await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+    const elapsed = Date.now() - started;
+    const remaining = totalBudget - elapsed;
+    if (remaining <= 150) break;
+    const attemptTimeout = Math.min(safeTimeout, remaining);
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), safeTimeout);
+    const timer = setTimeout(() => ctrl.abort(), attemptTimeout);
     try {
       const response = await fetch(url, {
         signal: ctrl.signal,
@@ -25,20 +53,24 @@ export async function fetchText(
       if (!response.ok) {
         const retryable = response.status === 408 || response.status === 425 || response.status === 429 || response.status >= 500;
         if (!retryable || attempt === delays.length - 1) throw new Error(`HTTP ${response.status}`);
+        lastError = new Error(`HTTP ${response.status}`);
         continue;
       }
-      return await response.text();
+      const text = await response.text();
+      recordProviderSuccess(provider, endpoint, Date.now() - started);
+      return text;
     } catch (error) {
       lastError = error;
       if (error instanceof Error && error.name === "AbortError") {
-        lastError = new Error(`请求超时（${Math.ceil(safeTimeout / 1000)}秒）`);
+        lastError = new Error(`请求超时（${Math.ceil(attemptTimeout / 1000)}秒）`);
       }
-      if (attempt === delays.length - 1) break;
+      if (attempt === delays.length - 1 || Date.now() - started >= totalBudget) break;
     } finally {
       clearTimeout(timer);
     }
   }
 
+  recordProviderFailure(provider, endpoint, Date.now() - started);
   throw lastError instanceof Error ? lastError : new Error("请求失败");
 }
 
