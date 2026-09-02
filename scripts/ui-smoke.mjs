@@ -39,6 +39,7 @@ async function testSmartAlerts(page, label) {
   await selects.first().selectOption({ index: 1 }); const threshold = page.locator('input[placeholder="阈值 %"]'); await threshold.fill("3");
   await page.getByRole("button", { name: "添加提醒规则" }).click(); await waitForText(page, "停用", `${label} alert rule saved`, 8_000);
   const stored = await page.evaluate(() => { try { const rows = JSON.parse(localStorage.getItem("fund_ai_pro_alert_rules_v1") || "[]"); return Array.isArray(rows) && rows.length > 0; } catch { return false; } }); if (!stored) throw new Error(`${label}: smart alert rule was not persisted`);
+  await page.getByRole("button", { name: /开启系统提醒|系统提醒已开启|系统提醒已拒绝|当前浏览器不支持/ }).waitFor({ state: "visible", timeout: 8_000 });
   await assertNoHorizontalOverflow(page, `${label} smart alerts`);
 }
 async function testRotationRadar(page, label) {
