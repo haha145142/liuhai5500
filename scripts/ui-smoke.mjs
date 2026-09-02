@@ -134,6 +134,7 @@ try {
       await waitForHydration(page, `${viewport.label} homepage`);
       await waitForText(page, "今日评估", `${viewport.label} daily assessment`);
       await waitForText(page, "今日市场评分", `${viewport.label} daily score`);
+      await waitForText(page, "我的持仓", `${viewport.label} portfolio section`);
       await assertNoHorizontalOverflow(page, `${viewport.label} homepage`);
       await testNews(page, viewport.label);
       await testSectorFundPool(page, viewport.label);
