@@ -1,9 +1,14 @@
 name: Vercel Production Deploy
 
-# 生产部署改为手动触发，避免每次开发提交都消耗 Vercel 免费部署次数。
+# 生产部署默认手动触发；最终部署提交允许通过本工作流文件自身的 push 触发，避免普通开发提交消耗部署次数。
 # 代码质量由独立 Quality Gate workflow 在 push/PR 上检查。
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/vercel-production.yml"
 
 permissions:
   contents: read
