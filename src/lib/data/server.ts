@@ -21,7 +21,7 @@ const FUND_CACHE_TTL_MS = 25_000;
 const FUND_POSTCLOSE_TTL_MS = 5_000;
 const FUND_SHARED_CACHE_TTL_MS = 60_000;
 const FUND_ESTIMATE_SHARED_CACHE_TTL_MS = 5_000;
-const SNAPSHOT_SHARED_CACHE_TTL_MS = 30_000;
+const SNAPSHOT_FIELD_TTL = { indices: 15_000, sectors: 60_000, flow: 5 * 60_000, global: 60_000, metadata: 60_000 } as const;
 const fundResolved = new Map<string, { at: number; value: FundQuote }>();
 const fundPending = new Map<string, Promise<FundQuote>>();
 const postCloseEstimate = new Map<string, FundQuote>();
@@ -32,7 +32,7 @@ function chinaDateLabel(date = new Date()) {
   return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
 }
 function usableFundData(quote: FundQuote | null | undefined) { return !!quote && (quote.nav != null || quote.estimate != null || quote.historyPoints.length > 0 || quote.metrics != null); }
-function isSameDayEstimate(quote: FundQuote | null | undefined) { return !!quote && quote.officialNavPublished !== true && quote.estimate != null && quote.estimateTime != null && quote.estimateTime.slice(0, 10) === chinaDateLabel(); }
+function isSameDayEstimate(quote: FundQuote | null | undefined) { return !!quote && quote.officialNavPublished !== true && quote.estimate != null && quote.estimateTime != null && chinaDateLabel(new Date(quote.estimateTime)) === chinaDateLabel(); }
 
 async function loadFundQuote(code: string): Promise<FundQuote> {
   const phase = getMarketPhase();
@@ -60,57 +60,64 @@ export const getFund = async ({ data }: { data: { code: string } }): Promise<Fun
   if (shared?.value && usableFundData(shared.value)) {
     const normalized = normalizeFundValuationState(shared.value);
     const sameDayEstimate = isSameDayEstimate(normalized);
-    const reusable = normalized.officialNavPublished === true || phase !== "postclose" || sameDayEstimate;
-    if (reusable) {
+    if (normalized.officialNavPublished === true || phase !== "postclose" || sameDayEstimate) {
       fundResolved.set(code, { at: Date.now(), value: normalized });
       if (sameDayEstimate) postCloseEstimate.set(code, normalized);
       return normalized;
     }
   }
-  const request = loadFundQuote(code)
-    .then(async (value) => {
-      const normalized = normalizeFundValuationState(value);
-      if (usableFundData(normalized)) {
-        fundResolved.set(code, { at: Date.now(), value: normalized });
-        if (isSameDayEstimate(normalized)) postCloseEstimate.set(code, normalized);
-        await sharedCacheSet(`fund-ai-pro:fund:${code}`, normalized, isSameDayEstimate(normalized) ? FUND_ESTIMATE_SHARED_CACHE_TTL_MS : FUND_SHARED_CACHE_TTL_MS);
-      }
-      return normalized;
-    })
-    .finally(() => fundPending.delete(code));
+  const request = loadFundQuote(code).then((value) => {
+    const normalized = normalizeFundValuationState(value);
+    if (usableFundData(normalized)) {
+      fundResolved.set(code, { at: Date.now(), value: normalized });
+      if (isSameDayEstimate(normalized)) postCloseEstimate.set(code, normalized);
+      void sharedCacheSet(`fund-ai-pro:fund:${code}`, normalized, isSameDayEstimate(normalized) ? FUND_ESTIMATE_SHARED_CACHE_TTL_MS : FUND_SHARED_CACHE_TTL_MS).catch(() => {});
+    }
+    return normalized;
+  }).finally(() => fundPending.delete(code));
   fundPending.set(code, request);
   return request;
 };
 
 const INDEX_CODES = ["000001", "399001", "399006", "000688"] as const;
-
+async function cacheSnapshotFields(snapshot: Snapshot) {
+  void Promise.all([
+    sharedCacheSet("fund-ai-pro:snapshot:indices", snapshot.indices, SNAPSHOT_FIELD_TTL.indices),
+    sharedCacheSet("fund-ai-pro:snapshot:sectors", snapshot.sectors, SNAPSHOT_FIELD_TTL.sectors),
+    sharedCacheSet("fund-ai-pro:snapshot:flow", snapshot.flow, SNAPSHOT_FIELD_TTL.flow),
+    sharedCacheSet("fund-ai-pro:snapshot:global", snapshot.global, SNAPSHOT_FIELD_TTL.global),
+    sharedCacheSet("fund-ai-pro:snapshot:meta", { sources: snapshot.sources, marketDate: snapshot.marketDate ?? null, fetchedAt: snapshot.fetchedAt, validation: snapshot.validation }, SNAPSHOT_FIELD_TTL.metadata),
+  ]).catch(() => {});
+}
+async function readFieldCachedSnapshot(): Promise<Snapshot | null> {
+  const [indices, sectors, flow, global, meta] = await Promise.all([
+    sharedCacheGet<Snapshot["indices"]>("fund-ai-pro:snapshot:indices"),
+    sharedCacheGet<Snapshot["sectors"]>("fund-ai-pro:snapshot:sectors"),
+    sharedCacheGet<Snapshot["flow"]>("fund-ai-pro:snapshot:flow"),
+    sharedCacheGet<Snapshot["global"]>("fund-ai-pro:snapshot:global"),
+    sharedCacheGet<{ sources: Snapshot["sources"]; marketDate: string | null; fetchedAt: number; validation: Snapshot["validation"] }>("fund-ai-pro:snapshot:meta"),
+  ]);
+  if (!indices?.value && !sectors?.value && !flow?.value && !global?.value && !meta?.value) return null;
+  return { indices: indices?.value ?? [], sectors: sectors?.value ?? [], boards: [], flow: flow?.value ?? null, global: global?.value ?? [], sources: meta?.value?.sources ?? [], fetchedAt: meta?.value?.fetchedAt ?? Date.now(), marketDate: meta?.value?.marketDate ?? null, validation: meta?.value?.validation };
+}
 async function buildSnapshot(): Promise<Snapshot> {
   const [baseSnapshot, moneyFlow] = await Promise.all([preserveReliableSnapshot(await getStableSnapshot()), getMarketMoneyFlow().catch(() => null)]);
-  const snapshot = moneyFlow ? { ...baseSnapshot, flow: moneyFlow, sources: baseSnapshot.sources.map((s) => s.name === "资金" ? { ...s, status: "ok" as const, note: `全A资金流 ${moneyFlow.count} 条 · ${moneyFlow.sourceCount} 个独立供应商 · ${moneyFlow.confidence}置信` } : s) } : baseSnapshot;
+  const snapshot = moneyFlow ? { ...baseSnapshot, flow: moneyFlow, sources: baseSnapshot.sources.map((s) => s.name === "资金" ? { ...s, status: "ok" as const, note: `全A资金流 ${moneyFlow.count} 条 · ${moneyFlow.sourceCount} 个供应商 · ${moneyFlow.confidence}置信` } : s) } : baseSnapshot;
   const [checked, global] = await Promise.all([
     Promise.all(INDEX_CODES.map(async (code) => { try { return { code, quote: await getMultiSourceQuote(code) }; } catch { return { code, quote: null }; } })),
     validateGlobalQuotes(snapshot.global),
   ]);
-  const indices = snapshot.indices.map((index) => {
-    const hit = checked.find((item) => item.code === index.code)?.quote;
-    if (!hit || hit.pct == null || hit.price == null) return index;
-    return ["three_source", "two_source", "single_source"].includes(hit.agreement) ? { ...index, price: hit.price, pct: hit.pct } : index;
-  });
-  const sources = snapshot.sources.map((entry) => {
-    if (entry.name === "指数") return { ...entry, note: "腾讯 + 东方财富 + 新浪多源校验；分歧时保留稳定结果" };
-    if (entry.name === "外围") return { ...entry, note: `腾讯财经主源 + 新浪备用/交叉校验；检查${global.checked}项，一致${global.agreed}项，备用补齐${global.fallback}项${global.disputed ? `，分歧${global.disputed}项` : ""}` };
-    return entry;
-  });
+  const indices = snapshot.indices.map((index) => { const hit = checked.find((item) => item.code === index.code)?.quote; if (!hit || hit.pct == null || hit.price == null) return index; return ["three_source", "two_source", "single_source"].includes(hit.agreement) ? { ...index, price: hit.price, pct: hit.pct } : index; });
+  const sources = snapshot.sources.map((entry) => entry.name === "指数" ? { ...entry, note: "腾讯 + 东方财富 + 新浪多源校验；分歧时保留稳定结果" } : entry.name === "外围" ? { ...entry, note: `腾讯财经主源 + 新浪备用/交叉校验；检查${global.checked}项，一致${global.agreed}项，备用补齐${global.fallback}项${global.disputed ? `，分歧${global.disputed}项` : ""}` } : entry);
   return preserveReliableSnapshot({ ...snapshot, indices, global: global.list, sources, validation: checked.some((x) => x.quote?.agreement === "three_source") ? "cross_checked" : snapshot.validation });
 }
-
 export const getSnapshot = async () => {
   if (snapshotPending) return snapshotPending;
   snapshotPending = (async () => {
-    const shared = await sharedCacheGet<Snapshot>("fund-ai-pro:snapshot");
-    if (shared?.value) return shared.value;
+    const cached = await readFieldCachedSnapshot();
+    if (cached && cached.indices.length && cached.sectors.length && cached.sources.length) return cached;
     const snapshot = await buildSnapshot();
-    await sharedCacheSet("fund-ai-pro:snapshot", snapshot, SNAPSHOT_SHARED_CACHE_TTL_MS);
+    cacheSnapshotFields(snapshot);
     return snapshot;
   })().finally(() => { snapshotPending = null; });
   return snapshotPending;
