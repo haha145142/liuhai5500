@@ -26,6 +26,16 @@ function HydrationMarker() {
   return null;
 }
 
+function RootNotFound() {
+  return (
+    <main className="fap-empty-state" role="status" aria-live="polite">
+      <h1>页面不存在</h1>
+      <p>找不到你访问的页面，请返回 Fund AI Pro 首页。</p>
+      <a className="fap-action-button" href="/">返回首页</a>
+    </main>
+  );
+}
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -56,6 +66,7 @@ export const Route = createRootRoute({
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
+  notFoundComponent: RootNotFound,
   component: () => (
     <html lang="zh-CN" className="antialiased" suppressHydrationWarning>
       <head><HeadContent /></head>
