@@ -41,18 +41,22 @@ function score(name: string, q: string) {
 export const searchFundBoards = createServerFn({ method: "POST" }).validator((input: { query?: string }) => input).handler(async ({ data }): Promise<{ items: BoardCandidate[] }> => {
   const q = String(data.query ?? "").trim();
   if (!q) return { items: [] };
-  const rows = await fetchBoards();
-  const remote = rows.map((row): (BoardCandidate & { _score: number }) | null => {
-    const code = rowCode(row); const name = rowName(row); const s = score(name, q);
-    return code && name && s ? { code, name, icon: iconFor(name), type: typeFor(code), _score: s } : null;
-  }).filter((x): x is BoardCandidate & { _score: number } => !!x).sort((a, b) => b._score - a._score);
+
   const local = SECTOR_RULES.map((rule): (BoardCandidate & { _score: number }) | null => {
     const hay = [rule.name, ...rule.searchKeys].map((x) => x.toLowerCase()); const k = q.toLowerCase();
     const s = hay.some((x) => x === k) ? 100 : hay.some((x) => x.startsWith(k)) ? 90 : hay.some((x) => x.includes(k)) ? 70 : 0;
     return s ? { code: rule.bkCode, name: rule.name, icon: iconFor(rule.name), type: rule.prefer, _score: s } : null;
   }).filter((x): x is BoardCandidate & { _score: number } => !!x);
-  const merged = [...remote, ...local].sort((a, b) => b._score - a._score).filter((item, index, list) => list.findIndex((x) => x.code === item.code) === index).slice(0, 20).map(({ _score: _ignore, ...item }) => item);
-  return { items: merged };
+
+  // Known/configured sectors are resolved locally first so typing “半导体/机器人/AI” never waits on a remote source.
+  if (local.length) return { items: local.sort((a, b) => b._score - a._score).slice(0, 20).map(({ _score: _ignore, ...item }) => item) };
+
+  const rows = await fetchBoards();
+  const remote = rows.map((row): (BoardCandidate & { _score: number }) | null => {
+    const code = rowCode(row); const name = rowName(row); const s = score(name, q);
+    return code && name && s ? { code, name, icon: iconFor(name), type: typeFor(code), _score: s } : null;
+  }).filter((x): x is BoardCandidate & { _score: number } => !!x).sort((a, b) => b._score - a._score);
+  return { items: remote.slice(0, 20).map(({ _score: _ignore, ...item }) => item) };
 });
 
 export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator((input: { codes?: string[] }) => input).handler(async ({ data }): Promise<{ rows: BoardWatchQuote[]; fetchedAt: number; weekend: boolean }> => {
