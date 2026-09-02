@@ -40,4 +40,18 @@ function previousOfficialNav(fund:FundQuote|undefined,currentPrice:number|null,m
 export function calcHoldingReturn(holding:Holding,fund?:FundQuote,now=new Date()):HoldingReturn{
   const shares=Number(holding.shares); const cost=Number(holding.cost); const safeShares=Number.isFinite(shares)&&shares>0?shares:0; const safeCost=finitePositive(cost)??0; const costValue=safeShares*safeCost; const quote=selectReturnQuote(fund,now); const marketValue=quote.price!=null?safeShares*quote.price:null; const holdingPnl=marketValue!=null?marketValue-costValue:null; const holdingPnlPct=holdingPnl!=null&&costValue>0?holdingPnl/costValue*100:null; const previousNav=previousOfficialNav(fund,quote.price,quote.mode); const canToday=quote.price!=null&&previousNav!=null&&(quote.mode==="live_estimate"||quote.mode==="official_today"); const todayPnl=canToday?(quote.price!-previousNav!)*safeShares:null; const todayPnlPct=canToday&&previousNav!>0?(quote.price!-previousNav!)/previousNav!*100:null; return{costValue,marketValue,holdingPnl,holdingPnlPct,todayPnl,todayPnlPct,previousOfficialNav:previousNav,price:quote.price,quoteMode:quote.mode};
 }
-export function calcPortfolioReturn(holdings:Holding[],funds:Record<string,FundQuote>,now=new Date()){const results=holdings.map(h=>calcHoldingReturn(h,funds[h.code],now));const costValue=results.reduce((s,x)=>s+x.costValue,0);const priced=results.filter(x=>x.marketValue!=null);const marketValue=priced.reduce((s,x)=>s+(x.marketValue??0),0);const holdingPnl=priced.reduce((s,x)=>s+(x.holdingPnl??0),0);const todayResults=results.filter(x=>x.todayPnl!=null);const todayPnl=todayResults.length===priced.length&&priced.length>0?todayResults.reduce((s,x)=>s+(x.todayPnl??0),0):null;return{costValue,marketValue,holdingPnl,holdingPnlPct:costValue>0&&priced.length===holdings.length?holdingPnl/costValue*100:null,todayPnl,todayPnlPct:todayPnl!=null&&marketValue-todayPnl>0?todayPnl/(marketValue-todayPnl)*100:null,pricedCount:priced.length,totalCount:holdings.length};}
+export function calcPortfolioReturn(holdings:Holding[],funds:Record<string,FundQuote>,now=new Date()){
+  const results=holdings.map(h=>calcHoldingReturn(h,funds[h.code],now));
+  const costValue=results.reduce((s,x)=>s+x.costValue,0);
+  const priced=results.filter(x=>x.marketValue!=null);
+  const pricedCostValue=priced.reduce((s,x)=>s+x.costValue,0);
+  const marketValue=priced.reduce((s,x)=>s+(x.marketValue??0),0);
+  const holdingPnl=priced.reduce((s,x)=>s+(x.holdingPnl??0),0);
+  const todayResults=results.filter(x=>x.todayPnl!=null);
+  const todayPnl=todayResults.length>0?todayResults.reduce((s,x)=>s+(x.todayPnl??0),0):null;
+  const todayBaseValue=results.filter(x=>x.todayPnl!=null&&x.previousOfficialNav!=null).reduce((s,x)=>s+(x.previousOfficialNav!*Number(holdings[results.indexOf(x)]?.shares||0)),0);
+  const pricedHoldingPnlPct=pricedCostValue>0?holdingPnl/pricedCostValue*100:null;
+  const fullHoldingPnlPct=costValue>0&&priced.length===holdings.length?holdingPnl/costValue*100:null;
+  const todayPnlPct=todayPnl!=null&&todayBaseValue>0?todayPnl/todayBaseValue*100:null;
+  return{costValue,marketValue,holdingPnl,holdingPnlPct:fullHoldingPnlPct,pricedHoldingPnlPct,todayPnl,todayPnlPct,pricedCount:priced.length,totalCount:holdings.length,pricedCostValue,coveragePct:holdings.length>0?priced.length/holdings.length*100:100};
+}
