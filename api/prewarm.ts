@@ -1,11 +1,14 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { getSnapshot } from "../src/lib/data/server";
 import { sharedCacheConfigured } from "../src/lib/data/shared-cache";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+type Request = { method?: string; headers: Record<string, string | string[] | undefined> };
+type Response = { status(code: number): Response; json(value: unknown): Response };
+
+export default async function handler(req: Request, res: Response) {
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ ok: false, error: "method-not-allowed" });
   const secret = String(process.env.CRON_SECRET || "").trim();
-  const auth = String(req.headers.authorization || "");
+  const header = req.headers.authorization;
+  const auth = Array.isArray(header) ? header[0] : String(header || "");
   if (secret && auth !== `Bearer ${secret}`) return res.status(401).json({ ok: false, error: "unauthorized" });
   if (!sharedCacheConfigured()) return res.status(200).json({ ok: false, skipped: true, reason: "shared-cache-not-configured" });
   try {
