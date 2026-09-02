@@ -6,6 +6,7 @@ import { getMultiSourceQuote } from "./multi-source-quotes";
 import { validateGlobalQuotes } from "./global-quote-validation";
 import { preserveReliableSnapshot } from "./reliable-snapshot";
 import { sharedCacheGet, sharedCacheSet } from "./shared-cache";
+import { getMarketMoneyFlow } from "./market-money-flow";
 import type { FundQuote, Snapshot } from "../types";
 
 export { calcIndicators } from "./server-stable";
@@ -16,7 +17,9 @@ export { searchFund, getFundRank, analyzeMarket, analyzeNews } from "./compat";
 export { testDeepSeek, analyzeDeepSeek } from "./deepseek";
 
 const FUND_CACHE_TTL_MS = 25_000;
+const FUND_POSTCLOSE_TTL_MS = 5_000;
 const FUND_SHARED_CACHE_TTL_MS = 60_000;
+const FUND_ESTIMATE_SHARED_CACHE_TTL_MS = 5_000;
 const SNAPSHOT_SHARED_CACHE_TTL_MS = 30_000;
 const fundResolved = new Map<string, { at: number; value: FundQuote }>();
 const fundPending = new Map<string, Promise<FundQuote>>();
@@ -27,14 +30,8 @@ function chinaDateLabel(date = new Date()) {
   const shifted = new Date(date.getTime() + 8 * 60 * 60 * 1000);
   return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
 }
-
-function usableFundData(quote: FundQuote | null | undefined) {
-  return !!quote && (quote.nav != null || quote.estimate != null || quote.historyPoints.length > 0 || quote.metrics != null);
-}
-
-function isSameDayEstimate(quote: FundQuote | null | undefined) {
-  return !!quote && quote.officialNavPublished !== true && quote.estimate != null && quote.estimateTime != null && quote.estimateTime.slice(0, 10) === chinaDateLabel();
-}
+function usableFundData(quote: FundQuote | null | undefined) { return !!quote && (quote.nav != null || quote.estimate != null || quote.historyPoints.length > 0 || quote.metrics != null); }
+function isSameDayEstimate(quote: FundQuote | null | undefined) { return !!quote && quote.officialNavPublished !== true && quote.estimate != null && quote.estimateTime != null && quote.estimateTime.slice(0, 10) === chinaDateLabel(); }
 
 async function loadFundQuote(code: string): Promise<FundQuote> {
   const phase = getMarketPhase();
@@ -52,14 +49,15 @@ async function loadFundQuote(code: string): Promise<FundQuote> {
 
 export const getFund = async ({ data }: { data: { code: string } }): Promise<FundQuote> => {
   const code = data.code.trim();
+  const phase = getMarketPhase();
+  const localTtl = phase === "postclose" ? FUND_POSTCLOSE_TTL_MS : FUND_CACHE_TTL_MS;
   const cached = fundResolved.get(code);
-  if (cached && Date.now() - cached.at < FUND_CACHE_TTL_MS) return cached.value;
+  if (cached && Date.now() - cached.at < localTtl) return cached.value;
   const running = fundPending.get(code);
   if (running) return running;
   const shared = await sharedCacheGet<FundQuote>(`fund-ai-pro:fund:${code}`);
   if (shared?.value && usableFundData(shared.value)) {
     const sameDayEstimate = isSameDayEstimate(shared.value);
-    const phase = getMarketPhase();
     const reusable = shared.value.officialNavPublished === true || phase !== "postclose" || sameDayEstimate;
     if (reusable) {
       fundResolved.set(code, { at: Date.now(), value: shared.value });
@@ -72,7 +70,7 @@ export const getFund = async ({ data }: { data: { code: string } }): Promise<Fun
       if (usableFundData(value)) {
         fundResolved.set(code, { at: Date.now(), value });
         if (isSameDayEstimate(value)) postCloseEstimate.set(code, value);
-        await sharedCacheSet(`fund-ai-pro:fund:${code}`, value, FUND_SHARED_CACHE_TTL_MS);
+        await sharedCacheSet(`fund-ai-pro:fund:${code}`, value, isSameDayEstimate(value) ? FUND_ESTIMATE_SHARED_CACHE_TTL_MS : FUND_SHARED_CACHE_TTL_MS);
       }
       return value;
     })
@@ -84,11 +82,10 @@ export const getFund = async ({ data }: { data: { code: string } }): Promise<Fun
 const INDEX_CODES = ["000001", "399001", "399006", "000688"] as const;
 
 async function buildSnapshot(): Promise<Snapshot> {
-  const snapshot = preserveReliableSnapshot(await getStableSnapshot());
+  const [baseSnapshot, moneyFlow] = await Promise.all([preserveReliableSnapshot(await getStableSnapshot()), getMarketMoneyFlow().catch(() => null)]);
+  const snapshot = moneyFlow ? { ...baseSnapshot, flow: moneyFlow, sources: baseSnapshot.sources.map((s) => s.name === "资金" ? { ...s, status: "ok" as const, note: `全A资金流 ${moneyFlow.count} 条 · ${moneyFlow.sourceCount} 个独立供应商 · ${moneyFlow.confidence}置信` } : s) } : baseSnapshot;
   const [checked, global] = await Promise.all([
-    Promise.all(INDEX_CODES.map(async (code) => {
-      try { return { code, quote: await getMultiSourceQuote(code) }; } catch { return { code, quote: null }; }
-    })),
+    Promise.all(INDEX_CODES.map(async (code) => { try { return { code, quote: await getMultiSourceQuote(code) }; } catch { return { code, quote: null }; } })),
     validateGlobalQuotes(snapshot.global),
   ]);
   const indices = snapshot.indices.map((index) => {
