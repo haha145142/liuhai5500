@@ -44,7 +44,9 @@ function readAiCache(signature: string): Record<string, AiInsight> {
     const raw = JSON.parse(sessionStorage.getItem(AI_CACHE_KEY) || "null") as { signature?: string; items?: AiInsight[]; ts?: number } | null;
     if (!raw || raw.signature !== signature || !raw.ts || Date.now() - raw.ts > 15 * 60_000) return {};
     return Object.fromEntries((raw.items || []).map((x) => [x.id, x]));
-  } catch { return {}; }
+  } catch {
+    return {};
+  }
 }
 function writeAiCache(signature: string, items: AiInsight[]) {
   try { sessionStorage.setItem(AI_CACHE_KEY, JSON.stringify({ signature, items, ts: Date.now() })); } catch {}
@@ -132,8 +134,10 @@ function NewsPage() {
     }
   }
 
+  const liveSourceCount = news?.sources?.filter((s) => s.status === "ok").length ?? 0;
   const sourceNames = news?.sources?.map((s) => s.name).filter((name) => /同花顺|金十数据|财联社/.test(name)).join(" · ") || "同花顺 · 金十数据 · 财联社";
   const latest = news?.latestPublishedAt;
+  const connectionText = liveSourceCount > 0 ? `🟢 资讯源已连接 · ${news?.items?.length || 0} 条 · ${liveSourceCount} 个来源` : "⚪ 暂无可靠资讯源";
 
   return (
     <div className="news-page pb-4">
@@ -149,8 +153,8 @@ function NewsPage() {
           <button type="button" onClick={() => void refreshNews()} disabled={newsLoading} className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/80 bg-white/70 text-slate-600 shadow-sm disabled:opacity-50" aria-label="刷新资讯"><RefreshCw className={`size-4 ${newsLoading ? "animate-spin" : ""}`} /></button>
         </div>
 
-        <div className="mt-2 rounded-[16px] border border-emerald-200/65 bg-emerald-50/55 px-3 py-2 text-[9px] font-medium text-emerald-700">
-          🟢 实时资讯已连接 · {news?.items?.length || 0} 条 · {news?.sources?.length || 0} 个来源 · 最新 {latest ? formatPublishedAt(latest) : "暂无可靠时间"} · {latest ? ageLabel(latest) : ""}
+        <div className={`mt-2 rounded-[16px] border px-3 py-2 text-[9px] font-medium ${liveSourceCount > 0 ? "border-emerald-200/65 bg-emerald-50/55 text-emerald-700" : "border-slate-200/70 bg-slate-50/65 text-slate-500"}`}>
+          {connectionText} {latest ? ` · 最新 ${formatPublishedAt(latest)} · ${ageLabel(latest)}` : ""}
         </div>
         <div className="mt-1.5 truncate px-1 text-[8px] text-slate-400">来源：{sourceNames}</div>
 
