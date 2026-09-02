@@ -1,3 +1,4 @@
+import { getMarketPhase } from "../market-hours";
 import { isWeekendLike, readCached, writeCached } from "./offline-cache";
 
 export type CacheDomain = "ui" | "portfolio" | "fundEstimate" | "index" | "fundSector" | "news" | "officialNav" | "ai";
@@ -43,14 +44,15 @@ export type MarketDataState = "trading" | "weekend" | "closed_weekday";
 export function classifyMarketDataState(input: { now?: Date; latestTradingDate?: string | null }): MarketDataState {
   const now = input.now ?? new Date();
   const today = chinaDate(now);
-  const shifted = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-  if (isWeekendLike(shifted)) return "weekend";
-  if (input.latestTradingDate && input.latestTradingDate !== today) return "closed_weekday";
+  const phase = getMarketPhase(now);
+  if (phase === "weekend" || isWeekendLike(now)) return "weekend";
+  if (phase === "postclose") return "closed_weekday";
+  if (input.latestTradingDate && input.latestTradingDate !== today && phase !== "preopen") return "closed_weekday";
   return "trading";
 }
 
 export function marketDataLabel(state: MarketDataState, latestTradingDate?: string | null) {
   if (state === "weekend") return latestTradingDate ? `休市 · 显示最近交易日 ${latestTradingDate}` : "休市 · 显示最近交易日数据";
-  if (state === "closed_weekday") return latestTradingDate ? `当日无可靠行情 · 显示最近交易日 ${latestTradingDate}` : "当日无可靠行情 · 显示最近交易日数据";
+  if (state === "closed_weekday") return latestTradingDate ? `已收盘 · 显示 ${latestTradingDate} 最近可靠数据` : "已收盘 · 显示最近可靠数据";
   return "交易时段 · 后台实时更新";
 }
