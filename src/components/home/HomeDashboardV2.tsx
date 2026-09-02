@@ -1,3 +1,4 @@
+import "@/styles/home-readability.css";
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, Plus, Sparkles, X } from "lucide-react";
