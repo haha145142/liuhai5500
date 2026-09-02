@@ -36,3 +36,5 @@ jobs:
         run: npm run build
         env:
           CI: true
+
+      # Keep this workflow as the canonical code-quality gate.
