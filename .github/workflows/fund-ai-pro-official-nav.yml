@@ -1,0 +1,24 @@
+name: Fund AI Pro Official NAV
+
+on:
+  workflow_dispatch:
+  schedule:
+    # UTC 10:00-14:00 = Asia/Shanghai 18:00-22:00.
+    # Every 15 minutes; the endpoint skips weekends and exchange holidays.
+    - cron: "*/15 10-14 * * 1-5"
+
+jobs:
+  official-nav:
+    if: ${{ secrets.PREWARM_URL != '' && secrets.CRON_SECRET != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Scan held funds for published official NAV
+        env:
+          PREWARM_NAV_URL: ${{ secrets.PREWARM_NAV_URL || format('{0}/api/prewarm-nav', secrets.PREWARM_URL) }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 180 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PREWARM_NAV_URL}"
