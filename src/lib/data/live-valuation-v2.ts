@@ -165,9 +165,33 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
       const externalPct = valuation?.pct ?? null;
       const rawHoldings = policy.allowAshareLookThrough ? await getHoldings(code) : [];
       const holdings = policy.allowAshareLookThrough ? await crossCheckStockQuotes(rawHoldings) : [];
-      const result = policy.allowAshareLookThrough
+
+      const lookThroughResult = policy.allowAshareLookThrough
         ? estimateFundNav({ previousNav: nav ?? 0, positions: holdings, externalEstimatePct: externalPct })
-        : { estimate: null, pct: null, grossPct: null, dailyFeePct: 0, disclosedWeight: 0, usableWeight: 0, coverageOfDisclosed: 0, crossCheckedWeight: 0, disagreedWeight: 0, confidence: "low" as const, method: policy.reason, validation: policy.reason, inferredFactorWeights: {} };
+        : null;
+      const externalEstimate = nav != null && externalPct != null && Number.isFinite(nav) && Number.isFinite(externalPct)
+        ? nav * (1 + externalPct / 100)
+        : null;
+      const externalConfidence = valuation?.validation === "双源外部估值一致"
+        ? "medium" as const
+        : "low" as const;
+      const fallbackEstimate = externalEstimate != null ? {
+        estimate: externalEstimate,
+        pct: externalPct,
+        confidence: externalConfidence,
+        method: `外部实时估值 · ${valuation?.validation || "已取得实时估值"}`,
+        validation: valuation?.validation || "外部实时估值",
+        estimateCoverage: 100,
+        disclosedWeight: 0,
+        usableWeight: 0,
+        coverageOfDisclosed: 0,
+        crossCheckedWeight: 0,
+        disagreedWeight: 0,
+      } : null;
+      const result = lookThroughResult && lookThroughResult.estimate != null
+        ? lookThroughResult
+        : fallbackEstimate;
+
       const history = historyPoints.map((x) => x.nav);
       const weekBase = historyPoints[Math.max(0, historyPoints.length - 6)];
       const monthBase = historyPoints[Math.max(0, historyPoints.length - 22)];
@@ -177,11 +201,20 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
       const officialToday = latest?.date === today() && latest.nav > 0;
       const officialNav = officialToday ? latest.nav : nav;
       const officialNavDate = officialToday ? latest.date : navDate;
-      const dayPct = officialToday ? latest?.changePct ?? null : result.pct ?? valuation?.pct ?? null;
+      const dayPct = officialToday ? latest?.changePct ?? null : result?.pct ?? valuation?.pct ?? null;
       const externalValidation = valuation?.validation || "暂无外部估值验证";
-      const estimateValue = result.estimate != null ? result.estimate : null;
-      const estimatePct = result.pct != null ? result.pct : null;
+      const estimateValue = result?.estimate ?? null;
+      const estimatePct = result?.pct ?? null;
       const estimateDeviation = externalPct != null && estimatePct != null ? Math.abs(estimatePct - externalPct) : null;
+      const resultCoverage = result?.estimateCoverage ?? 0;
+      const resultDisclosed = result?.disclosedWeight ?? 0;
+      const resultUsable = result?.usableWeight ?? 0;
+      const resultCoverageOfDisclosed = result?.coverageOfDisclosed ?? 0;
+      const resultCrossChecked = result?.crossCheckedWeight ?? 0;
+      const resultDisagreed = result?.disagreedWeight ?? 0;
+      const resultConfidence = result?.confidence ?? "low" as const;
+      const resultMethod = result?.method ?? policy.reason;
+      const resultValidation = result?.validation ?? externalValidation;
       const quote: FundQuote & ValuationAudit & { liveHoldings?: CrossCheckedHolding[] } = {
         code, name: fundName, type: fundType || policy.className,
         nav: officialNav, navDate: officialNavDate,
@@ -193,16 +226,16 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
         source: officialToday
           ? "今日官方净值 · 历史净值已发布"
           : estimateValue != null
-            ? `自算盘中估值 · ${result.method} · ${result.validation} · ${externalValidation}`
+            ? `${resultMethod} · ${resultValidation} · ${externalValidation}`
             : `暂无可靠盘中估值 · ${externalValidation}`,
         officialNavPublished: officialToday,
         valuationStatus: officialToday ? "official_nav" : estimateValue != null ? "estimate" : nav != null ? "waiting_official_nav" : "unavailable",
-        estimateConfidence: result.confidence,
-        estimateMethod: policy.allowAshareLookThrough ? result.method : policy.reason,
-        estimateCoverage: result.usableWeight,
-        disclosedWeight: result.disclosedWeight, usableWeight: result.usableWeight, coverageOfDisclosed: result.coverageOfDisclosed,
-        externalEstimatePct: externalPct, estimateDeviation, estimateValidation: `${result.validation} · ${externalValidation}`,
-        quoteCrossCheckedWeight: result.crossCheckedWeight, quoteDisagreedWeight: result.disagreedWeight,
+        estimateConfidence: resultConfidence,
+        estimateMethod: resultMethod,
+        estimateCoverage: resultCoverage,
+        disclosedWeight: resultDisclosed, usableWeight: resultUsable, coverageOfDisclosed: resultCoverageOfDisclosed,
+        externalEstimatePct: externalPct, estimateDeviation, estimateValidation: `${resultValidation} · ${externalValidation}`,
+        quoteCrossCheckedWeight: resultCrossChecked, quoteDisagreedWeight: resultDisagreed,
         liveHoldings: holdings,
         historyMae20: null, historySample20: 0, historyMaxError: null, historyP95Error: null, historyMae5: null,
       };
