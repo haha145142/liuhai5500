@@ -21,6 +21,8 @@ const FUND_CACHE_TTL_MS = 25_000;
 const FUND_POSTCLOSE_TTL_MS = 5_000;
 const FUND_SHARED_CACHE_TTL_MS = 60_000;
 const FUND_ESTIMATE_SHARED_CACHE_TTL_MS = 5_000;
+const FUND_REGISTRY_TTL_MS = 30 * 24 * 60 * 60_000;
+const FUND_REGISTRY_KEY = "fund-ai-pro:prewarm:fund-codes";
 const SNAPSHOT_FIELD_TTL = { indices: 15_000, sectors: 60_000, flow: 5 * 60_000, global: 60_000, metadata: 60_000 } as const;
 const fundResolved = new Map<string, { at: number; value: FundQuote }>();
 const fundPending = new Map<string, Promise<FundQuote>>();
@@ -36,6 +38,21 @@ function chinaDateLabel(date = new Date()) {
 }
 function usableFundData(quote: FundQuote | null | undefined) { return !!quote && (quote.nav != null || quote.estimate != null || quote.historyPoints.length > 0 || quote.metrics != null); }
 function isSameDayEstimate(quote: FundQuote | null | undefined) { return !!quote && quote.officialNavPublished !== true && quote.estimate != null && quote.estimateTime != null && chinaDateLabel(new Date(quote.estimateTime)) === chinaDateLabel(); }
+
+async function rememberFundCode(code: string) {
+  if (!/^\d{6}$/.test(code)) return;
+  try {
+    const cached = await sharedCacheGet<string[]>(FUND_REGISTRY_KEY);
+    const existing = Array.isArray(cached?.value) ? cached.value.filter((x) => /^\d{6}$/.test(String(x))) : [];
+    const next = [code, ...existing.filter((x) => x !== code)].slice(0, 200);
+    await sharedCacheSet(FUND_REGISTRY_KEY, next, FUND_REGISTRY_TTL_MS);
+  } catch {}
+}
+
+export async function getPrewarmFundCodes(): Promise<string[]> {
+  const cached = await sharedCacheGet<string[]>(FUND_REGISTRY_KEY);
+  return Array.isArray(cached?.value) ? cached.value.filter((x) => /^\d{6}$/.test(String(x))).slice(0, 200) : [];
+}
 
 async function loadFundQuote(code: string): Promise<FundQuote> {
   const phase = getMarketPhase();
@@ -53,6 +70,7 @@ async function loadFundQuote(code: string): Promise<FundQuote> {
 
 export const getFund = async ({ data }: { data: { code: string } }): Promise<FundQuote> => {
   const code = data.code.trim();
+  void rememberFundCode(code);
   const phase = getMarketPhase();
   const localTtl = phase === "postclose" ? FUND_POSTCLOSE_TTL_MS : FUND_CACHE_TTL_MS;
   const cached = fundResolved.get(code);
