@@ -26,19 +26,20 @@ export type BoardWatchQuote = {
 const UT = "fa5fd1943c7b386f172d6893dbfba10b";
 const FIELDS = "f12,f14,f3,f62,f66,f72,f78,f84,f6";
 const LIMIT = 1200;
+const LIMIT_FLOW_WAIT_MS = 1500;
 const KNOWN = new Map(SECTOR_RULES.map((s) => [s.bkCode, s]));
 
 function arr(value: unknown): Record<string, unknown>[] { if (Array.isArray(value)) return value as Record<string, unknown>[]; if (value && typeof value === "object") return Object.values(value) as Record<string, unknown>[]; return []; }
 async function fetchBoards(): Promise<Record<string, unknown>[]> {
   try {
-    const text = await fetchText(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=${LIMIT}&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:90+t:2,m:90+t:3&fields=${encodeURIComponent(FIELDS)}&ut=${UT}&_=${Date.now()}`, 10_000, { Referer: "https://quote.eastmoney.com/" });
+    const text = await fetchText(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=${LIMIT}&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:90+t:2,m:90+t:3&fields=${encodeURIComponent(FIELDS)}&ut=${UT}&_=${Date.now()}`, 5_000, { Referer: "https://quote.eastmoney.com/" });
     const j = parseMaybeJsonp(text) as { data?: { diff?: unknown } };
     return arr(j?.data?.diff);
   } catch { return []; }
 }
 async function fetchBoardByCode(code: string): Promise<Record<string, unknown> | null> {
   try {
-    const text = await fetchText(`https://push2.eastmoney.com/api/qt/stock/get?secid=90.${encodeURIComponent(code)}&fields=${encodeURIComponent(FIELDS)}&ut=${UT}&_=${Date.now()}`, 8_000, { Referer: "https://quote.eastmoney.com/" });
+    const text = await fetchText(`https://push2.eastmoney.com/api/qt/stock/get?secid=90.${encodeURIComponent(code)}&fields=${encodeURIComponent(FIELDS)}&ut=${UT}&_=${Date.now()}`, 5_000, { Referer: "https://quote.eastmoney.com/" });
     const j = parseMaybeJsonp(text) as { data?: Record<string, unknown> | null };
     return j?.data && typeof j.data === "object" ? j.data : null;
   } catch { return null; }
@@ -88,9 +89,7 @@ export const searchFundBoards = createServerFn({ method: "POST" }).validator((in
     return code && name && s ? { code, name, icon: iconFor(name), type: typeFor(code), _score: s } : null;
   }).filter((x): x is BoardCandidate & { _score: number } => !!x);
 
-  const merged = [...local, ...remote]
-    .sort((a, b) => b._score - a._score)
-    .filter((item, index, list) => list.findIndex((x) => x.code === item.code) === index);
+  const merged = [...local, ...remote].sort((a, b) => b._score - a._score).filter((item, index, list) => list.findIndex((x) => x.code === item.code) === index);
   return { items: merged.slice(0, 20).map(({ _score: _ignore, ...item }) => item) };
 });
 
@@ -99,11 +98,21 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
   const closed = isExchangeClosed();
   if (!codes.length) return { rows: [], fetchedAt: Date.now(), weekend: closed };
 
-  const [rows, akSnapshot] = await Promise.all([fetchBoards(), fetchAkShareSnapshot()]);
+  // First paint is deliberately driven by the board quote endpoint only.
+  // Capital-flow enrichment is best-effort and has a short deadline so a slow
+  // secondary source never blocks the visible board price/change data.
+  const rows = await fetchBoards();
   const byCode = new Map(rows.map((r) => [rowCode(r), r]));
   const date = tradingDateLabel();
-  const akFlows = akSnapshot.rows;
-  const akFreshness = akSnapshot.freshness;
+  let akSnapshot: Awaited<ReturnType<typeof fetchAkShareSnapshot>> | null = null;
+  try {
+    akSnapshot = await Promise.race([
+      fetchAkShareSnapshot(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), LIMIT_FLOW_WAIT_MS)),
+    ]);
+  } catch { akSnapshot = null; }
+  const akFlows = akSnapshot?.rows ?? [];
+  const akFreshness = akSnapshot?.freshness ?? "stale";
   const maxAbsMain = Math.max(...akFlows.map((row) => Math.abs(row.mainNetInflow ?? 0)), 1);
 
   const result = await Promise.all(codes.map(async (code): Promise<BoardWatchQuote> => {
@@ -115,41 +124,9 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
     const akUsable = !!ak && akFreshness !== "stale";
     const akValidation: BoardWatchQuote["validation"] = akUsable && akFreshness === "live" ? "live" : akUsable ? "recent" : "unavailable";
     if (!row) {
-      return {
-        code,
-        name,
-        icon: iconFor(name),
-        pct,
-        mainFlow: ak?.mainNetInflow ?? null,
-        superFlow: ak?.superNetInflow ?? null,
-        largeFlow: ak?.largeNetInflow ?? null,
-        midFlow: ak?.midNetInflow ?? null,
-        smallFlow: ak?.smallNetInflow ?? null,
-        turnover: null,
-        marketDate: akSnapshot.marketDate ?? date,
-        source: akUsable ? `AKShare板块资金流 · ${akFreshness === "live" ? "实时快照" : "最近快照"}` : "当前暂无可靠板块行情",
-        validation: akValidation,
-        flowScore: flow.score,
-        flowSignal: flow.signal,
-      };
+      return { code, name, icon: iconFor(name), pct, mainFlow: ak?.mainNetInflow ?? null, superFlow: ak?.superNetInflow ?? null, largeFlow: ak?.largeNetInflow ?? null, midFlow: ak?.midNetInflow ?? null, smallFlow: ak?.smallNetInflow ?? null, turnover: null, marketDate: akSnapshot?.marketDate ?? date, source: akUsable ? `AKShare板块资金流 · ${akFreshness === "live" ? "实时快照" : "最近快照"}` : "当前暂无可靠板块行情", validation: akValidation, flowScore: flow.score, flowSignal: flow.signal };
     }
-    return {
-      code,
-      name,
-      icon: iconFor(name),
-      pct,
-      mainFlow: ak?.mainNetInflow ?? n(row.f62),
-      superFlow: ak?.superNetInflow ?? n(row.f66),
-      largeFlow: ak?.largeNetInflow ?? n(row.f72),
-      midFlow: ak?.midNetInflow ?? n(row.f78),
-      smallFlow: ak?.smallNetInflow ?? n(row.f84),
-      turnover: n(row.f6),
-      marketDate: akSnapshot.marketDate ?? date,
-      source: akUsable ? `AKShare板块资金流 · ${akFreshness === "live" ? "实时快照" : "最近快照"} + 东方财富实时行情` : "东方财富实时板块行情",
-      validation: pct != null ? "live" : akValidation,
-      flowScore: flow.score,
-      flowSignal: flow.signal,
-    };
+    return { code, name, icon: iconFor(name), pct, mainFlow: ak?.mainNetInflow ?? n(row.f62), superFlow: ak?.superNetInflow ?? n(row.f66), largeFlow: ak?.largeNetInflow ?? n(row.f72), midFlow: ak?.midNetInflow ?? n(row.f78), smallFlow: ak?.smallNetInflow ?? n(row.f84), turnover: n(row.f6), marketDate: akSnapshot?.marketDate ?? date, source: akUsable ? `AKShare板块资金流 · ${akFreshness === "live" ? "实时快照" : "最近快照"} + 东方财富实时行情` : "东方财富实时板块行情", validation: pct != null ? "live" : akValidation, flowScore: flow.score, flowSignal: flow.signal };
   }));
   return { rows: result, fetchedAt: Date.now(), weekend: closed };
 });

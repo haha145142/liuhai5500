@@ -13,7 +13,7 @@ const FUNDS_CACHE_KEY = "fund_ai_pro_funds_cache_v1";
 
 export type AppSettings = { autoRefreshMs: number; newsRefreshMs: number };
 type CacheEnvelope<T> = { savedAt: number; data: T };
-const DEFAULT_SETTINGS: AppSettings = { autoRefreshMs: 30_000, newsRefreshMs: 3 * 60_000 };
+const DEFAULT_SETTINGS: AppSettings = { autoRefreshMs: 180_000, newsRefreshMs: 3 * 60_000 };
 const RELIABLE_MARKET_CACHE_MAX_AGE = 14 * 24 * 60 * 60_000;
 const NEWS_CACHE_MAX_AGE = 48 * 60 * 60_000;
 
@@ -22,9 +22,6 @@ function saveJson(key: string, value: unknown) { if (typeof window === "undefine
 function loadCache<T>(key: string, maxAge: number): T | null { if (typeof window === "undefined") return null; try { const item = JSON.parse(localStorage.getItem(key) || "null") as CacheEnvelope<T> | null; if (!item || typeof item.savedAt !== "number" || Date.now() - item.savedAt > maxAge) return null; return item.data ?? null; } catch { return null; } }
 function saveCache<T>(key: string, data: T) { saveJson(key, { savedAt: Date.now(), data } satisfies CacheEnvelope<T>); }
 
-/** Keep the latest reliable market/fund snapshot long enough to cover weekends and long holidays.
- * The stored marketDate/navDate remains authoritative, so a longer TTL never turns old data into "today".
- */
 export function loadCachedSnapshot(maxAge = RELIABLE_MARKET_CACHE_MAX_AGE): Snapshot | null { return loadCache<Snapshot>(SNAPSHOT_CACHE_KEY, maxAge); }
 export function saveCachedSnapshot(data: Snapshot) { saveCache(SNAPSHOT_CACHE_KEY, data); }
 export function loadCachedNews(maxAge = NEWS_CACHE_MAX_AGE): NewsFeed | null { return loadCache<NewsFeed>(NEWS_CACHE_KEY, maxAge); }
@@ -74,5 +71,5 @@ export function loadSelectedSectors(): string[] { const saved = readJson<string[
 export function saveSelectedSectors(ids: string[]) { try { localStorage.setItem(SECTOR_KEY, JSON.stringify(ids)); } catch {} }
 export function loadWatchlist(): string[] { return readJson<string[]>(WATCH_KEY, []).filter((x) => /^\d{6}$/.test(String(x))); }
 export function saveWatchlist(codes: string[]) { try { localStorage.setItem(WATCH_KEY, JSON.stringify(codes.filter((x) => /^\d{6}$/.test(String(x))))); } catch {} }
-export function loadSettings(): AppSettings { const saved = readJson<Partial<AppSettings>>(SETTINGS_KEY, {}); return { ...DEFAULT_SETTINGS, ...saved, autoRefreshMs: Number.isFinite(Number(saved.autoRefreshMs)) ? Math.max(30_000, Number(saved.autoRefreshMs)) : DEFAULT_SETTINGS.autoRefreshMs, newsRefreshMs: Number.isFinite(Number(saved.newsRefreshMs)) ? Math.max(60_000, Number(saved.newsRefreshMs)) : DEFAULT_SETTINGS.newsRefreshMs }; }
+export function loadSettings(): AppSettings { const saved = readJson<Partial<AppSettings>>(SETTINGS_KEY, {}); return { ...DEFAULT_SETTINGS, ...saved, autoRefreshMs: Number.isFinite(Number(saved.autoRefreshMs)) ? Math.max(180_000, Number(saved.autoRefreshMs)) : DEFAULT_SETTINGS.autoRefreshMs, newsRefreshMs: Number.isFinite(Number(saved.newsRefreshMs)) ? Math.max(60_000, Number(saved.newsRefreshMs)) : DEFAULT_SETTINGS.newsRefreshMs }; }
 export function saveSettings(s: AppSettings) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch {} }

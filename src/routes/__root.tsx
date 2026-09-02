@@ -16,13 +16,12 @@ import finalIos26Css from "../ios26-final-override.css?url";
 import designSystemCss from "../fund-ai-pro-design-system.css?url";
 import uiFinalPassCss from "../ui-final-pass.css?url";
 import compactPolishCss from "../predeploy-compact-polish.css?url";
+import fundCardControlsCss from "../fund-card-controls.css?url";
 
 const APP_NAME = "Fund AI Pro";
 
 function HydrationMarker() {
-  useEffect(() => {
-    document.body.dataset.fapHydrated = "true";
-  }, []);
+  useEffect(() => { document.body.dataset.fapHydrated = "true"; }, []);
   return null;
 }
 
@@ -62,6 +61,7 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: designSystemCss },
       { rel: "stylesheet", href: uiFinalPassCss },
       { rel: "stylesheet", href: compactPolishCss },
+      { rel: "stylesheet", href: fundCardControlsCss },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
