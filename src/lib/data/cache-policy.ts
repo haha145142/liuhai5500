@@ -7,15 +7,20 @@ export const CACHE_TTL_MS: Record<CacheDomain, number | null> = {
   portfolio: 5 * 60_000,
   fundEstimate: 25_000,
   index: 15_000,
-  fundSector: 30_000,
+  fundSector: 60_000,
   news: 3 * 60_000,
-  officialNav: null,
+  officialNav: 60 * 60_000,
   ai: 30 * 60_000,
 };
 
 export type CacheContext = { domain: CacheDomain; now?: Date; tradingDate?: string | null };
 
 export function cacheTtl(domain: CacheDomain) { return CACHE_TTL_MS[domain]; }
+
+function chinaDate(now: Date) {
+  const shifted = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
+}
 
 export function readDomainCache<T>(key: string, context: CacheContext): { value: T; savedAt: number; tradingDate: string | null } | null {
   const ttl = cacheTtl(context.domain);
@@ -24,7 +29,7 @@ export function readDomainCache<T>(key: string, context: CacheContext): { value:
   const now = context.now ?? new Date();
   const sameTradingDate = !context.tradingDate || !cached.tradingDate || context.tradingDate === cached.tradingDate;
   if (context.domain === "officialNav") return cached;
-  if (isWeekendLike(now) && cached.tradingDate) return cached;
+  if (isWeekendLike(new Date(now.getTime() + 8 * 60 * 60 * 1000)) && cached.tradingDate) return cached;
   if (!sameTradingDate && context.domain !== "news" && context.domain !== "ai") return null;
   return cached;
 }
@@ -37,10 +42,10 @@ export type MarketDataState = "trading" | "weekend" | "closed_weekday";
 
 export function classifyMarketDataState(input: { now?: Date; latestTradingDate?: string | null }): MarketDataState {
   const now = input.now ?? new Date();
-  if (isWeekendLike(now)) return "weekend";
-  const latest = input.latestTradingDate;
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  if (latest && latest !== today) return "closed_weekday";
+  const today = chinaDate(now);
+  const shifted = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  if (isWeekendLike(shifted)) return "weekend";
+  if (input.latestTradingDate && input.latestTradingDate !== today) return "closed_weekday";
   return "trading";
 }
 
