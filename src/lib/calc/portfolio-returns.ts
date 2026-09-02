@@ -3,6 +3,7 @@ import { isChinaTradingSession } from "../data/market-session.ts";
 
 type ReturnQuote={price:number|null;mode:"live_estimate"|"official_today"|"latest_official"|"none"};
 export type HoldingReturn={costValue:number;marketValue:number|null;holdingPnl:number|null;holdingPnlPct:number|null;todayPnl:number|null;todayPnlPct:number|null;previousOfficialNav:number|null;price:number|null;quoteMode:ReturnQuote["mode"]};
+const LIVE_ESTIMATE_MAX_AGE_MS=10*60_000;
 function finitePositive(v:number|null|undefined){return v!=null&&Number.isFinite(v)&&v>0?v:null;}
 function sameChinaDate(value:string|null|undefined, now=new Date()){
   if(!value)return false;
@@ -10,6 +11,13 @@ function sameChinaDate(value:string|null|undefined, now=new Date()){
   if(!m)return false;
   const cn=new Date(now.getTime()+8*60*60*1000);
   return Number(m[1])===cn.getUTCFullYear()&&Number(m[2])===cn.getUTCMonth()+1&&Number(m[3])===cn.getUTCDate();
+}
+function isFreshEstimate(fund:FundQuote,now=new Date()){
+  if(!fund.estimateTime)return false;
+  const at=Date.parse(fund.estimateTime);
+  if(!Number.isFinite(at))return false;
+  const age=now.getTime()-at;
+  return age>=0&&age<=LIVE_ESTIMATE_MAX_AGE_MS;
 }
 function isValidatedIntraday(fund:FundQuote){
   if(fund.estimateConfidence==="high"||fund.estimateConfidence==="medium")return true;
@@ -22,7 +30,7 @@ function selectReturnQuote(fund:FundQuote|undefined,now=new Date()):ReturnQuote{
   const official=finitePositive(fund.nav)!=null&&fund.officialNavPublished===true&&fund.valuationStatus==="official_nav";
   if(official)return{price:finitePositive(fund.nav),mode:"official_today"};
   const current=finitePositive(fund.estimate);
-  if(current!=null&&isValidatedIntraday(fund)&&(fund.valuationStatus==="estimate"||fund.valuationStatus==="live_estimate")&&fund.officialNavPublished!==true&&sameChinaDate(fund.estimateTime,now))return{price:current,mode:"live_estimate"};
+  if(current!=null&&isValidatedIntraday(fund)&&(fund.valuationStatus==="estimate"||fund.valuationStatus==="live_estimate")&&fund.officialNavPublished!==true&&sameChinaDate(fund.estimateTime,now)&&isFreshEstimate(fund,now))return{price:current,mode:"live_estimate"};
   if(isChinaTradingSession(now))return{price:null,mode:"none"};
   const nav=finitePositive(fund.nav);
   if(nav!=null)return{price:nav,mode:"latest_official"};
