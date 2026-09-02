@@ -2,8 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { calcHoldingReturn, calcPortfolioReturn } from "./portfolio-returns.ts";
 import { selectFundDisplayQuote } from "../data/quote-mode.ts";
+import type { FundQuote } from "../types";
 
-function fund(overrides: Partial<Parameters<typeof calcHoldingReturn>[1]> = {}) {
+function fund(overrides: Partial<FundQuote> = {}): FundQuote {
   return {
     code: "000001",
     name: "测试基金",
@@ -42,7 +43,7 @@ test("holding return uses previous official NAV for today's P&L", () => {
 });
 
 test("same-day estimate remains the displayed quote after close until official NAV is published", () => {
-  const now = new Date("2026-09-02T07:30:00Z"); // 15:30 China time
+  const now = new Date("2026-09-02T07:30:00Z");
   const result = selectFundDisplayQuote(fund(), now);
 
   assert.equal(result.mode, "live_estimate");
@@ -53,12 +54,7 @@ test("same-day estimate remains the displayed quote after close until official N
 
 test("official NAV immediately overrides same-day estimate once published", () => {
   const now = new Date("2026-09-02T08:00:00Z");
-  const result = selectFundDisplayQuote(fund({
-    nav: 1.24,
-    navDate: "2026-09-02",
-    officialNavPublished: true,
-    valuationStatus: "official_nav",
-  }), now);
+  const result = selectFundDisplayQuote(fund({ nav: 1.24, navDate: "2026-09-02", officialNavPublished: true, valuationStatus: "official_nav" }), now);
 
   assert.equal(result.mode, "official_today");
   assert.equal(result.price, 1.24);
@@ -66,10 +62,7 @@ test("official NAV immediately overrides same-day estimate once published", () =
 });
 
 test("estimate equal to the latest official NAV still uses that NAV as today's baseline", () => {
-  const result = calcHoldingReturn(
-    { code: "000001", name: "测试基金", shares: 10, cost: 1 },
-    fund({ estimate: 1.2, estimatePct: 0, dayPct: 0 }),
-  );
+  const result = calcHoldingReturn({ code: "000001", name: "测试基金", shares: 10, cost: 1 }, fund({ estimate: 1.2, estimatePct: 0, dayPct: 0 }));
 
   assert.equal(result.marketValue, 12);
   assert.equal(result.todayPnl, 0);
@@ -77,10 +70,7 @@ test("estimate equal to the latest official NAV still uses that NAV as today's b
 });
 
 test("latest official NAV is not used as an intraday price when the market is open and no estimate exists", () => {
-  const result = calcHoldingReturn(
-    { code: "000001", name: "测试基金", shares: 10, cost: 1 },
-    fund({ estimate: null, estimatePct: null, estimateTime: null, valuationStatus: "stale", navDate: "2026-09-01" }),
-  );
+  const result = calcHoldingReturn({ code: "000001", name: "测试基金", shares: 10, cost: 1 }, fund({ estimate: null, estimatePct: null, estimateTime: null, valuationStatus: "stale", navDate: "2026-09-01" }));
 
   assert.equal(result.marketValue, null);
   assert.equal(result.holdingPnl, null);
