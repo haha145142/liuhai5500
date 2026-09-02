@@ -4,6 +4,7 @@ import { getBoardWatchQuotes, searchFundBoards, type BoardCandidate, type BoardW
 import { getFundRiskMetrics, type FundRiskMetric } from "@/lib/data/fund-risk";
 import { getSectorFunds, type SectorFundRow } from "@/lib/data/sector-funds";
 import { SECTOR_RULES } from "@/lib/data/sectors";
+import { isExchangeClosed, tradingDateLabel } from "@/lib/data/trading-day";
 import { fmtPctShort, fmtPrice } from "@/lib/format";
 
 type Selection = { code: string; name: string; icon: string };
@@ -100,7 +101,9 @@ function fetchBoardQuotesJsonp(codes: string[]): Promise<BoardWatchQuote[]> {
       const rows = Array.isArray(raw) ? raw : raw && typeof raw === "object" ? Object.values(raw) : [];
       const wanted = new Set(codes);
       const now = new Date();
-      const marketDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const marketDate = tradingDateLabel(now);
+      const closed = isExchangeClosed(now);
+      const validation = closed ? "recent" as const : "live" as const;
       const out = rows.filter((r) => wanted.has(String(r.f12 ?? "").trim())).map((r) => ({
         code: String(r.f12 ?? ""), name: String(r.f14 ?? r.f12 ?? ""), icon: "📈",
         pct: Number.isFinite(Number(r.f3)) ? Number(r.f3) : null,
@@ -110,7 +113,7 @@ function fetchBoardQuotesJsonp(codes: string[]): Promise<BoardWatchQuote[]> {
         midFlow: Number.isFinite(Number(r.f78)) ? Number(r.f78) : null,
         smallFlow: Number.isFinite(Number(r.f84)) ? Number(r.f84) : null,
         turnover: Number.isFinite(Number(r.f6)) ? Number(r.f6) : null,
-        marketDate, source: "东方财富浏览器 JSONP 直连", validation: Number.isFinite(Number(r.f3)) ? "live" as const : "unavailable" as const,
+        marketDate, source: closed ? "东方财富浏览器 JSONP 直连 · 最近交易日" : "东方财富浏览器 JSONP 直连", validation,
       }));
       finish(true, out);
     };
