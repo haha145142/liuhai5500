@@ -13,14 +13,13 @@ export function SmartAlerts() {
   const [threshold, setThreshold] = useState("3");
   const codes = useMemo(() => [...new Set(portfolio.map((h) => h.code))], [portfolio]);
 
-  const check = () => {
-    const created = evaluateFundAlerts(funds);
-    if (created.length) setEvents(loadAlertEvents());
-    return created.length;
+  const refreshAlerts = () => {
+    evaluateFundAlerts(funds);
+    setEvents(loadAlertEvents());
   };
 
   useEffect(() => {
-    const timer = window.setInterval(() => { if (Object.keys(funds).length) setEvents(loadAlertEvents()); evaluateFundAlerts(funds); }, 30_000);
+    const timer = window.setInterval(refreshAlerts, 30_000);
     return () => window.clearInterval(timer);
   }, [funds]);
 
@@ -29,7 +28,7 @@ export function SmartAlerts() {
     if (!Number.isFinite(value) || value <= 0 || !/^\d{6}$/.test(code)) return;
     const rule: AlertRule = { id: `${code}-${kind}-${value}-${Date.now()}`, code, kind, threshold: value, enabled: true };
     const next = [rule, ...rules].slice(0, 30);
-    setRules(next); saveAlertRules(next); setEvents(loadAlertEvents());
+    setRules(next); saveAlertRules(next); refreshAlerts();
   };
 
   const toggle = (id: string) => { const next = rules.map((r) => r.id === id ? { ...r, enabled: !r.enabled } : r); setRules(next); saveAlertRules(next); };
@@ -43,7 +42,7 @@ export function SmartAlerts() {
         <input value={threshold} onChange={(e) => setThreshold(e.target.value)} inputMode="decimal" className="h-10 rounded-xl bg-white/70 px-2 text-[10px] outline-none ring-1 ring-border" placeholder="阈值 %" />
       </div>
       <button type="button" onClick={add} disabled={!/^\d{6}$/.test(code)} className="mt-2 h-10 w-full rounded-xl bg-accent text-xs font-semibold text-accent-fg disabled:opacity-50">添加提醒规则</button>
-      <button type="button" onClick={() => { const count = check(); setEvents(loadAlertEvents()); if (!count) window.dispatchEvent(new CustomEvent("fap-alert-check")); }} className="mt-1.5 h-9 w-full rounded-xl bg-white/75 text-[10px] font-semibold text-fg ring-1 ring-white/90">立即检查</button>
+      <button type="button" onClick={refreshAlerts} className="mt-1.5 h-9 w-full rounded-xl bg-white/75 text-[10px] font-semibold text-fg ring-1 ring-white/90">立即检查</button>
     </div>
     <div className="mt-2 space-y-1.5">{rules.length ? rules.map((r) => <div key={r.id} className="flex items-center gap-2 rounded-xl bg-white/55 px-2.5 py-2 text-[9px]"><span className={`size-2 rounded-full ${r.enabled ? "bg-emerald-500" : "bg-slate-300"}`} /><span className="min-w-0 flex-1 truncate">{r.code} · {alertKindLabel[r.kind]} {r.threshold.toFixed(1)}%</span><button type="button" onClick={() => toggle(r.id)} className="rounded-lg bg-white/75 px-2 py-1">{r.enabled ? "停用" : "启用"}</button><button type="button" onClick={() => remove(r.id)} className="rounded-lg bg-white/75 px-2 py-1">删除</button></div>) : <div className="rounded-xl bg-white/45 px-3 py-3 text-[9px] text-muted">还没有提醒规则。</div>}</div>
     {events.length ? <div className="mt-2 rounded-xl bg-amber-50/65 px-2.5 py-2"><div className="text-[9px] font-semibold text-fg">最近触发</div><div className="mt-1 space-y-1">{events.slice(0,5).map((e) => <div key={e.id} className="text-[8px] leading-[1.4] text-muted">{new Date(e.triggeredAt).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})} · {e.message}</div>)}</div></div> : null}
