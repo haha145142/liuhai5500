@@ -35,13 +35,14 @@ async function testIndexValuation(page, label) {
 }
 async function testSmartAlerts(page, label) {
   await page.goto(`${baseURL}/settings`, { waitUntil: "domcontentloaded" }); await waitForText(page, "智能提醒", `${label} smart alerts`); await waitForHydration(page, `${label} smart alerts`);
-  const selects = page.locator("select"); await selects.first().waitFor({ state: "visible", timeout: 8_000 });
-  const optionCount = await selects.first().locator("option").count(); if (optionCount < 2) throw new Error(`${label}: smart alert fund selector has no portfolio options`);
-  await selects.first().selectOption({ index: 1 });
-  const threshold = page.locator('input[placeholder="阈值 %"]'); await threshold.fill("3");
+  const selects = page.locator("select"); await selects.first().waitFor({ state: "visible", timeout: 8_000 }); const optionCount = await selects.first().locator("option").count(); if (optionCount < 2) throw new Error(`${label}: smart alert fund selector has no portfolio options`);
+  await selects.first().selectOption({ index: 1 }); const threshold = page.locator('input[placeholder="阈值 %"]'); await threshold.fill("3");
   await page.getByRole("button", { name: "添加提醒规则" }).click(); await waitForText(page, "停用", `${label} alert rule saved`, 8_000);
   const stored = await page.evaluate(() => { try { const rows = JSON.parse(localStorage.getItem("fund_ai_pro_alert_rules_v1") || "[]"); return Array.isArray(rows) && rows.length > 0; } catch { return false; } }); if (!stored) throw new Error(`${label}: smart alert rule was not persisted`);
   await assertNoHorizontalOverflow(page, `${label} smart alerts`);
+}
+async function testRotationRadar(page, label) {
+  await page.goto(`${baseURL}/rotation`, { waitUntil: "domcontentloaded" }); await waitForText(page, "AI 轮动雷达", `${label} rotation radar`, 15_000); await waitForText(page, "数据推断", `${label} rotation evidence boundary`); await waitForText(page, "板块强度", `${label} rotation score`); await assertNoHorizontalOverflow(page, `${label} rotation radar`);
 }
 async function testQuickAdd(browser, viewport) {
   const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
@@ -58,7 +59,7 @@ try {
     try {
       await page.addInitScript(() => { const holdings = Array.from({ length: 20 }, (_, i) => ({ code: String(i + 1).padStart(6, "0"), name: `测试基金${i + 1}`, shares: 100, cost: 1 })); localStorage.setItem("fund_ai_pro_portfolio_v3", JSON.stringify(holdings)); localStorage.removeItem("fund_ai_pro_board_watch_v7"); localStorage.removeItem("fund_ai_pro_board_watch_v8"); localStorage.removeItem("fund_ai_pro_fund_candidates_v1"); localStorage.removeItem("fund_ai_pro_alert_rules_v1"); localStorage.removeItem("fund_ai_pro_alert_events_v1"); });
       await page.goto(`${baseURL}/`, { waitUntil: "domcontentloaded" }); await waitForText(page, "我的基金", `${viewport.label} homepage`); await waitForHydration(page, `${viewport.label} homepage`); await waitForText(page, "今日评估", `${viewport.label} daily assessment`); await waitForText(page, "今日市场评分", `${viewport.label} daily score`); if ((await page.locator("body").innerText()).trim().length < 80) throw new Error(`${viewport.label}: homepage rendered blank/minimal content`); await assertNoHorizontalOverflow(page, `${viewport.label} homepage`);
-      await testSectorFundPool(page, viewport.label); await testFundPk(page, viewport.label); await testIndexValuation(page, viewport.label); await testSmartAlerts(page, viewport.label);
+      await testSectorFundPool(page, viewport.label); await testFundPk(page, viewport.label); await testIndexValuation(page, viewport.label); await testSmartAlerts(page, viewport.label); await testRotationRadar(page, viewport.label);
       await page.goto(`${baseURL}/portfolio`, { waitUntil: "domcontentloaded" }); await waitForText(page, "我的持仓", `${viewport.label} portfolio`); await waitForHydration(page, `${viewport.label} portfolio`); await waitForText(page, "000020", `${viewport.label} 20-holding render`, 15_000); await waitForText(page, "组合体检", `${viewport.label} portfolio insight`); await waitForText(page, "持仓重复度分析", `${viewport.label} overlap`); const bodyText = await page.locator("body").innerText(); if (!bodyText.includes("20只")) throw new Error(`${viewport.label}: 20-holding portfolio summary missing after holdings rendered`); for (const code of ["000001", "000010", "000020"]) if (!bodyText.includes(code)) throw new Error(`${viewport.label}: expected holding ${code} not rendered`); await assertNoHorizontalOverflow(page, `${viewport.label} portfolio`);
       await page.goto(`${baseURL}/band`, { waitUntil: "domcontentloaded" }); await waitForText(page, "波段信号", `${viewport.label} band signal`); await waitForText(page, "趋势强弱", `${viewport.label} trend strength`); await waitForText(page, "卖出提示 · 做T/波段", `${viewport.label} swing trade plan`); await assertNoHorizontalOverflow(page, `${viewport.label} band`);
       await page.goto(`${baseURL}/market`, { waitUntil: "domcontentloaded" }); await waitForText(page, "操作建议", `${viewport.label} operation advice`); await waitForText(page, "外围市场", `${viewport.label} market data`); await assertNoHorizontalOverflow(page, `${viewport.label} market`);
