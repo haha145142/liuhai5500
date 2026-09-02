@@ -20,7 +20,9 @@ export default async function handler(req: Request, res: Response) {
   if (!sharedCacheConfigured()) return res.status(200).json({ ok: false, skipped: true, reason: "shared-cache-not-configured" });
 
   const phase = getMarketPhase();
-  if (phase === "weekend") return res.status(200).json({ ok: true, skipped: true, reason: "market-closed-weekend", phase });
+  if (phase === "weekend" || phase === "postclose") {
+    return res.status(200).json({ ok: true, skipped: true, reason: phase === "weekend" ? "market-closed-weekend" : "market-closed-postclose", phase });
+  }
 
   try {
     const snapshot = await getSnapshot();
