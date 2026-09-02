@@ -6,7 +6,7 @@ import { QuickAddFund } from "@/components/portfolio/QuickAddFund";
 import { SmartAlerts } from "@/components/settings/SmartAlerts";
 import { EmptyNote, Glass, Tone } from "@/components/ui/Glass";
 import { matchFundSector } from "@/lib/data/sectors";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, fmtPctShort } from "@/lib/format";
 import { useApp } from "@/lib/store";
 import { calcPortfolioPeriodReturn } from "@/lib/calc/portfolio-periods";
 import { calcPortfolioReturn, calcHoldingReturn } from "@/lib/calc/portfolio-returns";
@@ -48,8 +48,7 @@ function PortfolioPage() {
     for (const h of portfolio) {
       const points = funds[h.code]?.historyPoints ?? [];
       for (let i = 1; i < points.length; i += 1) {
-        const current = points[i];
-        const previous = points[i - 1];
+        const current = points[i]; const previous = points[i - 1];
         if (!current || !previous || current.date === previous.date) continue;
         const delta = h.shares * (current.nav - previous.nav);
         if (!Number.isFinite(delta)) continue;
@@ -65,7 +64,7 @@ function PortfolioPage() {
     <div>
       <Glass className="portfolio-shell mb-3 overflow-hidden rounded-[28px] border border-white/75 bg-white/48 p-3 shadow-[0_18px_48px_rgba(38,78,112,.07),inset_0_1px_0_rgba(255,255,255,.95)] backdrop-blur-[20px] saturate-150">
         <div className="flex items-center justify-between gap-2"><div className="min-w-0"><div className="text-[17px] font-bold tracking-tight text-fg">💼 我的持仓 <span className="ml-1 text-[9px] font-normal text-muted">盘中估算 · 收盘以官方净值为准</span></div></div><span className="shrink-0 rounded-full bg-blue-100/75 px-2.5 py-1 text-[10px] font-semibold text-blue-600">{portfolio.length}只</span></div>
-        <div className="mt-2 flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-[10px] text-muted">{fullyPriced ? "持仓总收益" : "持仓总收益（已计价部分）"}</div><Tone v={summary.holdingPnl} className="mt-1 block text-[26px] font-bold leading-none tracking-tight">{summary.totalCount > 0 ? fmtMoney(summary.holdingPnl) : "—"}</Tone><Tone v={summary.pricedHoldingPnlPct} className="mt-1 block text-[12px] font-semibold">{summary.pricedHoldingPnlPct == null ? "—" : fmtMoney(summary.pricedHoldingPnlPct)}%</Tone></div><div className="shrink-0 pt-3 text-right text-[9px] leading-relaxed text-muted"><div>今日 {downCount} 跌 / {upCount} 涨 / {Math.max(0, portfolio.length - downCount - upCount)} 平</div><div>成本 {fmtMoney(summary.costValue)}</div><div>持仓市值 {summary.marketValue == null ? "—" : fmtMoney(summary.marketValue)}</div></div></div>
+        <div className="mt-2 flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-[10px] text-muted">{fullyPriced ? "持仓总收益" : "持仓总收益（已计价部分）"}</div><Tone v={summary.holdingPnl} className="mt-1 block text-[26px] font-bold leading-none tracking-tight">{summary.totalCount > 0 ? fmtMoney(summary.holdingPnl) : "—"}</Tone><Tone v={summary.pricedHoldingPnlPct} className="mt-1 block text-[12px] font-semibold">{summary.pricedHoldingPnlPct == null ? "—" : fmtPctShort(summary.pricedHoldingPnlPct)}</Tone></div><div className="shrink-0 pt-3 text-right text-[9px] leading-relaxed text-muted"><div>今日 {downCount} 跌 / {upCount} 涨 / {Math.max(0, portfolio.length - downCount - upCount)} 平</div><div>成本 {fmtMoney(summary.costValue)}</div><div>持仓市值 {summary.marketValue == null ? "—" : fmtMoney(summary.marketValue)}</div></div></div>
         <div className="mt-2 flex items-center justify-between rounded-2xl bg-white/48 px-1 py-1 ring-1 ring-white/75"><span className="px-2 text-[9px] text-muted">基金详情</span><div className="flex gap-1"><button type="button" onClick={() => setBulkExpanded(true)} className="rounded-full bg-white/75 px-2.5 py-1.5 text-[9px] font-medium text-slate-600 shadow-sm">一键打开</button><button type="button" onClick={() => setBulkExpanded(false)} className="rounded-full bg-white/75 px-2.5 py-1.5 text-[9px] font-medium text-slate-600 shadow-sm">一键折叠</button></div></div>
         <div className="mt-2.5 grid grid-cols-5 gap-1 rounded-2xl bg-white/48 p-0.5 ring-1 ring-white/75">{(["today","week","month","year","since"] as const).map((tab) => { const label = tab === "today" ? "今日" : tab === "week" ? "本周" : tab === "month" ? "本月" : tab === "year" ? "今年" : "以来"; return <button key={tab} type="button" onClick={() => setSummaryTab(tab)} className={`rounded-[13px] px-1 py-1.5 text-[10px] font-medium transition ${summaryTab === tab ? "bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,.20)]" : "bg-white/66 text-muted"}`}>{label}</button>; })}</div>
         <div className="mt-2 rounded-2xl bg-white/54 px-2.5 py-1.5 ring-1 ring-white/70"><div className="flex items-center justify-between gap-3"><span className="text-[10px] text-muted">{selectedSummary.label}</span><Tone v={selectedSummary.amount} className="text-[16px] font-bold">{selectedSummary.amount == null ? "—" : fmtMoney(selectedSummary.amount)}</Tone></div><div className="mt-0.5 text-right"><Tone v={selectedSummary.pct} className="text-[10px] font-semibold">{selectedSummary.pct == null ? "—" : fmtPctShort(selectedSummary.pct)}</Tone></div></div>
@@ -88,8 +87,6 @@ function PortfolioPage() {
 
 function CalendarCell({ date, inMonth, calendarPnl }: { date: Date; inMonth: boolean; calendarPnl: CalendarPnl }) {
   const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  const day = calendarPnl.get(key);
-  const pnl = day?.pnl ?? 0;
-  const found = day?.found === true;
+  const day = calendarPnl.get(key); const pnl = day?.pnl ?? 0; const found = day?.found === true;
   return <div className={`min-h-12 rounded-xl p-1 ${inMonth ? "bg-bg-elevated" : "opacity-30"}`}><div className="text-xs">{date.getDate()}</div><Tone v={found ? pnl : null} className="mt-1 block text-[10px] font-semibold">{found ? fmtMoney(pnl) : "—"}</Tone></div>;
 }
