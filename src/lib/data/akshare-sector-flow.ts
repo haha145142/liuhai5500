@@ -58,6 +58,8 @@ export type AkShareSectorFlowResult = {
 
 const SNAPSHOT_URL =
   "https://raw.githubusercontent.com/haha145142/liuhai5500/data/akshare/data/akshare/sector-flow.json";
+const SNAPSHOT_CACHE_MS = 60_000;
+let snapshotCache: { expiresAt: number; value: AkShareSectorFlowResult } | null = null;
 
 function asNumber(value: unknown): number | null {
   if (value == null || value === "") return null;
@@ -92,7 +94,6 @@ function snapshotFreshness(marketDate: string | null, fetchedAt: string | null, 
   const thirtyMinutes = 30 * 60 * 1000;
   if (!isExchangeClosed(now) && ageMs <= thirtyMinutes) return "live";
   if (ageMs <= twelveHours) return "recent";
-  // On closed days, retain the latest trading-day snapshot rather than inventing empty data.
   return isExchangeClosed(now) ? "recent" : "stale";
 }
 
@@ -104,8 +105,8 @@ export function classifyAkShareSnapshotFreshness(
   return snapshotFreshness(marketDate, fetchedAt, now);
 }
 
-export async function fetchAkShareSnapshot(): Promise<AkShareSectorFlowResult> {
-  const empty = (error: string, marketDate: string | null = null, fetchedAt: string | null = null): AkShareSectorFlowResult => ({
+function emptyResult(error: string, marketDate: string | null = null, fetchedAt: string | null = null): AkShareSectorFlowResult {
+  return {
     ok: false,
     source: "none",
     marketDate,
@@ -116,14 +117,19 @@ export async function fetchAkShareSnapshot(): Promise<AkShareSectorFlowResult> {
     sources: [],
     errors: [],
     error,
-  });
+  };
+}
+
+export async function fetchAkShareSnapshot(): Promise<AkShareSectorFlowResult> {
+  const now = Date.now();
+  if (snapshotCache && snapshotCache.expiresAt > now) return snapshotCache.value;
 
   try {
-    const response = await fetch(`${SNAPSHOT_URL}?t=${Date.now()}`, {
+    const response = await fetch(SNAPSHOT_URL, {
       headers: { Accept: "application/json" },
       cache: "no-store",
     });
-    if (!response.ok) return empty(`HTTP ${response.status}`);
+    if (!response.ok) return emptyResult(`HTTP ${response.status}`);
     const snapshot = (await response.json()) as Snapshot;
     const rows = (snapshot.rows ?? []).map(normalizeRow).filter((row): row is AkShareSectorFlow => row !== null);
     const marketDate = snapshot.marketDate ?? null;
@@ -140,23 +146,25 @@ export async function fetchAkShareSnapshot(): Promise<AkShareSectorFlowResult> {
         ? [{ sectorType: item.sector_type ? String(item.sector_type) : null, provider: item.provider ? String(item.provider) : null, error }]
         : [];
     });
-    if (!rows.length) return empty("AKShare 快照暂无可靠板块资金流", marketDate, fetchedAt);
+    if (!rows.length) return emptyResult("AKShare 快照暂无可靠板块资金流", marketDate, fetchedAt);
     if (freshness === "stale") {
       return { ok: false, source: "none", marketDate, fetchedAt, complete: snapshot.complete === true, freshness, rows: [], sources, errors, error: "AKShare 板块资金流已过期" };
     }
-    return {
+    const result: AkShareSectorFlowResult = {
       ok: snapshot.ok === true,
       source: "AKShare",
       marketDate,
       fetchedAt,
-      complete: snapshot.complete !== false,
+      complete: snapshot.complete === true,
       freshness,
       rows,
       sources,
       errors,
     };
+    snapshotCache = { expiresAt: now + SNAPSHOT_CACHE_MS, value: result };
+    return result;
   } catch (error) {
-    return empty(error instanceof Error ? error.message : "AKShare 快照读取失败");
+    return emptyResult(error instanceof Error ? error.message : "AKShare 快照读取失败");
   }
 }
 
