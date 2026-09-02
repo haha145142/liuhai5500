@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { requestFund, requestFundFast } from "@/lib/data/fund-request-cache";
+import { inferHoldingEntryDate } from "@/lib/calc/holding-entry-date";
 import type { FundQuote } from "@/lib/types";
 import "./QuickAddFund.css";
 
@@ -21,6 +22,7 @@ export function QuickAddFund() {
 
   const cached = /^\d{6}$/.test(code) ? funds[code] : undefined;
   const quote = remoteQuote?.code === code ? remoteQuote : cached;
+  const entryEstimate = quote && Number(cost) > 0 ? inferHoldingEntryDate(quote.historyPoints, Number(cost)) : null;
 
   useEffect(() => {
     if (!/^\d{6}$/.test(code)) {
@@ -49,8 +51,15 @@ export function QuickAddFund() {
       setMessage("请输入6位基金代码、持有份额和成本价");
       return;
     }
-    addHolding({ code, name: quote?.name || code, shares: s, cost: c }, quote);
-    setMessage("已添加");
+    addHolding({
+      code,
+      name: quote?.name || code,
+      shares: s,
+      cost: c,
+      purchaseDate: entryEstimate?.date ?? null,
+      purchaseDateSource: entryEstimate?.date ? "estimated" : null,
+    }, quote);
+    setMessage(entryEstimate?.date ? `已添加 · 估算买入日 ${entryEstimate.date}` : "已添加");
     setCode("");
     setShares("");
     setCost("");
@@ -66,7 +75,7 @@ export function QuickAddFund() {
         <input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" placeholder="成本价" aria-label="成本价" />
         <button type="button" onClick={save}><Plus size={16} />添加</button>
       </div>
-      {(message || quote?.name || loading) ? <div className={`quick-add-status ${message === "已添加" ? "ok" : ""}`}>{message || (quote?.name ? `${quote.name}${loading ? " · 正在更新" : ""}` : "正在读取基金数据…")}</div> : null}
+      {(message || quote?.name || loading || entryEstimate?.date) ? <div className={`quick-add-status ${message.startsWith("已添加") ? "ok" : ""}`}>{message || (quote?.name ? `${quote.name}${loading ? " · 正在更新" : ""}` : "正在读取基金数据…")}{entryEstimate?.date && !message ? ` · 估算买入日 ${entryEstimate.date} · 持有 ${entryEstimate.days} 天` : ""}</div> : null}
     </div>
   );
 }

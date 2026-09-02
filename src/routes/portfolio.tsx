@@ -33,6 +33,7 @@ function PortfolioPage() {
   const [alertPct, setAlertPct] = useState("");
   const [calendarCursor, setCalendarCursor] = useState(() => new Date());
   const [summaryTab, setSummaryTab] = useState<SummaryTab>("today");
+  const [bulkExpanded, setBulkExpanded] = useState<boolean | null>(null);
   useEffect(() => setAlerts(readAlerts()), []);
   useEffect(() => { try { localStorage.setItem(ALERT_KEY, JSON.stringify(alerts)); } catch {} }, [alerts]);
   const bench = snapshot?.indices[0]?.pct ?? null;
@@ -75,11 +76,18 @@ function PortfolioPage() {
       <Glass className="portfolio-shell mb-3 overflow-hidden rounded-[28px] border border-white/75 bg-white/48 p-3 shadow-[0_18px_48px_rgba(38,78,112,.07),inset_0_1px_0_rgba(255,255,255,.95)] backdrop-blur-[20px] saturate-150">
         <div className="flex items-center justify-between gap-2"><div className="min-w-0"><div className="text-[17px] font-bold tracking-tight text-fg">💼 我的持仓 <span className="ml-1 text-[9px] font-normal text-muted">盘中估值 · 收盘以官方净值为准</span></div></div><span className="shrink-0 rounded-full bg-blue-100/75 px-2.5 py-1 text-[10px] font-semibold text-blue-600">{portfolio.length}只</span></div>
         <div className="mt-2 flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-[10px] text-muted">持仓总收益</div><Tone v={fullyPriced ? summary.holdingPnl : null} className="mt-1 block text-[26px] font-bold leading-none tracking-tight">{fullyPriced && summary.totalCount > 0 ? fmtMoney(summary.holdingPnl) : "—"}</Tone><Tone v={fullyPriced ? summary.holdingPnlPct : null} className="mt-1 block text-[12px] font-semibold">{fullyPriced && summary.holdingPnlPct != null ? fmtPctShort(summary.holdingPnlPct) : "—"}</Tone></div><div className="shrink-0 pt-3 text-right text-[9px] leading-relaxed text-muted"><div>今日 {downCount} 跌 / {upCount} 涨 / {Math.max(0, portfolio.length - downCount - upCount)} 平</div><div>成本 {fmtMoney(summary.costValue)}</div><div>持仓市值 {fullyPriced ? fmtMoney(summary.marketValue) : "—"}</div></div></div>
+        <div className="mt-2 flex items-center justify-between rounded-2xl bg-white/48 px-1 py-1 ring-1 ring-white/75">
+          <span className="px-2 text-[9px] text-muted">基金详情</span>
+          <div className="flex gap-1">
+            <button type="button" onClick={() => setBulkExpanded(true)} className="rounded-full bg-white/75 px-2.5 py-1.5 text-[9px] font-medium text-slate-600 shadow-sm">一键打开</button>
+            <button type="button" onClick={() => setBulkExpanded(false)} className="rounded-full bg-white/75 px-2.5 py-1.5 text-[9px] font-medium text-slate-600 shadow-sm">一键折叠</button>
+          </div>
+        </div>
         <div className="mt-2.5 grid grid-cols-5 gap-1 rounded-2xl bg-white/48 p-0.5 ring-1 ring-white/75">{(["today","week","month","year","since"] as const).map((tab) => { const label = tab === "today" ? "今日" : tab === "week" ? "本周" : tab === "month" ? "本月" : tab === "year" ? "今年" : "以来"; return <button key={tab} type="button" onClick={() => setSummaryTab(tab)} className={`rounded-[13px] px-1 py-1.5 text-[10px] font-medium transition ${summaryTab === tab ? "bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,.20)]" : "bg-white/66 text-muted"}`}>{label}</button>; })}</div>
         <div className="mt-2 rounded-2xl bg-white/54 px-2.5 py-1.5 ring-1 ring-white/70"><div className="flex items-center justify-between gap-3"><span className="text-[10px] text-muted">{selectedSummary.label}</span><Tone v={selectedSummary.amount} className="text-[16px] font-bold">{selectedSummary.amount == null ? "—" : fmtMoney(selectedSummary.amount)}</Tone></div><div className="mt-0.5 text-right"><Tone v={selectedSummary.pct} className="text-[10px] font-semibold">{selectedSummary.pct == null ? "—" : fmtPctShort(selectedSummary.pct)}</Tone></div></div>
         {summary.totalCount > summary.pricedCount ? <div className="mt-1 rounded-xl bg-amber-50/70 px-2.5 py-1 text-[8px] text-muted">还有 {summary.totalCount - summary.pricedCount} 只基金暂未取得可靠行情；无法确认的数字不猜。</div> : null}
         {summaryTab !== "today" && summaryTab !== "since" && selectedSummary.amount == null ? <div className="mt-1 rounded-xl bg-amber-50/70 px-2.5 py-1 text-[8px] text-muted">该周期需要全部持仓具备对应历史净值；数据不完整时不显示估算收益。</div> : null}
-        {portfolio.length ? portfolio.map((h) => { const fname = funds[h.code]?.name || h.name; const rule = matchFundSector(fname); const sector = rule ? snapshot?.sectors.find((s) => s.id === rule.id) : undefined; return <FundCard key={h.code} holding={h} fund={funds[h.code]} sector={sector} benchPct={bench} totalMarketValue={summary.marketValue} onUpdate={(patch) => updateHolding(h.code, patch)} onRemove={() => removeHolding(h.code)} />; }) : <EmptyNote>还没有持仓。添加基金后会自动拉取官方净值、盘中估值和历史指标。</EmptyNote>}
+        {portfolio.length ? portfolio.map((h) => { const fname = funds[h.code]?.name || h.name; const rule = matchFundSector(fname); const sector = rule ? snapshot?.sectors.find((s) => s.id === rule.id) : undefined; return <FundCard key={h.code} holding={h} fund={funds[h.code]} sector={sector} benchPct={bench} totalMarketValue={summary.marketValue} expandedOverride={bulkExpanded} onUpdate={(patch) => updateHolding(h.code, patch)} onRemove={() => removeHolding(h.code)} />; }) : <EmptyNote>还没有持仓。添加基金后会自动拉取官方净值、盘中估值和历史指标。</EmptyNote>}
         <QuickAddFund />
       </Glass>
       <PortfolioInsight holdings={portfolio} funds={Object.values(funds)} sectors={snapshot?.sectors || []} />
