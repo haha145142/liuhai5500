@@ -2,6 +2,11 @@ name: AKShare Sector Flow Snapshot
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/akshare-sector-flow.yml"
+      - "scripts/akshare-sector-flow.py"
   schedule:
     # China A-share session: 09:30-15:00 Asia/Shanghai (01:30-07:00 UTC).
     - cron: "*/10 1-7 * * 1-5"
