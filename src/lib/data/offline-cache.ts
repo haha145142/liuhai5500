@@ -17,12 +17,14 @@ export function readCached<T>(key: string, maxAgeMs?: number): { value: T; saved
     const raw = window.localStorage.getItem(PREFIX + key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<CacheEnvelope<T>>;
-    if (parsed.version !== 1 || typeof parsed.savedAt !== "number" || !("value" in parsed)) return null;
-    if (maxAgeMs != null && Date.now() - parsed.savedAt > maxAgeMs) return null;
+    if (parsed.version !== 1 || typeof parsed.savedAt !== "number" || !Number.isFinite(parsed.savedAt) || !("value" in parsed)) return null;
+    const age = Date.now() - parsed.savedAt;
+    if (age < 0) return null;
+    if (maxAgeMs != null && age > maxAgeMs) return null;
     return {
       value: parsed.value as T,
       savedAt: parsed.savedAt,
-      tradingDate: parsed.tradingDate ?? null,
+      tradingDate: typeof parsed.tradingDate === "string" ? parsed.tradingDate : null,
     };
   } catch {
     return null;
@@ -51,7 +53,8 @@ export function removeCached(key: string) {
 }
 
 export function isWeekendLike(date = new Date()) {
-  const day = date.getDay();
+  const shifted = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+  const day = shifted.getUTCDay();
   return day === 0 || day === 6;
 }
 
