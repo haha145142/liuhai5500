@@ -17,53 +17,19 @@ import { Route as MarketRouteImport } from './routes/market'
 import { Route as MoreRouteImport } from './routes/more'
 import { Route as NewsRouteImport } from './routes/news'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
+import { Route as RotationRouteImport } from './routes/rotation'
 import { Route as SettingsRouteImport } from './routes/settings'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AiRoute = AiRouteImport.update({
-  id: '/ai',
-  path: '/ai',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BandRoute = BandRouteImport.update({
-  id: '/band',
-  path: '/band',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FundsRoute = FundsRouteImport.update({
-  id: '/funds',
-  path: '/funds',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MarketRoute = MarketRouteImport.update({
-  id: '/market',
-  path: '/market',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MoreRoute = MoreRouteImport.update({
-  id: '/more',
-  path: '/more',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NewsRoute = NewsRouteImport.update({
-  id: '/news',
-  path: '/news',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PortfolioRoute = PortfolioRouteImport.update({
-  id: '/portfolio',
-  path: '/portfolio',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
+const IndexRoute = IndexRouteImport.update({ id: '/', path: '/', getParentRoute: () => rootRouteImport } as any)
+const AiRoute = AiRouteImport.update({ id: '/ai', path: '/ai', getParentRoute: () => rootRouteImport } as any)
+const BandRoute = BandRouteImport.update({ id: '/band', path: '/band', getParentRoute: () => rootRouteImport } as any)
+const FundsRoute = FundsRouteImport.update({ id: '/funds', path: '/funds', getParentRoute: () => rootRouteImport } as any)
+const MarketRoute = MarketRouteImport.update({ id: '/market', path: '/market', getParentRoute: () => rootRouteImport } as any)
+const MoreRoute = MoreRouteImport.update({ id: '/more', path: '/more', getParentRoute: () => rootRouteImport } as any)
+const NewsRoute = NewsRouteImport.update({ id: '/news', path: '/news', getParentRoute: () => rootRouteImport } as any)
+const PortfolioRoute = PortfolioRouteImport.update({ id: '/portfolio', path: '/portfolio', getParentRoute: () => rootRouteImport } as any)
+const RotationRoute = RotationRouteImport.update({ id: '/rotation', path: '/rotation', getParentRoute: () => rootRouteImport } as any)
+const SettingsRoute = SettingsRouteImport.update({ id: '/settings', path: '/settings', getParentRoute: () => rootRouteImport } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -74,6 +40,7 @@ export interface FileRoutesByFullPath {
   '/more': typeof MoreRoute
   '/news': typeof NewsRoute
   '/portfolio': typeof PortfolioRoute
+  '/rotation': typeof RotationRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
@@ -85,6 +52,7 @@ export interface FileRoutesByTo {
   '/more': typeof MoreRoute
   '/news': typeof NewsRoute
   '/portfolio': typeof PortfolioRoute
+  '/rotation': typeof RotationRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesById {
@@ -97,6 +65,7 @@ export interface FileRoutesById {
   '/more': typeof MoreRoute
   '/news': typeof NewsRoute
   '/portfolio': typeof PortfolioRoute
+  '/rotation': typeof RotationRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
@@ -110,6 +79,7 @@ export interface FileRouteTypes {
     | '/more'
     | '/news'
     | '/portfolio'
+    | '/rotation'
     | '/settings'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -121,6 +91,7 @@ export interface FileRouteTypes {
     | '/more'
     | '/news'
     | '/portfolio'
+    | '/rotation'
     | '/settings'
   id:
     | '__root__'
@@ -132,6 +103,7 @@ export interface FileRouteTypes {
     | '/more'
     | '/news'
     | '/portfolio'
+    | '/rotation'
     | '/settings'
   fileRoutesById: FileRoutesById
 }
@@ -144,87 +116,36 @@ export interface RootRouteChildren {
   MoreRoute: typeof MoreRoute
   NewsRoute: typeof NewsRoute
   PortfolioRoute: typeof PortfolioRoute
+  RotationRoute: typeof RotationRoute
   SettingsRoute: typeof SettingsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ai': {
-      id: '/ai'
-      path: '/ai'
-      fullPath: '/ai'
-      preLoaderRoute: typeof AiRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/band': {
-      id: '/band'
-      path: '/band'
-      fullPath: '/band'
-      preLoaderRoute: typeof BandRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/funds': {
-      id: '/funds'
-      path: '/funds'
-      fullPath: '/funds'
-      preLoaderRoute: typeof FundsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/market': {
-      id: '/market'
-      path: '/market'
-      fullPath: '/market'
-      preLoaderRoute: typeof MarketRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/more': {
-      id: '/more'
-      path: '/more'
-      fullPath: '/more'
-      preLoaderRoute: typeof MoreRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/news': {
-      id: '/news'
-      path: '/news'
-      fullPath: '/news'
-      preLoaderRoute: typeof NewsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portfolio': {
-      id: '/portfolio'
-      path: '/portfolio'
-      fullPath: '/portfolio'
-      preLoaderRoute: typeof PortfolioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+    '/': { id: '/'; path: '/'; fullPath: '/'; preLoaderRoute: typeof IndexRouteImport; parentRoute: typeof rootRouteImport }
+    '/ai': { id: '/ai'; path: '/ai'; fullPath: '/ai'; preLoaderRoute: typeof AiRouteImport; parentRoute: typeof rootRouteImport }
+    '/band': { id: '/band'; path: '/band'; fullPath: '/band'; preLoaderRoute: typeof BandRouteImport; parentRoute: typeof rootRouteImport }
+    '/funds': { id: '/funds'; path: '/funds'; fullPath: '/funds'; preLoaderRoute: typeof FundsRouteImport; parentRoute: typeof rootRouteImport }
+    '/market': { id: '/market'; path: '/market'; fullPath: '/market'; preLoaderRoute: typeof MarketRouteImport; parentRoute: typeof rootRouteImport }
+    '/more': { id: '/more'; path: '/more'; fullPath: '/more'; preLoaderRoute: typeof MoreRouteImport; parentRoute: typeof rootRouteImport }
+    '/news': { id: '/news'; path: '/news'; fullPath: '/news'; preLoaderRoute: typeof NewsRouteImport; parentRoute: typeof rootRouteImport }
+    '/portfolio': { id: '/portfolio'; path: '/portfolio'; fullPath: '/portfolio'; preLoaderRoute: typeof PortfolioRouteImport; parentRoute: typeof rootRouteImport }
+    '/rotation': { id: '/rotation'; path: '/rotation'; fullPath: '/rotation'; preLoaderRoute: typeof RotationRouteImport; parentRoute: typeof rootRouteImport }
+    '/settings': { id: '/settings'; path: '/settings'; fullPath: '/settings'; preLoaderRoute: typeof SettingsRouteImport; parentRoute: typeof rootRouteImport }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  AiRoute: AiRoute,
-  BandRoute: BandRoute,
-  FundsRoute: FundsRoute,
-  MarketRoute: MarketRoute,
-  MoreRoute: MoreRoute,
-  NewsRoute: NewsRoute,
-  PortfolioRoute: PortfolioRoute,
-  SettingsRoute: SettingsRoute,
+  IndexRoute,
+  AiRoute,
+  BandRoute,
+  FundsRoute,
+  MarketRoute,
+  MoreRoute,
+  NewsRoute,
+  PortfolioRoute,
+  RotationRoute,
+  SettingsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
