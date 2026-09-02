@@ -47,6 +47,28 @@ test("estimate equal to the latest official NAV still uses that NAV as today's b
   assert.equal(result.todayPnlPct, 0);
 });
 
+test("low-confidence intraday estimate is not displayed while the market is open", () => {
+  const result = calcHoldingReturn(
+    { code: "000001", name: "测试基金", shares: 10, cost: 1 },
+    fund({ estimateConfidence: "low", estimateTime: "2026-09-02T02:00:00Z" }),
+    new Date("2026-09-02T02:30:00Z"),
+  );
+  assert.equal(result.marketValue, null);
+  assert.equal(result.quoteMode, "none");
+});
+
+test("medium/high confidence intraday estimate remains eligible", () => {
+  for (const confidence of ["medium", "high"] as const) {
+    const result = calcHoldingReturn(
+      { code: "000001", name: "测试基金", shares: 10, cost: 1 },
+      fund({ estimateConfidence: confidence, estimateTime: "2026-09-02T02:00:00Z" }),
+      new Date("2026-09-02T02:30:00Z"),
+    );
+    assert.equal(result.quoteMode, "live_estimate");
+    assert.equal(result.marketValue, 12.5);
+  }
+});
+
 test("latest official NAV is not used as an intraday price when the market is open and no estimate exists", () => {
   const result = calcHoldingReturn({ code: "000001", name: "测试基金", shares: 10, cost: 1 }, fund({ estimate: null, estimatePct: null, estimateTime: null, valuationStatus: "stale", navDate: "2026-09-01" }), new Date("2026-09-02T02:00:00Z"));
   assert.equal(result.marketValue, null);
