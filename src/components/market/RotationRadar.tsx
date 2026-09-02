@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { Check, Plus } from "lucide-react";
 import { Glass, SectionTitle } from "@/components/ui/Glass";
 import { useApp } from "@/lib/store";
 import { SECTOR_RULES } from "@/lib/data/sectors";
@@ -8,6 +9,7 @@ import { fmtPctShort } from "@/lib/format";
 import type { SectorQuote } from "@/lib/types";
 
 type Row = { id:string; name:string; bkCode:string; change:number|null; flow:number|null; streak:number; score:number; label:string; etfCode?:string; etfName?:string };
+const CANDIDATE_KEY = "fund_ai_pro_fund_candidates_v1";
 
 function normalize(values:number[], value:number|null) {
   if(value==null || !Number.isFinite(value) || values.length<2) return value==null?0:50;
@@ -43,15 +45,26 @@ function fundType(type:string) {
   return /ETF|指数|LOF/i.test(type) ? "ETF/指数" : "主动基金";
 }
 
+function loadCandidateCodes() {
+  if(typeof window === "undefined") return new Set<string>();
+  try { const rows=JSON.parse(localStorage.getItem(CANDIDATE_KEY)||"[]"); return new Set(Array.isArray(rows)?rows.map((x)=>String(x?.code||"")).filter((x)=>/^\d{6}$/.test(x)):[]); } catch { return new Set<string>(); }
+}
+
+function saveCandidateCodes(codes:Set<string>) {
+  try { localStorage.setItem(CANDIDATE_KEY, JSON.stringify([...codes].map((code)=>({code})))); } catch {}
+}
+
 export function RotationRadar() {
   const snapshot=useApp((s)=>s.snapshot);
   const rows=useMemo(()=>buildRows(snapshot?.sectors||[]),[snapshot]);
   const [selectedId,setSelectedId]=useState<string>("");
   const [fundRows,setFundRows]=useState<SectorFundRow[]>([]);
   const [loadingFunds,setLoadingFunds]=useState(false);
+  const [candidateCodes,setCandidateCodes]=useState<Set<string>>(loadCandidateCodes);
 
   const selected=rows.find((r)=>r.id===selectedId)??rows[0];
   useEffect(()=>{ if(!selected){setFundRows([]);return;} let live=true; setLoadingFunds(true); void getSectorFunds({data:{code:selected.bkCode}}).then((next)=>{if(live)setFundRows(next.slice(0,6));}).catch(()=>{if(live)setFundRows([]);}).finally(()=>{if(live)setLoadingFunds(false);}); return()=>{live=false;}; },[selected?.id,selected?.bkCode]);
+  const toggleCandidate=(code:string)=>setCandidateCodes((prev)=>{const next=new Set(prev);if(next.has(code))next.delete(code);else next.add(code);saveCandidateCodes(next);return next;});
 
   return <div className="space-y-3">
     <Glass className="overflow-hidden rounded-[22px] p-3"><SectionTitle title="AI 轮动雷达" hint="板块强度 · 资金确认 · 数据推断" />
@@ -59,8 +72,8 @@ export function RotationRadar() {
       <div className="mt-2 rounded-xl bg-blue-50/45 px-2.5 py-2 text-[8px] leading-[1.45] text-muted">评分是基于当前板块涨跌、资金流和连续性做的排序推断，不把推断当成事实；选中板块后会在本页继续展开真实基金池。</div>
     </Glass>
 
-    {selected?<Glass className="overflow-hidden rounded-[22px] p-3"><div className="flex items-center justify-between gap-2"><SectionTitle title={`${selected.name} · 关联基金池`} hint="真实排行数据优先 · 无数据则回退代表ETF" /><Link to="/market" className="shrink-0 rounded-xl bg-white/70 px-2 py-1 text-[8px] font-semibold text-accent ring-1 ring-white/90">去市场页</Link></div>
-      {loadingFunds?<div className="rounded-xl bg-white/50 px-3 py-4 text-center text-[9px] text-muted">正在读取相关基金…</div>:fundRows.length?<div className="space-y-1.5">{fundRows.map((f)=><article key={f.code} className="rounded-[17px] bg-white/55 px-2.5 py-2.5 ring-1 ring-white/75"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="truncate text-[10px] font-semibold text-fg">{f.name}</div><div className="mt-0.5 text-[7px] text-subtle">{f.code} · {fundType(f.type)}</div></div><span className="shrink-0 rounded-full bg-accent/10 px-2 py-1 text-[8px] font-semibold text-accent">{f.day==null?"暂无":fmtPctShort(f.day)}</span></div><div className="mt-1.5 grid grid-cols-3 gap-1 text-center text-[7px] text-muted"><span>1月 {f.month==null?"—":fmtPctShort(f.month)}</span><span>1年 {f.oneYear==null?"—":fmtPctShort(f.oneYear)}</span><span>{fundTrend(f).trend}</span></div><div className="mt-1 flex items-center justify-between gap-2 text-[7px] text-subtle"><span>{fundTrend(f).band}</span><span>{f.valuationTrust?`估值可信 ${f.valuationTrust.score}/100`:"估值可信度暂缺"}</span></div></article>)}</div>:<div className="rounded-xl bg-white/50 px-3 py-4 text-center text-[9px] text-muted">暂无可靠关联基金数据</div>}
+    {selected?<Glass className="overflow-hidden rounded-[22px] p-3"><div className="flex items-center justify-between gap-2"><div className="min-w-0"><div className="text-xs font-semibold text-fg">{selected.name} · 关联基金池</div><div className="mt-0.5 text-[8px] text-subtle">真实排行数据优先 · 无数据则回退代表ETF</div></div><Link to="/market" className="shrink-0 rounded-xl bg-white/70 px-2 py-1 text-[8px] font-semibold text-accent ring-1 ring-white/90">去市场页</Link></div>
+      {loadingFunds?<div className="mt-2 rounded-xl bg-white/50 px-3 py-4 text-center text-[9px] text-muted">正在读取相关基金…</div>:fundRows.length?<div className="mt-2 space-y-1.5">{fundRows.map((f)=><article key={f.code} className="rounded-[17px] bg-white/55 px-2.5 py-2.5 ring-1 ring-white/75"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="truncate text-[10px] font-semibold text-fg">{f.name}</div><div className="mt-0.5 text-[7px] text-subtle">{f.code} · {fundType(f.type)}</div></div><span className="shrink-0 rounded-full bg-accent/10 px-2 py-1 text-[8px] font-semibold text-accent">{f.day==null?"暂无":fmtPctShort(f.day)}</span></div><div className="mt-1.5 grid grid-cols-3 gap-1 text-center text-[7px] text-muted"><span>1月 {f.month==null?"—":fmtPctShort(f.month)}</span><span>1年 {f.oneYear==null?"—":fmtPctShort(f.oneYear)}</span><span>{fundTrend(f).trend}</span></div><div className="mt-1 flex items-center justify-between gap-2 text-[7px] text-subtle"><span>{fundTrend(f).band}</span><span>{f.valuationTrust?`估值可信 ${f.valuationTrust.score}/100`:"估值可信度暂缺"}</span></div><button type="button" onClick={()=>toggleCandidate(f.code)} className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-xl bg-white/70 px-2 py-1.5 text-[8px] font-semibold text-accent ring-1 ring-white/90">{candidateCodes.has(f.code)?<Check size={11}/>:<Plus size={11}/>} {candidateCodes.has(f.code)?"已加入候选":"加入候选"}</button></article>)}</div>:<div className="mt-2 rounded-xl bg-white/50 px-3 py-4 text-center text-[9px] text-muted">暂无可靠关联基金数据</div>}
     </Glass>:null}
   </div>;
 }
