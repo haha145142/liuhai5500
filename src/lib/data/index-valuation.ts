@@ -7,7 +7,10 @@ export type IndexValuation = {
   pe: number | null;
   pb: number | null;
   roe: number | null;
+  pePercentile: number | null;
+  pbPercentile: number | null;
   percentile: number | null;
+  dataDate: string | null;
   level: "高估" | "中性" | "低估" | "暂无可靠数据";
   source: string;
   updatedAt: string | null;
@@ -23,7 +26,7 @@ const CORE: Config[] = [
 
 const PERCENTILE_SOURCE = "https://baifenwei.com/indices/";
 
-type PercentileSnapshot = { pePercentile: number; pbPercentile: number | null };
+type PercentileSnapshot = { pePercentile: number; pbPercentile: number | null; dataDate: string | null };
 
 function levelFromPercentile(percentile: number | null): IndexValuation["level"] {
   if (percentile == null) return "暂无可靠数据";
@@ -32,22 +35,26 @@ function levelFromPercentile(percentile: number | null): IndexValuation["level"]
   return "中性";
 }
 
+function parsePercentileRow(normalized: string, code: string): PercentileSnapshot | null {
+  const index = normalized.indexOf(code);
+  if (index < 0) return null;
+  const row = normalized.slice(index, Math.min(normalized.length, index + 900));
+  const dates = [...row.matchAll(/20\d{2}-\d{2}-\d{2}/g)].map((m) => m[0]);
+  const percents = [...row.matchAll(/(\d+(?:\.\d+)?)%/g)]
+    .map((m) => Number(m[1]))
+    .filter((v) => Number.isFinite(v) && v >= 0 && v <= 100);
+  if (percents.length < 2) return null;
+  return { pePercentile: percents[0], pbPercentile: percents[1], dataDate: dates[0] ?? null };
+}
+
 async function loadPercentiles(): Promise<Map<string, PercentileSnapshot>> {
   try {
     const raw = await fetchText(`${PERCENTILE_SOURCE}?_=${Date.now()}`, 8000, { Referer: "https://baifenwei.com/" });
     const normalized = raw.replace(/\s+/g, " ");
     const result = new Map<string, PercentileSnapshot>();
-    const codes = ["399001", "399006", "000300"];
-    for (const code of codes) {
-      const index = normalized.indexOf(code);
-      if (index < 0) continue;
-      const row = normalized.slice(index, Math.min(normalized.length, index + 420));
-      const percents = [...row.matchAll(/(\d+(?:\.\d+)?)%/g)]
-        .map((m) => Number(m[1]))
-        .filter((v) => Number.isFinite(v) && v >= 0 && v <= 100);
-      if (percents.length >= 2) {
-        result.set(code, { pePercentile: percents[0], pbPercentile: percents[1] });
-      }
+    for (const code of ["399001", "399006", "000300", "000001"]) {
+      const snapshot = parsePercentileRow(normalized, code);
+      if (snapshot) result.set(code, snapshot);
     }
     return result;
   } catch {
@@ -66,35 +73,19 @@ async function load(config: Config, percentiles: Map<string, PercentileSnapshot>
     const pb = pbRaw == null ? null : pbRaw / 100;
     const roe = pe != null && pb != null && pe > 0 ? (pb / pe) * 100 : null;
     const valuation = percentiles.get(config.code);
-    const percentile = valuation?.pePercentile ?? null;
+    const pePercentile = valuation?.pePercentile ?? null;
+    const pbPercentile = valuation?.pbPercentile ?? null;
+    const percentile = pePercentile != null && pbPercentile != null
+      ? pePercentile * 0.6 + pbPercentile * 0.4
+      : pePercentile ?? pbPercentile;
     const level = levelFromPercentile(percentile);
-    const sourceParts = ["东方财富指数估值字段"];
+    const sourceParts = ["东方财富 PE/PB 实时字段"];
     if (percentile != null) sourceParts.push("百分位：百分位官网近10年指数估值表");
-    if (valuation?.pbPercentile != null) sourceParts.push(`PB分位${valuation.pbPercentile.toFixed(1)}%`);
+    if (valuation?.dataDate) sourceParts.push(`数据日 ${valuation.dataDate}`);
     if (roe != null) sourceParts.push("ROE由PB/PE推导");
-    return {
-      code: config.code,
-      name: config.name,
-      pe,
-      pb,
-      roe,
-      percentile,
-      level,
-      source: sourceParts.join(" · "),
-      updatedAt: new Date().toISOString(),
-    };
+    return { code: config.code, name: config.name, pe, pb, roe, pePercentile, pbPercentile, percentile, dataDate: valuation?.dataDate ?? null, level, source: sourceParts.join(" · "), updatedAt: new Date().toISOString() };
   } catch {
-    return {
-      code: config.code,
-      name: config.name,
-      pe: null,
-      pb: null,
-      roe: null,
-      percentile: null,
-      level: "暂无可靠数据",
-      source: "暂无可靠指数估值数据",
-      updatedAt: null,
-    };
+    return { code: config.code, name: config.name, pe: null, pb: null, roe: null, pePercentile: null, pbPercentile: null, percentile: null, dataDate: null, level: "暂无可靠数据", source: "暂无可靠指数估值数据", updatedAt: null };
   }
 }
 
