@@ -26,14 +26,14 @@ export async function fetchText(url: string, timeout = 5000, headers: Record<str
         continue;
       }
       const text = await response.text();
-      await recordProviderSuccessAsync(provider, endpoint, Date.now() - started);
+      void recordProviderSuccessAsync(provider, endpoint, Date.now() - started).catch(() => {});
       return text;
     } catch (error) {
       lastError = error instanceof Error && error.name === "AbortError" ? new Error(`请求超时（${Math.ceil(attemptTimeout / 1000)}秒）`) : error;
       if (attempt === delays.length - 1 || Date.now() - started >= totalBudget) break;
     } finally { clearTimeout(timer); }
   }
-  await recordProviderFailureAsync(provider, endpoint, Date.now() - started);
+  void recordProviderFailureAsync(provider, endpoint, Date.now() - started).catch(() => {});
   throw lastError instanceof Error ? lastError : new Error("请求失败");
 }
 
