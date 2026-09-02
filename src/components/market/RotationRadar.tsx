@@ -1,8 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { Glass, SectionTitle, Tone } from "@/components/ui/Glass";
+import { Glass, SectionTitle } from "@/components/ui/Glass";
 import { useApp } from "@/lib/store";
 import { SECTOR_RULES } from "@/lib/data/sectors";
 import { fmtPctShort } from "@/lib/format";
+import type { SectorQuote } from "@/lib/types";
 
 type Row = { id:string; name:string; change:number|null; flow:number|null; streak:number; score:number; label:string; etfCode?:string; etfName?:string };
 
@@ -12,7 +13,7 @@ function normalize(values:number[], value:number|null) {
   return max===min?50:((value-min)/(max-min))*100;
 }
 
-function buildRows(sectors:ReturnType<typeof useApp.getState>["snapshot"] extends infer S ? NonNullable<S>["sectors"] : never):Row[] {
+function buildRows(sectors:SectorQuote[]):Row[] {
   const usable=sectors.filter((s)=>s.change!=null || s.flow!=null);
   const changes=usable.map((s)=>s.change).filter((v):v is number=>v!=null && Number.isFinite(v));
   const flows=usable.map((s)=>s.flow).filter((v):v is number=>v!=null && Number.isFinite(v));
@@ -21,8 +22,8 @@ function buildRows(sectors:ReturnType<typeof useApp.getState>["snapshot"] extend
     const changeScore=normalize(changes,s.change);
     const flowScore=normalize(flows,s.flow);
     const streakScore=Math.max(0,Math.min(100,50+s.streak*10));
-    const parts=[changeScore*(changes.length?0.6:0),flowScore*(flows.length?0.3:0),streakScore*(s.streak!=null?0.1:0)];
-    const weight=(changes.length?0.6:0)+(flows.length?0.3:0)+(s.streak!=null?0.1:0);
+    const parts=[changeScore*(changes.length?0.6:0),flowScore*(flows.length?0.3:0),streakScore*0.1];
+    const weight=(changes.length?0.6:0)+(flows.length?0.3:0)+0.1;
     const score=Math.round(weight?parts.reduce((a,b)=>a+b,0)/weight:50);
     const label=score>=75?"强势":score>=60?"偏强":score>=40?"中性":score>=25?"偏弱":"弱势";
     return {id:s.id,name:s.name,change:s.change,flow:s.flow,streak:s.streak,score,label,etfCode:rule?.etf?.code,etfName:rule?.etf?.name};
