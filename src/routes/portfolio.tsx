@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { FundCard } from "@/components/portfolio/FundCard";
 import { PortfolioInsight } from "@/components/portfolio/PortfolioInsight";
