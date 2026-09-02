@@ -5,6 +5,10 @@ import { chromium } from "playwright";
 const port = Number(process.env.SMOKE_PORT || 8091);
 const base = `http://127.0.0.1:${port}`;
 const routes = ["/", "/market", "/news", "/funds", "/portfolio"];
+const viewports = [
+  { width: 390, height: 844 },
+  { width: 430, height: 932 },
+];
 let server;
 
 async function waitForServer(url, timeoutMs = 30_000) {
@@ -17,6 +21,19 @@ async function waitForServer(url, timeoutMs = 30_000) {
 }
 
 function hasBadNumber(text) { return /(?:NaN|Infinity|-Infinity)/.test(text); }
+function isExpectedAbort(errorText = "") { return /ERR_ABORTED|NS_BINDING_ABORTED|aborted/i.test(errorText); }
+
+async function assertHealthyPage(page, routePath) {
+  await page.goto(`${base}${routePath}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await page.waitForTimeout(800);
+  const html = await page.locator("body").innerText();
+  if (!html.trim()) throw new Error(`${routePath} rendered an empty body`);
+  if (hasBadNumber(html)) throw new Error(`${routePath} contains NaN/Infinity`);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
+  if (overflow) throw new Error(`${routePath} has horizontal overflow`);
+  const root = page.locator("#root");
+  if (await root.count() && !(await root.innerText()).trim()) throw new Error(`${routePath} root is empty after hydration`);
+}
 
 async function main() {
   server = spawn("npm", ["run", "dev", "--", "--port", String(port)], { stdio: "pipe", env: { ...process.env, PORT: String(port) } });
@@ -26,38 +43,42 @@ async function main() {
 
   const browser = await chromium.launch({ headless: true });
   try {
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: "zh-CN", timezoneId: "Asia/Shanghai" });
-    const consoleErrors = [];
-    const requestFailures = [];
-    const badHttp = [];
-    page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
-    page.on("requestfailed", (request) => requestFailures.push(`${request.method()} ${request.url()} :: ${request.failure()?.errorText || "failed"}`));
-    page.on("response", (response) => { if (response.status() >= 500) badHttp.push(`${response.status()} ${response.url()}`); });
+    for (const viewport of viewports) {
+      const context = await browser.newContext({ viewport, locale: "zh-CN", timezoneId: "Asia/Shanghai" });
+      const page = await context.newPage();
+      const consoleErrors = [];
+      const pageErrors = [];
+      const requestFailures = [];
+      const badHttp = [];
+      page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+      page.on("pageerror", (error) => pageErrors.push(error.message));
+      page.on("requestfailed", (request) => {
+        const errorText = request.failure()?.errorText || "failed";
+        if (!isExpectedAbort(errorText)) requestFailures.push(`${request.method()} ${request.url()} :: ${errorText}`);
+      });
+      page.on("response", (response) => { if (response.status() >= 500) badHttp.push(`${response.status()} ${response.url()}`); });
 
-    for (const routePath of routes) {
-      await page.goto(`${base}${routePath}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-      await page.waitForTimeout(500);
-      const html = await page.locator("body").innerText();
-      if (hasBadNumber(html)) throw new Error(`${routePath} contains NaN/Infinity`);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
-      if (overflow) throw new Error(`${routePath} has horizontal overflow`);
+      for (const routePath of routes) await assertHealthyPage(page, routePath);
+
+      await page.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      const newsSection = page.locator('[aria-label="最新资讯"]');
+      if (await newsSection.count() !== 1) throw new Error("homepage latest-news section is missing");
+      if (!(await page.locator('section[aria-label="最新资讯"]').innerText()).trim()) throw new Error("homepage latest-news section is empty DOM");
+
+      await page.route(/eastmoney\.com/i, async (route) => {
+        await route.fulfill({ status: 503, contentType: "text/plain", body: "simulated provider outage" });
+      });
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+      await page.waitForTimeout(900);
+      const degraded = await page.locator("body").innerText();
+      if (hasBadNumber(degraded)) throw new Error("provider failure caused NaN/Infinity");
+      if (/数据异常|undefined/.test(degraded)) throw new Error("provider failure leaked undefined/error text into UI");
+
+      const summary = { viewport, routes: routes.length, consoleErrors, pageErrors, requestFailures, badHttp, faultInjection: "eastmoney=503", newsSection: true };
+      console.log(JSON.stringify(summary, null, 2));
+      if (consoleErrors.length || pageErrors.length || requestFailures.length || badHttp.length) process.exitCode = 1;
+      await context.close();
     }
-
-    await page.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-    const newsSection = page.locator('[aria-label="最新资讯"]');
-    if (await newsSection.count() !== 1) throw new Error("homepage latest-news section is missing");
-
-    await page.route(/eastmoney\.com/i, async (route) => {
-      await route.fulfill({ status: 503, contentType: "text/plain", body: "simulated provider outage" });
-    });
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(700);
-    const degraded = await page.locator("body").innerText();
-    if (hasBadNumber(degraded)) throw new Error("provider failure caused NaN/Infinity");
-
-    const summary = { routes: routes.length, consoleErrors, requestFailures: requestFailures.slice(0, 20), badHttp, faultInjection: "eastmoney=503", newsSection: true };
-    console.log(JSON.stringify(summary, null, 2));
-    if (consoleErrors.length || badHttp.length) process.exitCode = 1;
   } finally {
     await browser.close();
   }
