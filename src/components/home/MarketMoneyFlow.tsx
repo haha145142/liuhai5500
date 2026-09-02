@@ -26,12 +26,12 @@ export function MarketMoneyFlow() {
   }, []);
 
   return (
-    <section className="mt-3" aria-label="全市场资金">
+    <section className="mt-3" aria-label="全市场资金雷达">
       <Glass tight className="overflow-hidden rounded-[24px] border border-white/75 bg-white/52 p-3 shadow-[0_14px_38px_rgba(38,78,112,.07)] backdrop-blur-[22px]">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-[16px] font-semibold tracking-tight text-slate-950">今天谁在买卖</div>
-            <div className="mt-0.5 text-[10px] text-slate-500">全市场资金行为 · 不是散户/机构真实身份识别，而是按订单规模的市场资金口径参考</div>
+            <div className="text-[16px] font-semibold tracking-tight text-slate-950">全市场资金雷达</div>
+            <div className="mt-0.5 text-[10px] text-slate-500">全市场资金脉络 · 订单规模口径 · 观察资金进出与市场放缩量</div>
           </div>
           <span className="shrink-0 rounded-full bg-white/75 px-2.5 py-1 text-[9px] text-slate-500">{loading && !data ? "读取中" : data ? "全市场" : "暂无可靠数据"}</span>
         </div>
@@ -51,7 +51,7 @@ export function MarketMoneyFlow() {
               <Metric label="较前一交易日" value={data.turnoverChangePct == null ? "暂无可靠数据" : `${data.turnoverChangePct >= 0 ? "+" : ""}${data.turnoverChangePct.toFixed(1)}% · ${data.turnoverState}`} tone={data.turnoverChangePct == null ? "text-slate-400" : data.turnoverChangePct >= 0 ? "text-up" : "text-down"} />
             </div>
             <div className="mt-2 rounded-[15px] bg-white/58 px-3 py-2.5 text-[10px] leading-[1.55] text-slate-500">
-              <b className="text-slate-800">怎么读：</b>大单 + 超大单代表“大资金/主力订单规模”的代理口径；中单、小单只反映订单规模，不能直接等同真实的机构或散户身份。资金数字先做内部平衡校验，校验不过不会用于方向判断。
+              <b className="text-slate-800">怎么看：</b>超大单 + 大单作为大资金/主力订单规模代理；中单、小单用于观察小额资金行为。这里看的是订单规模，不冒充真实机构或散户身份。资金先经过结构校验，校验不足时不用于方向判断。
             </div>
             <div className="mt-1.5 flex items-center justify-between text-[9px] text-slate-400">
               <span>{data.marketDate} · {data.source}</span>
