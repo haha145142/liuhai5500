@@ -63,7 +63,7 @@ async function loadFundQuote(code: string): Promise<FundQuote> {
   } catch {}
   if (phase === "postclose") {
     const saved = postCloseEstimate.get(code);
-    if (isSameDayEstimate(saved)) return saved;
+    if (saved && isSameDayEstimate(saved)) return saved;
   }
   return normalizeFundValuationState(await getResilientFund({ data: { code } }));
 }
