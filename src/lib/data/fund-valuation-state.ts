@@ -1,4 +1,4 @@
-import type { FundQuote } from "../types";
+import type { FundQuote } from "../types.ts";
 
 export type FundValuationState = "official_nav" | "same_day_estimate" | "latest_official" | "unavailable";
 
