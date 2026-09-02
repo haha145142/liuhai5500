@@ -32,8 +32,6 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: Deterministic tests
-        env:
-          NODE_OPTIONS: --experimental-specifier-resolution=node
-        run: npm test
+        run: node scripts/run-deterministic-tests.mjs
       - name: Runtime contract smoke
         run: npm run test:runtime
