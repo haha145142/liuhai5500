@@ -38,7 +38,7 @@ test("holding return uses previous official NAV for today's P&L", () => {
   assert.equal(Number(result.todayPnl?.toFixed(4)), 0.5);
 });
 
-test("latest official NAV is not treated as today's return", () => {
+test("latest official NAV is not used as an intraday price when the market is open", () => {
   const result = calcHoldingReturn(
     { code: "000001", name: "测试基金", shares: 10, cost: 1 },
     {
@@ -68,8 +68,12 @@ test("latest official NAV is not treated as today's return", () => {
     },
   );
 
-  assert.equal(result.holdingPnl, 2);
+  assert.equal(result.marketValue, null);
+  assert.equal(result.holdingPnl, null);
+  assert.equal(result.holdingPnlPct, null);
   assert.equal(result.todayPnl, null);
+  assert.equal(result.todayPnlPct, null);
+  assert.equal(result.quoteMode, "none");
 });
 
 test("portfolio totals remain available when one fund is missing a quote", () => {
