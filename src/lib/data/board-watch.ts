@@ -36,21 +36,20 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
   ]);
   const flowRows = flowSnapshot?.rows ?? [];
   const maxAbsMain = Math.max(1, ...flowRows.map((row) => Math.abs(row.mainNetInflow ?? 0)).filter(Number.isFinite));
-  const flowMap = new Map(codes.map((_, i) => [i, null]));
   const result: BoardWatchQuote[] = rows.map((row, index) => {
     const code = codes[index];
     const pct = row ? n(row.f3) : null;
     const name = row ? rowName(row) || code : code;
     const ak = findAkFlow(name, flowRows);
-    const classified = classifyFlow(ak, maxAbsMain);
-    const flowFresh = !!ak && (!flowSnapshot?.fetchedAt || Date.now() - flowSnapshot.fetchedAt <= 10 * 60_000);
+    const flowFresh = !!ak && !!flowSnapshot?.fetchedAt && Date.now() - Date.parse(flowSnapshot.fetchedAt) <= 10 * 60_000;
+    const effectiveFlow = flowFresh ? ak : null;
+    const classified = classifyFlow(effectiveFlow, maxAbsMain);
     const liveQuote = !closed && pct != null;
     const validation: BoardWatchQuote["validation"] = liveQuote ? "live" : (pct != null || flowFresh ? "recent" : "unavailable");
     const sourceParts = [row ? (closed ? "东方财富板块行情 · 最近交易日" : "东方财富板块实时行情") : "当前暂无可靠板块行情"];
     if (flowFresh) sourceParts.push("AKShare资金流交叉源");
     else if (ak) sourceParts.push("AKShare资金流较旧，仅作参考");
-    return { code, name, icon: iconFor(name), pct, mainFlow: ak?.mainNetInflow ?? (row ? n(row.f62) : null), superFlow: ak?.superNetInflow ?? (row ? n(row.f66) : null), largeFlow: ak?.largeNetInflow ?? (row ? n(row.f72) : null), midFlow: ak?.midNetInflow ?? (row ? n(row.f78) : null), smallFlow: ak?.smallNetInflow ?? (row ? n(row.f84) : null), turnover: row ? n(row.f6) : null, marketDate, source: sourceParts.join(" · "), validation, flowScore: classified.score, flowSignal: classified.signal };
+    return { code, name, icon: iconFor(name), pct, mainFlow: effectiveFlow?.mainNetInflow ?? null, superFlow: effectiveFlow?.superNetInflow ?? null, largeFlow: effectiveFlow?.largeNetInflow ?? null, midFlow: effectiveFlow?.midNetInflow ?? null, smallFlow: effectiveFlow?.smallNetInflow ?? null, turnover: row ? n(row.f6) : null, marketDate, source: sourceParts.join(" · "), validation, flowScore: classified.score, flowSignal: classified.signal };
   });
-  void flowMap;
   return { rows: result, fetchedAt: Date.now(), weekend: closed };
 });
