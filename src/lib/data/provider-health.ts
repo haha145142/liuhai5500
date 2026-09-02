@@ -1,4 +1,4 @@
-import { sharedCacheConfigured, sharedCacheGet, sharedCacheSet } from "./shared-cache";
+import { sharedCacheConfigured, sharedCacheGet, sharedCacheSet } from "./shared-cache.ts";
 export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 export type ProviderHealth = { provider: string; endpoint: string; state: CircuitState; consecutiveFailures: number; lastSuccess: number; lastFailure: number; latencyMs: number; successCount: number; requestCount: number; successRate: number };
 type State = ProviderHealth & { openedAt: number };
