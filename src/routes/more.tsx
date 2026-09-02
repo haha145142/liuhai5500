@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Activity, Settings, Sparkles, Trophy } from "lucide-react";
+import { Activity, Settings, Sparkles, Trophy, Radar } from "lucide-react";
 import { Glass } from "@/components/ui/Glass";
 
 export const Route = createFileRoute("/more")({ component: MorePage });
 
 const LINKS = [
   { to: "/funds" as const, title: "基金排行", sub: "日涨幅 / 阶段收益 / 关注", icon: Trophy },
+  { to: "/rotation" as const, title: "AI 轮动雷达", sub: "板块强度 / 资金 / 代表ETF", icon: Radar },
   { to: "/ai" as const, title: "AI 证据链", sub: "七步判断 · 模型复核", icon: Sparkles },
   { to: "/band" as const, title: "波段与做 T", sub: "RSI MACD 布林 · 趋势禁 T", icon: Activity },
   { to: "/settings" as const, title: "设置", sub: "数据源 · 刷新 · Key", icon: Settings },
