@@ -14,13 +14,10 @@ function sameChinaDate(value:string|null|undefined, now=new Date()){
 }
 function isFreshEstimate(fund:FundQuote,now=new Date()){
   if(!fund.estimateTime)return false;
-  const raw=String(fund.estimateTime).trim();
-  const iso=raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.(\d+))?(?:Z|([+-])?(\d{2}):?(\d{2})?)?)?$/);
-  if(!iso)return false;
-  let at=Date.parse(raw);
-  if(!Number.isFinite(at)){at=Date.parse(`${raw.replace(" ","T")}:00+08:00`);}
-  if(!Number.isFinite(at))return false;
-  const age=now.getTime()-at;
+  const raw=String(fund.estimateTime).trim().replace(" ","T");
+  const parsed=Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/.test(raw)?raw:`${raw}+08:00`);
+  if(!Number.isFinite(parsed))return false;
+  const age=now.getTime()-parsed;
   return age>=0&&age<=LIVE_ESTIMATE_MAX_AGE_MS;
 }
 function isValidatedIntraday(fund:FundQuote){
