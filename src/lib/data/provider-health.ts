@@ -1,26 +1,17 @@
+import { sharedCacheConfigured, sharedCacheGet, sharedCacheSet } from "./shared-cache";
+
 export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
-
-export type ProviderHealth = {
-  provider: string;
-  endpoint: string;
-  state: CircuitState;
-  consecutiveFailures: number;
-  lastSuccess: number;
-  lastFailure: number;
-  latencyMs: number;
-  successCount: number;
-  requestCount: number;
-  successRate: number;
-};
-
+export type ProviderHealth = { provider: string; endpoint: string; state: CircuitState; consecutiveFailures: number; lastSuccess: number; lastFailure: number; latencyMs: number; successCount: number; requestCount: number; successRate: number };
 type State = ProviderHealth & { openedAt: number };
 const FAILURE_THRESHOLD = 5;
 const OPEN_MS = 30_000;
+const SHARED_HEALTH_TTL_MS = 60_000;
+const SHARED_HEALTH_READ_MS = 10_000;
 const states = new Map<string, State>();
+const sharedReadAt = new Map<string, number>();
 
-function key(provider: string, endpoint: string) {
-  try { return `${provider}:${new URL(endpoint).host}`; } catch { return `${provider}:${endpoint}`; }
-}
+function key(provider: string, endpoint: string) { try { return `${provider}:${new URL(endpoint).host}`; } catch { return `${provider}:${endpoint}`; } }
+function sharedKey(provider: string, endpoint: string) { return `fund-ai-pro:provider-health:${key(provider, endpoint)}`; }
 
 export function providerFromUrl(endpoint: string) {
   try {
@@ -37,47 +28,63 @@ export function providerFromUrl(endpoint: string) {
   } catch { return "unknown"; }
 }
 
-export function getProviderHealth(provider: string, endpoint: string): ProviderHealth {
+function localState(provider: string, endpoint: string): State {
   const k = key(provider, endpoint);
   const current = states.get(k);
-  if (!current) {
-    const empty: State = { provider, endpoint, state: "CLOSED", consecutiveFailures: 0, lastSuccess: 0, lastFailure: 0, latencyMs: 0, successCount: 0, requestCount: 0, successRate: 1, openedAt: 0 };
-    states.set(k, empty);
-    return empty;
+  if (current) {
+    if (current.state === "OPEN" && Date.now() - current.openedAt >= OPEN_MS) current.state = "HALF_OPEN";
+    return current;
   }
-  if (current.state === "OPEN" && Date.now() - current.openedAt >= OPEN_MS) current.state = "HALF_OPEN";
-  return current;
+  const empty: State = { provider, endpoint, state: "CLOSED", consecutiveFailures: 0, lastSuccess: 0, lastFailure: 0, latencyMs: 0, successCount: 0, requestCount: 0, successRate: 1, openedAt: 0 };
+  states.set(k, empty);
+  return empty;
 }
 
-export function providerAllowed(provider: string, endpoint: string) {
-  return getProviderHealth(provider, endpoint).state !== "OPEN";
+export function getProviderHealth(provider: string, endpoint: string): ProviderHealth { return localState(provider, endpoint); }
+export function providerAllowed(provider: string, endpoint: string) { return localState(provider, endpoint).state !== "OPEN"; }
+
+export async function providerAllowedAsync(provider: string, endpoint: string) {
+  const local = localState(provider, endpoint);
+  if (local.state === "OPEN" && Date.now() - local.openedAt >= OPEN_MS) local.state = "HALF_OPEN";
+  if (local.state === "OPEN" || !sharedCacheConfigured()) return local.state !== "OPEN";
+  const k = key(provider, endpoint);
+  const lastRead = sharedReadAt.get(k) ?? 0;
+  if (Date.now() - lastRead < SHARED_HEALTH_READ_MS) return local.state !== "OPEN";
+  sharedReadAt.set(k, Date.now());
+  const shared = await sharedCacheGet<State>(sharedKey(provider, endpoint));
+  if (!shared?.value) return local.state !== "OPEN";
+  const merged = shared.value;
+  if (merged.state === "OPEN" && Date.now() - merged.openedAt >= OPEN_MS) {
+    local.state = "HALF_OPEN";
+  } else if (merged.state === "OPEN" || merged.state === "HALF_OPEN") {
+    local.state = merged.state;
+    local.consecutiveFailures = Math.max(local.consecutiveFailures, merged.consecutiveFailures);
+    local.openedAt = merged.openedAt;
+  }
+  return local.state !== "OPEN";
 }
 
 export function recordProviderSuccess(provider: string, endpoint: string, latencyMs: number) {
-  const current = getProviderHealth(provider, endpoint) as State;
-  current.requestCount += 1;
-  current.successCount += 1;
-  current.successRate = current.successCount / Math.max(1, current.requestCount);
-  current.consecutiveFailures = 0;
-  current.lastSuccess = Date.now();
-  current.latencyMs = Math.round(latencyMs);
-  current.state = "CLOSED";
-  current.openedAt = 0;
+  const current = localState(provider, endpoint);
+  current.requestCount += 1; current.successCount += 1; current.successRate = current.successCount / Math.max(1, current.requestCount);
+  current.consecutiveFailures = 0; current.lastSuccess = Date.now(); current.latencyMs = Math.round(latencyMs); current.state = "CLOSED"; current.openedAt = 0;
 }
 
 export function recordProviderFailure(provider: string, endpoint: string, latencyMs: number) {
-  const current = getProviderHealth(provider, endpoint) as State;
-  current.requestCount += 1;
-  current.consecutiveFailures += 1;
-  current.successRate = current.successCount / Math.max(1, current.requestCount);
-  current.lastFailure = Date.now();
-  current.latencyMs = Math.round(latencyMs);
-  if (current.state === "HALF_OPEN" || current.consecutiveFailures >= FAILURE_THRESHOLD) {
-    current.state = "OPEN";
-    current.openedAt = Date.now();
-  }
+  const current = localState(provider, endpoint);
+  current.requestCount += 1; current.consecutiveFailures += 1; current.successRate = current.successCount / Math.max(1, current.requestCount);
+  current.lastFailure = Date.now(); current.latencyMs = Math.round(latencyMs);
+  if (current.state === "HALF_OPEN" || current.consecutiveFailures >= FAILURE_THRESHOLD) { current.state = "OPEN"; current.openedAt = Date.now(); }
 }
 
-export function listProviderHealth(): ProviderHealth[] {
-  return [...states.values()].map(({ openedAt: _openedAt, ...entry }) => ({ ...entry }));
+export async function recordProviderSuccessAsync(provider: string, endpoint: string, latencyMs: number) {
+  recordProviderSuccess(provider, endpoint, latencyMs);
+  if (sharedCacheConfigured()) await sharedCacheSet(sharedKey(provider, endpoint), localState(provider, endpoint), SHARED_HEALTH_TTL_MS);
 }
+
+export async function recordProviderFailureAsync(provider: string, endpoint: string, latencyMs: number) {
+  recordProviderFailure(provider, endpoint, latencyMs);
+  if (sharedCacheConfigured()) await sharedCacheSet(sharedKey(provider, endpoint), localState(provider, endpoint), SHARED_HEALTH_TTL_MS);
+}
+
+export function listProviderHealth(): ProviderHealth[] { return [...states.values()].map(({ openedAt: _openedAt, ...entry }) => ({ ...entry })); }
