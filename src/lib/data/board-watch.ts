@@ -82,14 +82,16 @@ export const searchFundBoards = createServerFn({ method: "POST" }).validator((in
     return s ? { code: rule.bkCode, name: rule.name, icon: iconFor(rule.name), type: rule.prefer, _score: s } : null;
   }).filter((x): x is BoardCandidate & { _score: number } => !!x);
 
-  if (local.length) return { items: local.sort((a, b) => b._score - a._score).slice(0, 20).map(({ _score: _ignore, ...item }) => item) };
-
   const rows = await fetchBoards();
   const remote = rows.map((row): (BoardCandidate & { _score: number }) | null => {
     const code = rowCode(row); const name = rowName(row); const s = score(name, q);
     return code && name && s ? { code, name, icon: iconFor(name), type: typeFor(code), _score: s } : null;
-  }).filter((x): x is BoardCandidate & { _score: number } => !!x).sort((a, b) => b._score - a._score);
-  return { items: remote.slice(0, 20).map(({ _score: _ignore, ...item }) => item) };
+  }).filter((x): x is BoardCandidate & { _score: number } => !!x);
+
+  const merged = [...local, ...remote]
+    .sort((a, b) => b._score - a._score)
+    .filter((item, index, list) => list.findIndex((x) => x.code === item.code) === index);
+  return { items: merged.slice(0, 20).map(({ _score: _ignore, ...item }) => item) };
 });
 
 export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator((input: { codes?: string[] }) => input).handler(async ({ data }): Promise<{ rows: BoardWatchQuote[]; fetchedAt: number; weekend: boolean }> => {
