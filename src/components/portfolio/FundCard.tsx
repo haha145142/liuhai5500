@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Tone } from "@/components/ui/Glass";
 import { calcSixFactor } from "@/lib/calc/six-factor";
 import { calcSwingTrade } from "@/lib/calc/indicators";
 import { synthesizeSwing } from "@/lib/calc/swing-synthesis";
 import { calcHoldingReturn } from "@/lib/calc/portfolio-returns";
 import { calcFundPeriodReturn, type FundPeriodId } from "@/lib/calc/portfolio-periods";
+import { inferHoldingEntryDate } from "@/lib/calc/holding-entry-date";
 import { matchFundSector } from "@/lib/data/sectors";
 import { fmtMoney, fmtPctShort, fmtPrice } from "@/lib/format";
 import type { FundQuote, Holding, SectorQuote } from "@/lib/types";
@@ -62,6 +63,7 @@ export function FundCard({
   totalMarketValue,
   onRemove,
   onUpdate,
+  expandedOverride = null,
 }: {
   holding: Holding;
   fund?: FundQuote;
@@ -70,6 +72,7 @@ export function FundCard({
   totalMarketValue: number;
   onRemove: () => void;
   onUpdate: (patch: Partial<Holding>) => void;
+  expandedOverride?: boolean | null;
 }) {
   const [period, setPeriod] = useState<Period>("week");
   const [expanded, setExpanded] = useState(true);
@@ -77,6 +80,15 @@ export function FundCard({
   const [editing, setEditing] = useState(false);
   const [shares, setShares] = useState(String(holding.shares));
   const [cost, setCost] = useState(String(holding.cost));
+
+  useEffect(() => {
+    if (expandedOverride != null) setExpanded(expandedOverride);
+  }, [expandedOverride]);
+
+  useEffect(() => {
+    setShares(String(holding.shares));
+    setCost(String(holding.cost));
+  }, [holding.cost, holding.shares]);
 
   const name = fund?.name || holding.name || holding.code;
   const ret = calcHoldingReturn(holding, fund);
@@ -105,12 +117,22 @@ export function FundCard({
   const confidence = valuationConfidence(fund);
   const referenceNav = fund?.nav ?? null;
   const referenceDate = fund?.navDate ?? null;
+  const entryEstimate = inferHoldingEntryDate(fund?.historyPoints, holding.cost);
+  const entryDate = holding.purchaseDate || entryEstimate.date;
+  const entryDays = entryDate ? Math.max(0, Math.floor((Date.now() - new Date(`${entryDate}T00:00:00+08:00`).getTime()) / 86_400_000)) : entryEstimate.days;
+  const entrySource = holding.purchaseDate ? holding.purchaseDateSource === "manual" ? "手动" : "已保存估算" : entryEstimate.date ? "按历史净值匹配" : null;
 
   const saveEdit = () => {
     const nextShares = Number(shares);
     const nextCost = Number(cost);
     if (nextShares > 0 && nextCost > 0) {
-      onUpdate({ shares: nextShares, cost: nextCost });
+      const nextEntry = inferHoldingEntryDate(fund?.historyPoints, nextCost);
+      onUpdate({
+        shares: nextShares,
+        cost: nextCost,
+        purchaseDate: nextEntry.date ?? null,
+        purchaseDateSource: nextEntry.date ? "estimated" : null,
+      });
       setEditing(false);
     }
   };
@@ -139,8 +161,9 @@ export function FundCard({
           <Tone v={ret.holdingPnl}>持有 {ret.holdingPnl == null ? "—" : fmtMoney(ret.holdingPnl)}</Tone>
           <Tone v={ret.holdingPnlPct}>收益率 {ret.holdingPnlPct == null ? "—" : fmtPctShort(ret.holdingPnlPct)}</Tone>
         </div>
+        {entryDate ? <div className="mt-1.5 flex items-center justify-between rounded-xl bg-blue-50/55 px-2 py-1 text-[8px] text-slate-500"><span>买入日约 {entryDate}{entrySource ? ` · ${entrySource}` : ""}</span><b className="text-blue-700">持有 {entryDays ?? "—"} 天</b></div> : null}
         {estimateDisagreement ? <div className="mt-1.5 rounded-xl bg-red-50/70 px-2 py-1 text-[8px] leading-[1.4] text-red-500">三路估值分歧超过阈值，当前盘中估值仅供参考{fund?.estimateRouteSpreadPct != null ? ` · 分歧 ${fund.estimateRouteSpreadPct.toFixed(2)}%` : ""}</div> : null}
-        <div className="mt-1.5 flex items-center justify-between text-[8px] text-subtle"><span>{expanded ? "收起详情" : "点击查看详情"}</span><span>{expanded ? "⌃" : "⌄"}</span></div>
+        <div className="mt-1.5 flex items-center justify-between text-[8px] text-subtle"><span>{expanded ? "收起详情" : "点击查看详情"}</span><span className="inline-flex size-6 items-center justify-center rounded-full bg-white/70 text-[14px] text-slate-500 shadow-sm ring-1 ring-white/90">{expanded ? "⌃" : "⌄"}</span></div>
       </button>
 
       {expanded ? (
