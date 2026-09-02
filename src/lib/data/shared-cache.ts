@@ -1,6 +1,7 @@
 export type SharedCacheEntry<T> = { value: T; savedAt: number; expiresAt: number };
 
 type UpstashResponse<T> = { result?: T };
+const SHARED_CACHE_TIMEOUT_MS = 500;
 
 function config() {
   const url = String(process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "").trim();
@@ -11,9 +12,12 @@ function config() {
 async function command<T>(parts: Array<string | number>): Promise<T | null> {
   const cfg = config();
   if (!cfg) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), SHARED_CACHE_TIMEOUT_MS);
   try {
     const response = await fetch(`${cfg.url}/pipeline`, {
       method: "POST",
+      signal: ctrl.signal,
       headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/json" },
       body: JSON.stringify([parts]),
       cache: "no-store",
@@ -23,12 +27,12 @@ async function command<T>(parts: Array<string | number>): Promise<T | null> {
     return payload[0]?.result ?? null;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
-export function sharedCacheConfigured() {
-  return !!config();
-}
+export function sharedCacheConfigured() { return !!config(); }
 
 export async function sharedCacheGet<T>(key: string): Promise<SharedCacheEntry<T> | null> {
   const raw = await command<string>(["GET", key]);
@@ -38,9 +42,7 @@ export async function sharedCacheGet<T>(key: string): Promise<SharedCacheEntry<T
     if (!parsed || typeof parsed.savedAt !== "number" || typeof parsed.expiresAt !== "number" || !("value" in parsed)) return null;
     if (parsed.expiresAt <= Date.now()) return null;
     return parsed;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 export async function sharedCacheSet<T>(key: string, value: T, ttlMs: number): Promise<boolean> {
