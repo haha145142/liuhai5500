@@ -99,11 +99,17 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
   const closed = isExchangeClosed();
   if (!codes.length) return { rows: [], fetchedAt: Date.now(), weekend: closed };
 
-  const [rows, akSnapshot] = await Promise.all([fetchBoards(), fetchAkShareSnapshot()]);
+  // Price/percentage is the first-paint data for a saved board. Money-flow is
+  // useful but slower and must never hold the board quote hostage.
+  const rows = await fetchBoards();
+  const akResult = await Promise.race([
+    fetchAkShareSnapshot().catch(() => null),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_200)),
+  ]);
   const byCode = new Map(rows.map((r) => [rowCode(r), r]));
   const date = tradingDateLabel();
-  const akFlows = akSnapshot.rows;
-  const akFreshness = akSnapshot.freshness;
+  const akFlows = akResult?.rows ?? [];
+  const akFreshness = akResult?.freshness ?? "stale";
   const maxAbsMain = Math.max(...akFlows.map((row) => Math.abs(row.mainNetInflow ?? 0)), 1);
 
   const result = await Promise.all(codes.map(async (code): Promise<BoardWatchQuote> => {
@@ -126,7 +132,7 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
         midFlow: ak?.midNetInflow ?? null,
         smallFlow: ak?.smallNetInflow ?? null,
         turnover: null,
-        marketDate: akSnapshot.marketDate ?? date,
+        marketDate: akResult?.marketDate ?? date,
         source: akUsable ? `AKShare板块资金流 · ${akFreshness === "live" ? "实时快照" : "最近快照"}` : "当前暂无可靠板块行情",
         validation: akValidation,
         flowScore: flow.score,
@@ -144,7 +150,7 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
       midFlow: ak?.midNetInflow ?? n(row.f78),
       smallFlow: ak?.smallNetInflow ?? n(row.f84),
       turnover: n(row.f6),
-      marketDate: akSnapshot.marketDate ?? date,
+      marketDate: akResult?.marketDate ?? date,
       source: akUsable ? `AKShare板块资金流 · ${akFreshness === "live" ? "实时快照" : "最近快照"} + 东方财富实时行情` : "东方财富实时板块行情",
       validation: pct != null ? "live" : akValidation,
       flowScore: flow.score,
