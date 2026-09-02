@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { calcDailyPortfolioPnl, calcFundPeriodReturn, calcPortfolioPeriodReturn } from "./portfolio-periods.ts";
+import { matchFundSector } from "../data/sectors.ts";
+import { sanitizePortfolio } from "../storage.ts";
 
 const baseFund = {
   code: "000001", name: "测试基金", type: "基金", nav: 1.4, navDate: "2026-08-28",
@@ -35,4 +37,15 @@ test("daily P&L uses official NAV changes only", () => {
   const result = calcDailyPortfolioPnl("2026-08-25", [{ code: "000001", name: "测试基金", shares: 10, cost: 1 }], { "000001": baseFund });
   assert.ok(Math.abs((result.amount ?? 0) - 1) < 1e-12);
   assert.equal(result.coveredFunds, 1);
+});
+
+test("portfolio sanitizer preserves valid purchase metadata", () => {
+  const result = sanitizePortfolio([{ code: "000001", name: "测试基金", shares: 10, cost: 1.25, purchaseDate: "2026-08-26", purchaseDateSource: "manual" }]);
+  assert.deepEqual(result[0], { code: "000001", name: "测试基金", shares: 10, cost: 1.25, purchaseDate: "2026-08-26", purchaseDateSource: "manual" });
+});
+
+test("fund-sector matching does not use generic one-character keywords", () => {
+  assert.equal(matchFundSector("黄金ETF联接A")?.id, "gold");
+  assert.equal(matchFundSector("某金融行业精选基金"), null);
+  assert.equal(matchFundSector("白酒主题指数基金")?.id, "liquor");
 });
