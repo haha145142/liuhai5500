@@ -1,0 +1,13 @@
+/* Final mobile compactness pass: keep information dense without oversized hero typography. */
+.home-income-card .text-\[30px\] { font-size: 26px; line-height: 1.08; }
+.portfolio-shell .text-\[26px\] { font-size: 24px; line-height: 1.08; }
+.app-header-card { min-height: 108px; padding: 18px 16px 17px; }
+.app-header-title { font-size: 24px; }
+.app-header-meta { margin-top: 5px; font-size: 12px; }
+.app-refresh-button { width: 54px; height: 54px; margin-left: 8px; }
+@media (max-width: 360px) {
+  .app-header-card { min-height: 100px; padding: 16px 14px; }
+  .app-header-title { font-size: 22px; }
+  .app-header-meta { font-size: 11px; }
+  .app-refresh-button { width: 48px; height: 48px; }
+}
