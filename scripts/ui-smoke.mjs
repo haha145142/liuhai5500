@@ -43,8 +43,7 @@ async function testSmartAlerts(page, label) {
   await assertNoHorizontalOverflow(page, `${label} smart alerts`);
 }
 async function testRotationRadar(page, label) {
-  await page.goto(`${baseURL}/rotation`, { waitUntil: "domcontentloaded" }); await waitForText(page, "AI 轮动雷达", `${label} rotation radar`, 15_000); await waitForText(page, "数据推断", `${label} rotation evidence boundary`); await waitForText(page, "板块强度", `${label} rotation score`); await assertNoHorizontalOverflow(page, `${label} rotation radar`);
-}
+  await page.goto(`${baseURL}/rotation`, { waitUntil: "domcontentloaded" }); await waitForText(page, "AI 轮动雷达", `${label} rotation radar`, 15_000); await waitForText(page, "数据推断", `${label} rotation evidence boundary`); await waitForText(page, "板块强度", `${label} rotation score`); const rows = page.locator('button').filter({ has: page.locator('span') }); if (await page.locator('button').count()) { const candidates = page.locator('button').filter({ hasText: /事实：涨幅/ }); if (await candidates.count()) { await candidates.first().click(); await waitForText(page, "关联基金池", `${label} rotation fund pool`, 15_000); await waitForText(page, "主动基金", `${label} rotation active fund type`, 15_000); await assertNoHorizontalOverflow(page, `${label} rotation linked pool`); } } }
 async function testQuickAdd(browser, viewport) {
   const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
   try {
