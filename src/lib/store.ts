@@ -10,8 +10,9 @@ import { tradingDateLabel } from "./data/trading-day";
 import { cnTime } from "./format";
 
 let lastFundRoutineKey = "";
-let lastPostCloseFundAttemptAt = 0;
+const lastPostCloseFundAttemptByCode = new Map<string, number>();
 let lastWeekendSnapshotKey = "";
+let queuedFundRefresh = false;
 
 type AppState = {
   ready: boolean;
@@ -95,30 +96,13 @@ function mergeSnapshot(previous: Snapshot | null, incoming: Snapshot): Snapshot 
   const sectors = incoming.sectors.map((x) => {
     const old = bySector.get(x.id);
     if (!old) return x;
-    return {
-      ...old, ...x,
-      change: x.change ?? old.change,
-      flow: x.flow ?? old.flow,
-      super: x.super ?? old.super,
-      large: x.large ?? old.large,
-      mid: x.mid ?? old.mid,
-      small: x.small ?? old.small,
-      turnover: x.turnover ?? old.turnover,
-      available: x.change != null ? true : old.available,
-      validation: x.validation && x.validation !== "unavailable" ? x.validation : old.validation,
-    };
+    return { ...old, ...x, change: x.change ?? old.change, flow: x.flow ?? old.flow, super: x.super ?? old.super, large: x.large ?? old.large, mid: x.mid ?? old.mid, small: x.small ?? old.small, turnover: x.turnover ?? old.turnover, available: x.change != null ? true : old.available, validation: x.validation && x.validation !== "unavailable" ? x.validation : old.validation };
   });
   const byBoard = new Map(previous.boards.map((x) => [x.code, x]));
-  const boards = incoming.boards.length ? incoming.boards.map((x) => {
-    const old = byBoard.get(x.code);
-    return old ? { ...old, ...x, change: x.change ?? old.change, flow: x.flow ?? old.flow } : x;
-  }) : previous.boards;
+  const boards = incoming.boards.length ? incoming.boards.map((x) => { const old = byBoard.get(x.code); return old ? { ...old, ...x, change: x.change ?? old.change, flow: x.flow ?? old.flow } : x; }) : previous.boards;
   const flow = incoming.flow || previous.flow || null;
   const globalByName = new Map(previous.global.map((x) => [x.name, x]));
-  const global = incoming.global.map((x) => {
-    const old = globalByName.get(x.name);
-    return old ? { ...old, ...x, price: x.price ?? old.price, pct: x.pct ?? old.pct } : x;
-  });
+  const global = incoming.global.map((x) => { const old = globalByName.get(x.name); return old ? { ...old, ...x, price: x.price ?? old.price, pct: x.pct ?? old.pct } : x; });
   const sources = incoming.sources.length ? incoming.sources : previous.sources;
   return { ...incoming, indices, sectors, boards, flow, global, sources };
 }
@@ -193,7 +177,13 @@ export const useApp = create<AppState>((set, get) => ({
     } catch { const cached = loadCachedNews(); set({ news: get().news || cached, newsLoading: false }); }
   },
   refreshFunds: async () => {
-    if (get().fundsLoading) return;
+    if (get().fundsLoading) {
+      if (!queuedFundRefresh) {
+        queuedFundRefresh = true;
+        window.setTimeout(() => { queuedFundRefresh = false; void get().refreshFunds(); }, 500);
+      }
+      return;
+    }
     const list = get().portfolio;
     if (!list.length) return;
     const phase = getMarketPhase();
@@ -205,22 +195,43 @@ export const useApp = create<AppState>((set, get) => ({
       const routineKey = `${phase}:${referenceDate}:${codes.join(",")}`;
       if (lastFundRoutineKey === routineKey) return;
     }
+
+    let requestCodes = codes;
     if (phase === "postclose") {
-      const allOfficial = codes.every((code) => { const q = currentFunds[code]; return q?.nav != null && q.navDate === referenceDate && q.officialNavPublished === true; });
-      if (allOfficial) return;
-      if (Date.now() - lastPostCloseFundAttemptAt < 180_000) return;
-      lastPostCloseFundAttemptAt = Date.now();
+      const now = Date.now();
+      requestCodes = codes.filter((code) => {
+        const q = currentFunds[code];
+        const allOfficial = q?.nav != null && q.navDate === referenceDate && q.officialNavPublished === true && q.valuationStatus === "official_nav";
+        if (allOfficial) return false;
+        const lastAttempt = lastPostCloseFundAttemptByCode.get(code) ?? 0;
+        if (now - lastAttempt < 180_000) return false;
+        lastPostCloseFundAttemptByCode.set(code, now);
+        return true;
+      });
+      if (!requestCodes.length) return;
     }
+
     set({ fundsLoading: true });
     try {
-      const entries = await mapSettledLimited(codes, 3, async (code) => {
+      const entries = await mapSettledLimited(requestCodes, 3, async (code) => {
         const raw = await getFund({ data: { code } });
-        try { const validated = await validateFundQuote({ data: { quote: raw } }); const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(validated.quote, referenceDate) : validated.quote; return [code, quote] as const; }
-        catch { const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(raw, referenceDate) : raw; return [code, quote] as const; }
+        try {
+          const validated = await validateFundQuote({ data: { quote: raw } });
+          const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(validated.quote, referenceDate) : validated.quote;
+          return [code, quote] as const;
+        } catch {
+          const quote = (phase === "weekend" || phase === "preopen") ? withLatestOfficialMode(raw, referenceDate) : raw;
+          return [code, quote] as const;
+        }
       });
       const funds = { ...get().funds };
       let updatedCount = 0;
-      for (const result of entries) { if (result.status !== "fulfilled") continue; const [code, quote] = result.value; const hasUsableValue = quote.nav != null || quote.estimate != null || quote.history.length > 0; if (hasUsableValue) { funds[code] = quote; updatedCount += 1; } }
+      for (const result of entries) {
+        if (result.status !== "fulfilled") continue;
+        const [code, quote] = result.value;
+        const hasUsableValue = quote.nav != null || quote.estimate != null || quote.history.length > 0;
+        if (hasUsableValue) { funds[code] = quote; updatedCount += 1; }
+      }
       if (updatedCount > 0) saveCachedFunds(funds);
       set({ funds });
       if ((phase === "weekend" || phase === "preopen") && updatedCount > 0) lastFundRoutineKey = `${phase}:${referenceDate}:${codes.join(",")}`;
