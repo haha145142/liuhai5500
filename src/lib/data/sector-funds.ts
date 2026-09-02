@@ -22,6 +22,7 @@ export type SectorFundRow = {
   valuationTrust?: SectorFundTrust;
 };
 
+// Board fund-pool source is configurable here; the live universe currently uses Eastmoney's fund ranking feed.
 const RANK_URL = "https://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=rzf&st=desc&pi=1&pn=2000&dx=1";
 const CACHE_MS = 60 * 60 * 1000;
 let cached: { savedAt: number; rows: SectorFundRow[] } | null = null;
@@ -107,10 +108,10 @@ function deriveBand(row: SectorFundRow) {
   return "波段中性";
 }
 
-function withDerivedLabels(row: SectorFundRow, reason: string): SectorFundRow {
+function withDerivedLabels(row: SectorFundRow, reason: string, matchScore = row.matchScore): SectorFundRow {
   const trend = deriveTrend(row);
   const band = deriveBand(row);
-  return { ...row, matchReason: `${reason} · ${trend.label} · ${band}` };
+  return { ...row, matchScore, matchReason: `${reason} · ${trend.label} · ${band}` };
 }
 
 function trustFromQuote(quote: TrustQuote): SectorFundTrust | undefined {
@@ -166,7 +167,7 @@ async function fallbackRepresentativeFund(rule: SectorRule): Promise<SectorFundR
       matchScore: 1000,
       matchReason: "",
     };
-    return [withDerivedLabels(row, `${rule.name}代表ETF · 数据源降级；仅展示可靠可取得的实时数据`)];
+    return [withDerivedLabels(row, `${rule.name}代表ETF · 数据源降级；仅展示可靠可取得的实时数据`, 1000)];
   } catch {
     const row: SectorFundRow = {
       code: etf.code,
@@ -182,7 +183,7 @@ async function fallbackRepresentativeFund(rule: SectorRule): Promise<SectorFundR
       matchScore: 1000,
       matchReason: "",
     };
-    return [withDerivedLabels(row, `${rule.name}代表ETF · 当前行情源不可用`)];
+    return [withDerivedLabels(row, `${rule.name}代表ETF · 当前行情源不可用`, 1000)];
   }
 }
 
@@ -196,7 +197,7 @@ export const getSectorFunds = createServerFn({ method: "POST" })
       .map((row) => {
         const hit = scoreFund(row, rule);
         if (!hit.score) return null;
-        return withDerivedLabels(row, hit.reason);
+        return withDerivedLabels({ ...row, matchScore: hit.score }, hit.reason, hit.score);
       })
       .filter((x): x is SectorFundRow => !!x)
       .sort((a, b) => (b.matchScore - a.matchScore) || ((b.day ?? -999) - (a.day ?? -999)))
