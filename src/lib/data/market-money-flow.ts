@@ -43,7 +43,7 @@ async function fetchTurnoverKline(secid: string) {
   const text = await fetchText(url, 5000, { Referer: "https://quote.eastmoney.com/" });
   const json = parseMaybeJsonp(text) as { data?: { klines?: unknown[] } };
   const rows = Array.isArray(json?.data?.klines) ? json.data!.klines.map((x) => String(x).split(",")) : [];
-  return rows.map((parts) => ({ date: parts[0] || "", amount: finite(parts[5]) })).filter((x) => x.date && x.amount != null);
+  return rows.map((parts) => ({ date: parts[0] || "", amount: finite(parts[5]) })).filter((x): x is { date: string; amount: number } => !!x.date && x.amount != null);
 }
 
 export const getMarketMoneyFlow = createServerFn({ method: "GET" }).handler(async (): Promise<MarketMoneyFlow | null> => {
