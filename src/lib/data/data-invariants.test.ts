@@ -11,9 +11,9 @@ test("official NAV publication truth comes only from historical NAV", () => {
   const live = read("live-valuation-v2.ts");
   const validation = read("validation.ts");
 
-  assert.match(live, /const historyOfficialToday\s*=\s*latest\?\.date\s*===\s*today\(\)/);
+  assert.match(live, /const historyOfficialToday\s*=\s*latest\?\.date===today\(\)\s*&&\s*latest\.nav>0/);
   assert.match(live, /const officialToday\s*=\s*historyOfficialToday/);
-  assert.match(live, /officialNavPublished:\s*officialToday/);
+  assert.match(live, /officialNavPublished:officialToday/);
   assert.match(validation, /officialNavPublished:\s*q\.officialNavPublished/);
   assert.doesNotMatch(validation, /officialNavPublished:\s*q\.navDate\s*!=\s*null\s*&&/);
 });
