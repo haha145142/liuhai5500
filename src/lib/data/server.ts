@@ -36,11 +36,6 @@ function isSameDayEstimate(quote: FundQuote | null | undefined) {
     && quote.estimateTime.slice(0, 10) === chinaDateLabel();
 }
 
-function isIntradayPhase() {
-  const phase = getMarketPhase();
-  return phase === "morning" || phase === "afternoon";
-}
-
 async function loadFundQuote(code: string): Promise<FundQuote> {
   const phase = getMarketPhase();
   try {
