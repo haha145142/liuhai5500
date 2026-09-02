@@ -11,12 +11,18 @@ function sameChinaDate(value:string|null|undefined, now=new Date()){
   const cn=new Date(now.getTime()+8*60*60*1000);
   return Number(m[1])===cn.getUTCFullYear()&&Number(m[2])===cn.getUTCMonth()+1&&Number(m[3])===cn.getUTCDate();
 }
+function isValidatedIntraday(fund:FundQuote){
+  if(fund.estimateConfidence==="high"||fund.estimateConfidence==="medium")return true;
+  const routes=fund.estimateRoutes??[];
+  const distinctSources=new Set(routes.map((r)=>String(r.source||"")).filter(Boolean));
+  return distinctSources.size>=2 && (fund.estimateRouteWarning==null);
+}
 function selectReturnQuote(fund:FundQuote|undefined,now=new Date()):ReturnQuote{
   if(!fund)return{price:null,mode:"none"};
   const official=finitePositive(fund.nav)!=null&&fund.officialNavPublished===true&&fund.valuationStatus==="official_nav";
   if(official)return{price:finitePositive(fund.nav),mode:"official_today"};
   const current=finitePositive(fund.estimate);
-  if(current!=null&&(fund.valuationStatus==="estimate"||fund.valuationStatus==="live_estimate")&&fund.officialNavPublished!==true&&sameChinaDate(fund.estimateTime,now))return{price:current,mode:"live_estimate"};
+  if(current!=null&&isValidatedIntraday(fund)&&(fund.valuationStatus==="estimate"||fund.valuationStatus==="live_estimate")&&fund.officialNavPublished!==true&&sameChinaDate(fund.estimateTime,now))return{price:current,mode:"live_estimate"};
   if(isChinaTradingSession(now))return{price:null,mode:"none"};
   const nav=finitePositive(fund.nav);
   if(nav!=null)return{price:nav,mode:"latest_official"};
