@@ -4,6 +4,11 @@ import { getMarketMoneyFlow, type MarketMoneyFlow } from "@/lib/data/market-mone
 import { fmtYi } from "@/lib/format";
 
 function tone(v: number | null) { return v == null ? "text-slate-400" : v > 0 ? "text-up" : v < 0 ? "text-down" : "text-slate-500"; }
+function freshnessLabel(data: MarketMoneyFlow) {
+  if (data.freshness === "live") return "资金流近实时";
+  if (data.freshness === "recent") return "资金流较新";
+  return "资金流已过期";
+}
 
 export function MarketMoneyFlow() {
   const [data, setData] = useState<MarketMoneyFlow | null>(null);
@@ -31,9 +36,9 @@ export function MarketMoneyFlow() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[16px] font-semibold tracking-tight text-slate-950">全市场资金雷达</div>
-            <div className="mt-0.5 text-[10px] text-slate-500">全市场资金脉络 · 订单规模口径 · 观察资金进出与市场放缩量</div>
+            <div className="mt-0.5 text-[10px] text-slate-500">订单规模口径 · 观察资金进出与市场放缩量</div>
           </div>
-          <span className="shrink-0 rounded-full bg-white/75 px-2.5 py-1 text-[9px] text-slate-500">{loading && !data ? "读取中" : data ? "全市场" : "暂无可靠数据"}</span>
+          <span className="shrink-0 rounded-full bg-white/75 px-2.5 py-1 text-[9px] text-slate-500">{loading && !data ? "读取中" : data ? freshnessLabel(data) : "暂无可靠数据"}</span>
         </div>
 
         {data ? (
@@ -51,9 +56,9 @@ export function MarketMoneyFlow() {
               <Metric label="较前一交易日" value={data.turnoverChangePct == null ? "暂无可靠数据" : `${data.turnoverChangePct >= 0 ? "+" : ""}${data.turnoverChangePct.toFixed(1)}% · ${data.turnoverState}`} tone={data.turnoverChangePct == null ? "text-slate-400" : data.turnoverChangePct >= 0 ? "text-up" : "text-down"} />
             </div>
             <div className="mt-2 rounded-[15px] bg-white/58 px-3 py-2.5 text-[10px] leading-[1.55] text-slate-500">
-              <b className="text-slate-800">怎么看：</b>超大单 + 大单作为大资金/主力订单规模代理；中单、小单用于观察小额资金行为。这里看的是订单规模，不冒充真实机构或散户身份。资金先经过结构校验，校验不足时不用于方向判断。
+              <b className="text-slate-800">口径：</b>超大单 + 大单只作为大资金/主力订单规模代理；中单、小单用于观察小额订单行为，不代表真实机构或散户身份。当前资金流来自单一供应商，已做内部结构平衡校验，因此不标记为双源确认。
             </div>
-            <div className="mt-1.5 flex items-center justify-between text-[9px] text-slate-400">
+            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[9px] text-slate-400">
               <span>{data.marketDate} · {data.source}</span>
               <span>{data.validation === "fully_consistent" ? "结构一致" : data.validation === "partially_consistent" ? "部分一致" : "不可用于方向判断"}</span>
             </div>
