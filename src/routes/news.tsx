@@ -1,76 +1,70 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { EmptyNote, Glass, SectionTitle, Tone } from "@/components/ui/Glass";
+import { ChevronDown, RefreshCw, Sparkles } from "lucide-react";
+import { EmptyNote, Glass } from "@/components/ui/Glass";
 import { ageLabel, clockStr, formatPublishedAt } from "@/lib/format";
 import { analyzeNews } from "@/lib/data/server";
-import { assessNewsEvidence } from "@/lib/calc/news-evidence";
+import { getDSKey, getDSModel } from "@/lib/storage";
 import { useApp } from "@/lib/store";
 import type { NewsItem } from "@/lib/types";
 
 export const Route = createFileRoute("/news")({ component: NewsPage });
 
-const FILTERS = [
+type FilterId = "all" | "fund" | "sector" | "policy" | "market" | "macro" | "global";
+type AiInsight = { id: string; text: string; relation: string; validation: string; importance: number };
+
+const FILTERS: Array<{ id: FilterId; label: string }> = [
   { id: "all", label: "全部" },
+  { id: "fund", label: "基金" },
+  { id: "sector", label: "科技" },
   { id: "policy", label: "政策" },
   { id: "market", label: "市场" },
-  { id: "sector", label: "板块" },
-  { id: "global", label: "外围" },
-] as const;
+  { id: "macro", label: "宏观" },
+  { id: "global", label: "海外" },
+];
+const AI_CACHE_KEY = "fund_ai_pro_news_ai_v4";
+const VISIBLE_DEFAULT = 5;
 
-const AI_CACHE_KEY = "fund_ai_pro_news_ai_v2";
-const AI_CACHE_TTL = 10 * 60 * 1000;
-
-function readAiCache() {
-  if (typeof window === "undefined") return "";
+function normalizeText(text: string) { return text.replace(/\s+/g, " ").trim(); }
+function filterItem(item: NewsItem, filter: FilterId) {
+  if (filter === "all") return true;
+  if (filter === "fund") return item.relatedSectors.length > 0 || /基金|ETF|份额|净值|申购|赎回|持仓/.test(`${item.title} ${item.summary}`);
+  if (filter === "sector") return item.category === "sector";
+  if (filter === "policy") return item.category === "policy";
+  if (filter === "market") return item.category === "market";
+  if (filter === "global") return item.category === "global";
+  return item.category === "other";
+}
+function sentimentLabel(item: NewsItem) { return item.sentiment === "bull" ? "偏利好" : item.sentiment === "bear" ? "偏利空" : "中性"; }
+function sentimentClass(item: NewsItem) { return item.sentiment === "bull" ? "bg-emerald-50/75 text-emerald-700" : item.sentiment === "bear" ? "bg-rose-50/75 text-rose-700" : "bg-slate-50/80 text-slate-600"; }
+function cacheSignature(items: NewsItem[]) { return items.slice(0, 5).map((x) => `${x.id}:${x.title}`).join("|"); }
+function readAiCache(signature: string): Record<string, AiInsight> {
+  if (typeof window === "undefined") return {};
   try {
-    const raw = JSON.parse(sessionStorage.getItem(AI_CACHE_KEY) || "null") as { ts?: number; text?: string } | null;
-    return raw?.text && raw.ts && Date.now() - raw.ts < AI_CACHE_TTL ? raw.text : "";
-  } catch {
-    return "";
-  }
+    const raw = JSON.parse(sessionStorage.getItem(AI_CACHE_KEY) || "null") as { signature?: string; items?: AiInsight[]; ts?: number } | null;
+    if (!raw || raw.signature !== signature || !raw.ts || Date.now() - raw.ts > 15 * 60_000) return {};
+    return Object.fromEntries((raw.items || []).map((x) => [x.id, x]));
+  } catch { return {}; }
 }
-
-function writeAiCache(text: string) {
-  try { sessionStorage.setItem(AI_CACHE_KEY, JSON.stringify({ ts: Date.now(), text })); } catch { /* local only */ }
+function writeAiCache(signature: string, items: AiInsight[]) {
+  try { sessionStorage.setItem(AI_CACHE_KEY, JSON.stringify({ signature, items, ts: Date.now() })); } catch {}
 }
-
-function renderAiText(text: string) {
-  return text.split("\n").map((line, i) => {
-    const heading = /^【.+】$/.test(line.trim());
-    return heading
-      ? <div key={`${i}-${line}`} className="mt-3 first:mt-0 rounded-xl bg-accent/8 px-2.5 py-1.5 text-xs font-bold text-fg">{line}</div>
-      : <p key={`${i}-${line}`} className="mt-1 text-sm leading-7 text-fg">{line || "\u00a0"}</p>;
-  });
-}
-
-function normalizeTopic(s: string) {
-  return s.replace(/基金|指数|行业|概念/g, "").trim().toLowerCase();
-}
-
-function newsTouchesHoldings(item: NewsItem, holdingNames: string[]) {
-  const topics = item.relatedSectors.map(normalizeTopic).filter(Boolean);
-  return holdingNames.some((name) => {
-    const n = normalizeTopic(name);
-    return topics.some((topic) => topic.length >= 2 && (n.includes(topic) || topic.includes(n.slice(0, 4))));
-  });
-}
-
-function matchFundThemes(item: NewsItem, funds: Array<{ name: string; code: string }>) {
-  const topics = item.relatedSectors.map(normalizeTopic).filter(Boolean);
-  if (!topics.length) return [] as string[];
-  return funds
-    .filter((f) => {
-      const name = normalizeTopic(f.name);
-      return topics.some((topic) => topic.length >= 2 && (name.includes(topic) || topic.includes(name.slice(0, 4))));
-    })
-    .slice(0, 8)
-    .map((f) => f.name);
-}
-
-function evidenceTone(validation?: string) {
-  if (validation === "cross_checked") return "已交叉验证";
-  if (validation === "single_source") return "部分验证";
-  return "待验证";
+function parseAi(text: string): AiInsight[] {
+  const cleaned = text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  try {
+    const parsed = JSON.parse(cleaned) as unknown;
+    const arr = Array.isArray(parsed) ? parsed : typeof parsed === "object" && parsed && Array.isArray((parsed as { items?: unknown[] }).items) ? (parsed as { items: unknown[] }).items : [];
+    return arr.map((x) => {
+      const v = x as Partial<AiInsight>;
+      return {
+        id: String(v.id || ""),
+        text: normalizeText(String(v.text || "")),
+        relation: normalizeText(String(v.relation || "")),
+        validation: normalizeText(String(v.validation || "")),
+        importance: Number.isFinite(Number(v.importance)) ? Number(v.importance) : 0,
+      };
+    }).filter((x) => x.id && x.text).slice(0, 5);
+  } catch { return []; }
 }
 
 function NewsPage() {
@@ -80,163 +74,113 @@ function NewsPage() {
   const snapshot = useApp((s) => s.snapshot);
   const portfolio = useApp((s) => s.portfolio);
   const funds = useApp((s) => s.funds);
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
-  const [tab, setTab] = useState<"flash" | "deep" | "mood">("flash");
-  const [aiText, setAiText] = useState(() => readAiCache());
+  const [filter, setFilter] = useState<FilterId>("all");
+  const [expanded, setExpanded] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const [aiMap, setAiMap] = useState<Record<string, AiInsight>>({});
 
-  const names = portfolio.map((p) => funds[p.code]?.name || p.name).filter(Boolean);
-  const fundList = Object.values(funds).map((f) => ({ name: f.name, code: f.code }));
+  const filteredItems = useMemo(() => (news?.items || []).filter((x) => filterItem(x, filter)), [filter, news]);
+  const visibleItems = expanded ? filteredItems : filteredItems.slice(0, VISIBLE_DEFAULT);
+  const signature = useMemo(() => cacheSignature(filteredItems), [filteredItems]);
 
-  const items = useMemo(() => {
-    const src = tab === "deep" ? news?.deep : tab === "mood" ? news?.sentiment : news?.items;
-    const list = src || [];
-    if (filter === "all") return list;
-    return list.filter((n) => n.category === filter);
-  }, [news, filter, tab]);
+  useEffect(() => {
+    setExpanded(false);
+    setAiMap(readAiCache(signature));
+  }, [signature]);
 
-  const runNewsAI = async () => {
+  useEffect(() => {
+    if (!filteredItems.length) return;
+    if (Object.keys(readAiCache(signature)).length) return;
+    void runBatchAI(filteredItems.slice(0, VISIBLE_DEFAULT), snapshot, portfolio.map((p) => funds[p.code]?.name || p.name));
+  }, [filteredItems, signature, snapshot, portfolio, funds]);
+
+  async function runBatchAI(items: NewsItem[], market: ReturnType<typeof useApp.getState>["snapshot"], holdingNames: string[]) {
     if (!items.length || aiBusy) return;
     setAiBusy(true);
     try {
-      const evidence = items.slice(0, 10).map((n, i) => ({
-        no: i + 1,
-        title: n.title,
-        summary: n.summary,
-        source: n.source,
-        publishedAt: n.publishedAt ? formatPublishedAt(n.publishedAt) : "暂无可靠时间",
-        category: n.category,
-        sentiment: n.sentiment,
-        relatedSectors: n.relatedSectors,
+      const evidence = items.map((item) => ({
+        id: item.id,
+        title: item.title,
+        summary: item.summary,
+        source: item.source,
+        publishedAt: item.publishedAt ? formatPublishedAt(item.publishedAt) : "暂无可靠时间",
+        category: item.category,
+        sentiment: item.sentiment,
+        relatedSectors: item.relatedSectors,
       }));
-      const holdingEvidence = names.length ? `我的持仓名称：${JSON.stringify(names.slice(0, 20))}` : "我的持仓：暂无可靠数据";
-      const fundEvidence = fundList.length ? `当前已加载基金：${JSON.stringify(fundList.slice(0, 30))}` : "当前基金数据：暂无可靠数据";
       const prompt = [
-        "请解读下面最新新闻。重点回答哪些新闻真正可能影响A股、影响哪个基金主题，以及影响逻辑。",
-        "必须把‘新闻关联’和‘行情验证’分开：新闻提到某板块，不代表这个板块已经上涨，也不代表资金已经流入。",
+        "你是基金投资者的新闻研判助手。逐条解读下面最多5条新闻，每条只输出一段非常短、但有事实依据的判断。",
+        "核心规则：新闻提到某行业，不等于该行业上涨；新闻提到某公司，不等于相关基金已经受益；没有行情数据就不能说趋势成立；没有资金数据就不能说资金流入或流出。",
+        "最重要：不要为了‘看起来和基金有关’而强行联系用户持仓。只有新闻主题与基金主题直接吻合，并且输入的行情/指数/板块数据也支持时，才可以写具体基金或持仓影响；否则必须写‘暂无直接关联’。",
+        "不要复制新闻原文，不要做事实之外的延伸，不要给确定性买卖指令。",
         `新闻：${JSON.stringify(evidence)}`,
-        holdingEvidence,
-        fundEvidence,
-        snapshot ? `指数：${JSON.stringify(snapshot.indices)}` : "指数：暂无可靠数据",
-        snapshot ? `板块资金：${JSON.stringify(snapshot.sectors)}` : "板块资金：暂无可靠数据",
-        snapshot ? `市场资金：${JSON.stringify(snapshot.flow)}` : "市场资金：暂无可靠数据",
-        snapshot ? `外围：${JSON.stringify(snapshot.global)}` : "外围：暂无可靠数据",
-        "只在现有证据支持时说‘验证成立’；新闻只有主题关联但没有行情/资金验证时，明确写‘事件关联，尚未验证趋势’。",
-        "没有可靠发布时间时，不得称为最新；没有资金数据时，不得声称资金流入/流出；没有基金价格时，不得计算持仓影响金额。",
-        "输出结构：\n【今日新闻结论】一句话总判断\n【最重要的新闻】按重要性列3—5条，每条包含：发生了什么｜影响哪个基金主题｜利好/利空/中性｜行情是否验证｜资金是否验证\n【基金主题影响】说明新闻涉及的基金主题，以及哪些已经得到行情验证；没有证据就写暂无可靠数据\n【与我的持仓关系】只在输入证据能支持时关联具体持仓，否则写暂无明显关联\n【后续观察】告诉我下一步需要盯什么数据\n【一句话提醒】普通投资者今天最应该关注什么。",
+        `用户当前持仓名称（仅在证据充分时使用）：${JSON.stringify(holdingNames.slice(0, 20))}`,
+        `当前指数数据：${JSON.stringify(market?.indices || [])}`,
+        `当前板块数据：${JSON.stringify(market?.sectors || [])}`,
+        `当前市场资金：${JSON.stringify(market?.flow || null)}`,
+        `当前外围数据：${JSON.stringify(market?.global || null)}`,
+        "输出必须是 JSON 数组，不要 Markdown：[{\"id\":\"对应新闻id\",\"text\":\"20-55字中文解读\",\"relation\":\"暂无直接关联/主题相关/与持仓直接相关\",\"validation\":\"已被行情验证/事件关联，行情尚未验证/暂无可靠行情验证\",\"importance\":1}]",
       ].join("\n");
-      const r = await analyzeNews({ data: { prompt } });
-      if (r.ok && r.text) {
-        setAiText(r.text);
-        writeAiCache(r.text);
-      } else {
-        setAiText(`AI 解读暂时不可用：${r.error}`);
-      }
+      const r = await analyzeNews({ data: { prompt, apiKey: typeof window === "undefined" ? "" : getDSKey(), model: typeof window === "undefined" ? "deepseek-chat" : getDSModel() } });
+      const parsed = r.ok && r.text ? parseAi(r.text) : [];
+      setAiMap(Object.fromEntries(parsed.map((x) => [x.id, x])));
+      if (parsed.length) writeAiCache(signature, parsed);
+    } catch {
+      setAiMap({});
     } finally {
       setAiBusy(false);
     }
-  };
+  }
+
+  const sourceNames = news?.sources?.map((s) => s.name).filter((name) => /同花顺|金十数据|财联社/.test(name)).join(" · ") || "同花顺 · 金十数据 · 财联社";
+  const latest = news?.latestPublishedAt;
 
   return (
-    <div>
-      <Glass>
-        <SectionTitle
-          title="市场资讯"
-          hint={newsLoading ? "刷新中" : "真实发布时间"}
-          right={<button type="button" onClick={() => void refreshNews()} className="text-xs font-semibold text-accent">刷新新闻</button>}
-        />
-        <p className="text-xs text-muted">
-          {news ? `抓取于 ${clockStr(new Date(news.fetchedAt))} · 最新发布 ${news.latestPublishedAt ? formatPublishedAt(news.latestPublishedAt) : "时间未知"}` : "尚未抓取"}
-        </p>
-        <p className="mt-1 text-[11px] text-subtle">发布时间取自源站字段，不用抓取时间冒充「刚刚」。</p>
-        <div className="mt-3 flex gap-1">
-          {(["flash", "deep", "mood"] as const).map((t) => (
-            <button key={t} type="button" onClick={() => setTab(t)} className={`flex-1 rounded-xl py-2 text-xs font-semibold ${tab === t ? "bg-accent text-accent-fg" : "bg-bg-elevated text-muted"}`}>
-              {t === "flash" ? "快讯" : t === "deep" ? "深度" : "社区情绪"}
-            </button>
-          ))}
+    <div className="news-page pb-4">
+      <Glass className="overflow-hidden rounded-[26px] bg-white/56 p-3 shadow-[0_16px_42px_rgba(38,78,112,.07)] backdrop-blur-[24px]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[17px] font-bold tracking-tight text-slate-950">📰 市场资讯</span>
+              <span className="text-[10px] font-medium text-slate-400">最新快讯</span>
+            </div>
+            <div className="mt-1 text-[9px] text-slate-400">最后更新 {news?.fetchedAt ? clockStr(new Date(news.fetchedAt)) : "等待数据"}</div>
+          </div>
+          <button type="button" onClick={() => void refreshNews()} disabled={newsLoading} className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/80 bg-white/70 text-slate-600 shadow-sm disabled:opacity-50" aria-label="刷新资讯"><RefreshCw className={`size-4 ${newsLoading ? "animate-spin" : ""}`} /></button>
         </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {FILTERS.map((f) => (
-            <button key={f.id} type="button" onClick={() => setFilter(f.id)} className={`rounded-full px-3 py-1 text-[11px] font-semibold ${filter === f.id ? "bg-fg text-bg" : "bg-bg-elevated text-muted"}`}>
-              {f.label}
-            </button>
-          ))}
+
+        <div className="mt-2 rounded-[16px] border border-emerald-200/65 bg-emerald-50/55 px-3 py-2 text-[9px] font-medium text-emerald-700">
+          🟢 实时资讯已连接 · {news?.items?.length || 0} 条 · {news?.sources?.length || 0} 个来源 · 最新 {latest ? formatPublishedAt(latest) : "暂无可靠时间"} · {latest ? ageLabel(latest) : ""}
+        </div>
+        <div className="mt-1.5 truncate px-1 text-[8px] text-slate-400">来源：{sourceNames}</div>
+
+        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+          {FILTERS.map((item) => <button key={item.id} type="button" onClick={() => setFilter(item.id)} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${filter === item.id ? "bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,.20)]" : "bg-white/72 text-slate-500 ring-1 ring-white/80"}`}>{item.label}</button>)}
         </div>
       </Glass>
 
-      {items.length ? (
-        <>
-          <Glass className="mb-2 border border-accent/15">
-            <SectionTitle title="AI解读新闻" hint="新闻 + 基金主题 + 行情 + 资金" />
-            <p className="text-xs leading-relaxed text-muted">先判断新闻影响谁，再检查基金主题、指数和资金有没有实际验证。没有证据时不强行下结论。</p>
-            <button type="button" onClick={() => void runNewsAI()} disabled={aiBusy} className="mt-3 w-full rounded-2xl bg-accent py-2.5 text-sm font-semibold text-accent-fg disabled:opacity-60">
-              {aiBusy ? "正在交叉分析新闻…" : aiText && !aiText.startsWith("AI 解读暂时不可用") ? "重新分析最新新闻" : "一键生成 AI 解读"}
-            </button>
-            {aiText ? <div className="mt-3 rounded-2xl bg-bg-elevated/80 p-3">{renderAiText(aiText)}</div> : null}
-            {aiText && !aiBusy ? <p className="mt-2 text-[10px] text-subtle">AI 解读仅基于当前已获取证据；结果已在本次会话缓存约 10 分钟。</p> : null}
-          </Glass>
-          {items.map((n) => {
-            const matchedFunds = matchFundThemes(n, fundList);
-            const touched = matchedFunds.length > 0 || newsTouchesHoldings(n, names);
-            return <NewsCard key={n.id + n.source} item={n} holdings={names} matchedFunds={matchedFunds} touched={touched} snapshot={snapshot} />;
-          })}
-        </>
-      ) : (
-        <EmptyNote>{newsLoading ? "正在抓取资讯…" : "暂无可靠资讯，请稍后刷新"}</EmptyNote>
-      )}
+      {visibleItems.length ? <div className="mt-2.5 space-y-2">
+        {visibleItems.map((item, index) => <NewsCard key={`${item.id}-${item.source}`} item={item} insight={aiMap[item.id]} index={index} />)}
+      </div> : <EmptyNote>{newsLoading ? "正在抓取资讯…" : "暂无可靠资讯，请稍后刷新"}</EmptyNote>}
 
-      {news ? <p className="px-1 pb-2 text-[10px] text-subtle">源：{news.sources.map((s) => `${s.name} ${s.note}`).join(" · ")}</p> : null}
+      {filteredItems.length > VISIBLE_DEFAULT ? <button type="button" onClick={() => setExpanded((v) => !v)} className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-[18px] border border-white/80 bg-white/58 py-2.5 text-[10px] font-semibold text-slate-500 shadow-sm backdrop-blur-xl">{expanded ? "收起其余资讯" : `展开更多资讯（还有 ${filteredItems.length - VISIBLE_DEFAULT} 条）`}<ChevronDown className={`size-3.5 transition ${expanded ? "rotate-180" : ""}`} /></button> : null}
+
+      <div className="mt-2 flex items-center justify-between px-1 text-[8px] text-slate-400"><span>{aiBusy ? "🤖 AI正在重新研判前5条资讯…" : "🤖 每条新闻独立判断，未被强行绑定持仓"}</span><button type="button" onClick={() => void runBatchAI(filteredItems.slice(0, VISIBLE_DEFAULT), snapshot, portfolio.map((p) => funds[p.code]?.name || p.name))} className="rounded-full bg-blue-50/75 px-2 py-1 font-semibold text-blue-600"><Sparkles className="mr-0.5 inline size-3" />重新解读</button></div>
     </div>
   );
 }
 
-function NewsCard({ item, holdings, matchedFunds, touched, snapshot }: { item: NewsItem; holdings: string[]; matchedFunds: string[]; touched: boolean; snapshot: ReturnType<typeof useApp.getState>["snapshot"] }) {
-  const hitHold = holdings.filter((n) => n && (item.title.includes(n.slice(0, 4)) || item.relatedSectors.some((s) => n.includes(s))));
-  const hasSourceUrl = /^https?:\/\//i.test(item.url);
-  const timeReliable = item.publishedAt != null;
-  const signalLabel = item.sentiment === "bull" ? "偏利好" : item.sentiment === "bear" ? "偏利空" : "中性";
-  const normalized = item.relatedSectors.map(normalizeTopic).filter(Boolean);
-  const sector = snapshot?.sectors.find((s) => normalized.some((t) => t.length >= 2 && (normalizeTopic(s.name).includes(t) || t.includes(normalizeTopic(s.name).slice(0, 4)))));
-  const evidence = assessNewsEvidence({
-    publishedAt: item.publishedAt,
-    sourceUrl: item.url,
-    relatedSector: item.relatedSectors.length > 0,
-    sectorPct: sector?.change ?? null,
-    sectorValidation: sector?.validation,
-    indexPct: snapshot?.indices.find((x) => x.pct != null)?.pct ?? null,
-    moneyFlow: sector?.flow ?? snapshot?.flow?.main ?? null,
-    hasFundQuote: matchedFunds.length > 0,
-  });
-  const evidenceReasons = [
-    !evidence.checks.publishTime ? "缺可靠发布时间" : null,
-    !evidence.checks.source ? "缺原文来源" : null,
-    !evidence.checks.theme ? "未识别明确基金主题" : null,
-    !evidence.checks.market ? "缺板块行情验证" : null,
-    !evidence.checks.flow ? "缺资金验证" : null,
-    !evidence.checks.fund ? "缺具体基金行情" : null,
-  ].filter(Boolean) as string[];
-  const tone = evidence.level === "verified" ? "bg-up/10 text-up" : evidence.level === "corroborated" ? "bg-accent/10 text-accent" : evidence.level === "event_only" ? "bg-warn/10 text-warn" : "bg-bg-elevated text-muted";
-  return (
-    <article className={`glass-tight mb-2 p-3 ${touched ? "ring-1 ring-accent/10" : ""}`}>
-      <div className="flex items-center gap-2 text-[11px] text-muted"><span>{item.source}</span><span>·</span><span>{formatPublishedAt(item.publishedAt)}</span><span className="ml-auto">{ageLabel(item.publishedAt)}</span></div>
-      <h3 className="mt-1 text-sm font-semibold leading-snug text-fg">{item.title}</h3>
-      {item.summary ? <p className="mt-1 text-xs leading-relaxed text-muted">{item.summary}</p> : null}
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <Tone v={item.sentiment === "bull" ? 1 : item.sentiment === "bear" ? -1 : 0} className="rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-semibold">{signalLabel}</Tone>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tone}`}>{evidence.label}</span>
-        {item.relatedSectors.slice(0, 3).map((s) => <span key={s} className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">{s}</span>)}
-        {timeReliable ? <span className="rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-semibold text-muted">时间可信</span> : <span className="rounded-full bg-warn/10 px-2 py-0.5 text-[10px] font-semibold text-warn">时间未知</span>}
-        {matchedFunds.length ? <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">关联基金 {matchedFunds.length} 只</span> : null}
-        {hasSourceUrl ? <a href={item.url} target="_blank" rel="noopener noreferrer" className="ml-auto rounded-full bg-bg-elevated px-2.5 py-1 text-[10px] font-semibold text-accent">查看原文</a> : null}
-      </div>
-      {matchedFunds.length ? <p className="mt-2 rounded-xl bg-accent/8 px-2 py-1 text-[10.5px] leading-relaxed text-accent">相关基金：{matchedFunds.slice(0, 4).join("、")}</p> : null}
-      {hitHold.length ? <p className="mt-2 rounded-xl bg-warn/10 px-2 py-1 text-[11px] font-semibold text-warn">可能关联持仓：{hitHold.join("、")}</p> : null}
-      <div className="mt-2 rounded-xl bg-bg-elevated/65 px-2.5 py-2 text-[9.5px] leading-relaxed text-subtle">
-        <div className="flex items-center justify-between gap-2"><span>{evidence.statement}</span><span className="shrink-0">{evidence.checks.market ? evidenceTone(evidence.checks.market ? sector?.validation : undefined) : "待验证"}</span></div>
-        {evidenceReasons.length ? <div className="mt-1">尚缺：{evidenceReasons.join(" · ")}</div> : null}
-      </div>
-      <p className="mt-2 text-[9.5px] text-subtle">新闻情绪只表示文本倾向；是否真正影响行情，需要指数、基金涨跌和资金数据进一步验证。</p>
-    </article>
-  );
+function NewsCard({ item, insight, index }: { item: NewsItem; insight?: AiInsight; index: number }) {
+  const aiTone = insight?.validation?.includes("已被行情验证") ? "border-emerald-200/70 bg-emerald-50/45" : insight?.relation === "暂无直接关联" ? "border-slate-200/80 bg-slate-50/60" : "border-blue-100/80 bg-blue-50/45";
+  return <article className="overflow-hidden rounded-[22px] border border-white/80 bg-white/58 p-3 shadow-[0_12px_32px_rgba(38,78,112,.06)] backdrop-blur-[22px]">
+    <div className="flex items-center gap-2 text-[9px] text-slate-400"><span className="font-medium text-slate-500">{item.source}</span><span>·</span><span>{formatPublishedAt(item.publishedAt)}</span><span className="ml-auto rounded-full bg-white/72 px-2 py-0.5 text-[8px]">{ageLabel(item.publishedAt)}</span></div>
+    <div className="mt-1.5 flex items-start gap-2"><div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-slate-100/80 text-[9px] font-bold text-slate-400">{index + 1}</div><h2 className="min-w-0 flex-1 text-[14px] font-bold leading-[1.45] tracking-tight text-slate-900">{item.title}</h2></div>
+    {item.summary ? <p className="mt-1 line-clamp-2 text-[10px] leading-[1.55] text-slate-500">{item.summary}</p> : null}
+    <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className={`rounded-full px-2 py-0.5 text-[8px] font-semibold ${sentimentClass(item)}`}>{sentimentLabel(item)}</span>{item.relatedSectors.slice(0, 3).map((s) => <span key={s} className="rounded-full bg-white/72 px-2 py-0.5 text-[8px] text-slate-500 ring-1 ring-white/80">{s}</span>)}</div>
+    <div className={`mt-2.5 rounded-[16px] border px-2.5 py-2.5 ${aiTone}`}>
+      <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-1 text-[10px] font-bold text-blue-700">🤖 AI解读</span><span className="text-[8px] text-slate-400">{insight?.importance ? `重要度 ${insight.importance}` : "当前证据"}</span></div>
+      <p className="mt-1 text-[10px] font-medium leading-[1.55] text-slate-700">{insight?.text || "正在结合新闻主题、指数、板块与资金证据判断；没有可靠验证时不会强行下结论。"}</p>
+      {insight ? <div className="mt-1.5 flex flex-wrap gap-1.5 text-[8px]"><span className="rounded-full bg-white/72 px-2 py-0.5 text-slate-500">{insight.relation}</span><span className="rounded-full bg-white/72 px-2 py-0.5 text-slate-500">{insight.validation}</span></div> : null}
+    </div>
+  </article>;
 }
