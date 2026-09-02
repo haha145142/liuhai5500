@@ -1,5 +1,5 @@
 import type { FundQuote, Holding } from "../types";
-import { isChinaTradingSession } from "../data/market-session.ts";
+import { getMarketPhase } from "../data/market-hours.ts";
 
 type ReturnQuote={price:number|null;mode:"live_estimate"|"official_today"|"latest_official"|"none"};
 export type HoldingReturn={costValue:number;marketValue:number|null;holdingPnl:number|null;holdingPnlPct:number|null;todayPnl:number|null;todayPnlPct:number|null;previousOfficialNav:number|null;price:number|null;quoteMode:ReturnQuote["mode"]};
@@ -32,7 +32,8 @@ function selectReturnQuote(fund:FundQuote|undefined,now=new Date()):ReturnQuote{
   if(official)return{price:finitePositive(fund.nav),mode:"official_today"};
   const current=finitePositive(fund.estimate);
   if(current!=null&&isValidatedIntraday(fund)&&(fund.valuationStatus==="estimate"||fund.valuationStatus==="live_estimate")&&fund.officialNavPublished!==true&&sameChinaDate(fund.estimateTime,now)&&isFreshEstimate(fund,now))return{price:current,mode:"live_estimate"};
-  if(isChinaTradingSession(now))return{price:null,mode:"none"};
+  const phase=getMarketPhase(now);
+  if(phase==="morning"||phase==="afternoon")return{price:null,mode:"none"};
   const nav=finitePositive(fund.nav);
   if(nav!=null)return{price:nav,mode:"latest_official"};
   return{price:null,mode:"none"};
