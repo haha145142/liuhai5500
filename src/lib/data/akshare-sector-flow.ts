@@ -73,7 +73,7 @@ function normalizeRow(row: RawRow): AkShareSectorFlow | null {
   };
 }
 
-async function fetchSnapshot(): Promise<AkShareSectorFlowResult> {
+export async function fetchAkShareSnapshot(): Promise<AkShareSectorFlowResult> {
   try {
     const response = await fetch(`${SNAPSHOT_URL}?t=${Date.now()}`, {
       headers: { Accept: "application/json" },
@@ -96,7 +96,7 @@ async function fetchSnapshot(): Promise<AkShareSectorFlowResult> {
   }
 }
 
-export const getAkShareSectorFlow = createServerFn({ method: "GET" }).handler(fetchSnapshot);
+export const getAkShareSectorFlow = createServerFn({ method: "GET" }).handler(fetchAkShareSnapshot);
 
 function scoreFlow(row: AkShareSectorFlow): number | null {
   const main = row.mainNetInflow;
