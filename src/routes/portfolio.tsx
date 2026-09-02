@@ -19,6 +19,8 @@ function readAlerts(): AlertRule[] { if (typeof window === "undefined") return [
 function monthKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`; }
 function monthCells(cursor: Date) { const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1); const start = new Date(first); start.setDate(1 - first.getDay()); return Array.from({ length: 42 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; }); }
 
+type CalendarPnl = Map<string, { pnl: number; found: boolean }>;
+
 function PortfolioPage() {
   const portfolio = useApp((s) => s.portfolio);
   const funds = useApp((s) => s.funds);
@@ -50,6 +52,23 @@ function PortfolioPage() {
     return { label: "今日收益", amount: summary.todayPnl, pct: summary.todayPnlPct };
   }, [fullyPriced, month, summary, summaryTab, week, year]);
   const calendar = useMemo(() => { const cells = monthCells(calendarCursor); const activeMonth = monthKey(calendarCursor); return cells.map((date) => ({ date, key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`, inMonth: monthKey(date) === activeMonth })); }, [calendarCursor]);
+  const calendarPnl = useMemo<CalendarPnl>(() => {
+    const result: CalendarPnl = new Map();
+    for (const h of portfolio) {
+      const points = funds[h.code]?.historyPoints ?? [];
+      for (let i = 1; i < points.length; i += 1) {
+        const current = points[i];
+        const previous = points[i - 1];
+        if (!current || !previous || current.date === previous.date) continue;
+        const delta = h.shares * (current.nav - previous.nav);
+        if (!Number.isFinite(delta)) continue;
+        const entry = result.get(current.date);
+        if (entry) entry.pnl += delta;
+        else result.set(current.date, { pnl: delta, found: true });
+      }
+    }
+    return result;
+  }, [funds, portfolio]);
   const addAlert = () => { const pct = Number(alertPct); if (!/^\d{6}$/.test(alertCode) || !Number.isFinite(pct) || pct <= 0) return; setAlerts((cur) => [...cur.filter((x) => !(x.code === alertCode && x.kind === alertKind)), { code: alertCode, kind: alertKind, targetPct: pct }]); setAlertCode(""); setAlertPct(""); };
   return (
     <div>
@@ -67,7 +86,7 @@ function PortfolioPage() {
       <Glass>
         <div className="mb-3 flex items-center justify-between"><div className="text-base font-semibold text-fg">收益日历</div><span className="text-xs text-muted">{calendarCursor.getFullYear()}/{String(calendarCursor.getMonth() + 1).padStart(2, "0")}</span></div>
         <div className="flex items-center justify-between rounded-2xl bg-bg-elevated px-3 py-2"><button type="button" onClick={() => setCalendarCursor(new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1))} className="size-9 rounded-full bg-white/70 text-lg">‹</button><b>{calendarCursor.getFullYear()}年{calendarCursor.getMonth() + 1}月</b><button type="button" onClick={() => setCalendarCursor(new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 1))} className="size-9 rounded-full bg-white/70 text-lg">›</button></div>
-        <div className="mt-2 grid grid-cols-7 gap-1 text-center text-[10px] text-muted">{["日","一","二","三","四","五","六"].map((d) => <div key={d} className="py-1">{d}</div>)}{calendar.map((c) => <CalendarCell key={c.key} date={c.date} inMonth={c.inMonth} portfolio={portfolio} funds={funds} />)}</div>
+        <div className="mt-2 grid grid-cols-7 gap-1 text-center text-[10px] text-muted">{["日","一","二","三","四","五","六"].map((d) => <div key={d} className="py-1">{d}</div>)}{calendar.map((c) => <CalendarCell key={c.key} date={c.date} inMonth={c.inMonth} calendarPnl={calendarPnl} />)}</div>
         <p className="mt-2 text-[10px] text-muted">历史日期只使用官方净值回算。</p>
       </Glass>
       <Glass>
@@ -79,4 +98,11 @@ function PortfolioPage() {
     </div>
   );
 }
-function CalendarCell({ date, inMonth, portfolio, funds }: { date: Date; inMonth: boolean; portfolio: import("@/lib/types").Holding[]; funds: Record<string, FundQuote> }) { const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; let pnl = 0; let found = false; for (const h of portfolio) { const points = funds[h.code]?.historyPoints || []; const idx = points.findIndex((p) => p.date === key); if (idx > 0) { pnl += h.shares * (points[idx].nav - points[idx - 1].nav); found = true; } } return <div className={`min-h-12 rounded-xl p-1 ${inMonth ? "bg-bg-elevated" : "opacity-30"}`}><div className="text-xs">{date.getDate()}</div><Tone v={found ? pnl : null} className="mt-1 block text-[10px] font-semibold">{found ? fmtMoney(pnl) : "—"}</Tone></div>; }
+
+function CalendarCell({ date, inMonth, calendarPnl }: { date: Date; inMonth: boolean; calendarPnl: CalendarPnl }) {
+  const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const day = calendarPnl.get(key);
+  const pnl = day?.pnl ?? 0;
+  const found = day?.found === true;
+  return <div className={`min-h-12 rounded-xl p-1 ${inMonth ? "bg-bg-elevated" : "opacity-30"}`}><div className="text-xs">{date.getDate()}</div><Tone v={found ? pnl : null} className="mt-1 block text-[10px] font-semibold">{found ? fmtMoney(pnl) : "—"}</Tone></div>;
+}
