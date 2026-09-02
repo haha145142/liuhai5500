@@ -3,7 +3,9 @@ name: Fund AI Pro Prewarm
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    # UTC 00:00-07:00 = Asia/Shanghai 08:00-15:00.
+    # The endpoint still rejects exchange holidays/weekends.
+    - cron: "*/5 0-7 * * 1-5"
 
 jobs:
   prewarm:
