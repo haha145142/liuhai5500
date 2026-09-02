@@ -12,8 +12,7 @@ test("official NAV publication truth comes only from dated official NAV inputs",
   const validation = read("validation.ts");
 
   assert.match(live, /const historyOfficialToday\s*=\s*latest\?\.date\s*===\s*today\(\)/);
-  assert.match(live, /const valuationOfficialToday\s*=\s*valuation\?\.nav\s*!=\s*null/);
-  assert.match(live, /const officialToday\s*=\s*historyOfficialToday\s*\|\|\s*valuationOfficialToday/);
+  assert.match(live, /const officialToday\s*=\s*historyOfficialToday/);
   assert.match(live, /officialNavPublished\s*:\s*officialToday/);
   assert.match(validation, /officialNavPublished\s*:\s*q\.officialNavPublished/);
   assert.doesNotMatch(validation, /officialNavPublished\s*:\s*q\.navDate\s*!=\s*null\s*&&/);
