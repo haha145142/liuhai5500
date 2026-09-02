@@ -15,6 +15,7 @@ import fundAiProV6Css from "../fund-ai-pro-v6.css?url";
 import finalIos26Css from "../ios26-final-override.css?url";
 import designSystemCss from "../fund-ai-pro-design-system.css?url";
 import uiFinalPassCss from "../ui-final-pass.css?url";
+import compactPolishCss from "../predeploy-compact-polish.css?url";
 
 const APP_NAME = "Fund AI Pro";
 
@@ -50,6 +51,7 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: finalIos26Css },
       { rel: "stylesheet", href: designSystemCss },
       { rel: "stylesheet", href: uiFinalPassCss },
+      { rel: "stylesheet", href: compactPolishCss },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],

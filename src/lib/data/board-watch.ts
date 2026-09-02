@@ -18,7 +18,7 @@ export type BoardWatchQuote = {
   turnover: number | null;
   marketDate: string;
   source: string;
-  validation: "live" | "unavailable";
+  validation: "live" | "recent" | "unavailable";
   flowScore: number | null;
   flowSignal: "强流入" | "流入" | "中性" | "流出" | "强流出" | "暂无";
 };
@@ -78,12 +78,10 @@ export const searchFundBoards = createServerFn({ method: "POST" }).validator((in
   if (!q) return { items: [] };
 
   const local = SECTOR_RULES.map((rule): (BoardCandidate & { _score: number }) | null => {
-    const hay = [rule.name, ...rule.searchKeys].map((x) => x.toLowerCase()); const k = q.toLowerCase();
-    const s = hay.some((x) => x === k) ? 100 : hay.some((x) => x.startsWith(k)) ? 90 : hay.some((x) => x.includes(k)) ? 70 : 0;
+    const hay = [rule.name, ...rule.searchKeys].map((x) => x.toLowerCase()); const k = q.toLowerCase(); const s = hay.some((x) => x === k) ? 100 : hay.some((x) => x.startsWith(k)) ? 90 : hay.some((x) => x.includes(k)) ? 70 : 0;
     return s ? { code: rule.bkCode, name: rule.name, icon: iconFor(rule.name), type: rule.prefer, _score: s } : null;
   }).filter((x): x is BoardCandidate & { _score: number } => !!x);
 
-  // Known/configured sectors are resolved locally first so typing “半导体/机器人/AI” never waits on a remote source.
   if (local.length) return { items: local.sort((a, b) => b._score - a._score).slice(0, 20).map(({ _score: _ignore, ...item }) => item) };
 
   const rows = await fetchBoards();
@@ -103,6 +101,7 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
   const byCode = new Map(rows.map((r) => [rowCode(r), r]));
   const date = tradingDateLabel();
   const akFlows = akSnapshot.rows;
+  const akFreshness = akSnapshot.freshness;
   const maxAbsMain = Math.max(...akFlows.map((row) => Math.abs(row.mainNetInflow ?? 0)), 1);
 
   const result = await Promise.all(codes.map(async (code): Promise<BoardWatchQuote> => {
@@ -111,6 +110,8 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
     const name = row ? rowName(row) || code : code;
     const ak = findAkFlow(name, akFlows);
     const flow = classifyFlow(ak, maxAbsMain);
+    const akUsable = !!ak && akFreshness !== "stale";
+    const akValidation: BoardWatchQuote["validation"] = akUsable && akFreshness === "live" ? "live" : akUsable ? "recent" : "unavailable";
     if (!row) {
       return {
         code,
@@ -124,8 +125,8 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
         smallFlow: ak?.smallNetInflow ?? null,
         turnover: null,
         marketDate: akSnapshot.marketDate ?? date,
-        source: ak ? "AKShare真实板块资金流" : "当前暂无可靠板块行情",
-        validation: ak ? "live" : "unavailable",
+        source: akUsable ? `AKShare板块资金流 · ${akFreshness === "live" ? "实时快照" : "最近快照"}` : "当前暂无可靠板块行情",
+        validation: akValidation,
         flowScore: flow.score,
         flowSignal: flow.signal,
       };
@@ -142,8 +143,8 @@ export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator(
       smallFlow: ak?.smallNetInflow ?? n(row.f84),
       turnover: n(row.f6),
       marketDate: akSnapshot.marketDate ?? date,
-      source: ak ? "AKShare真实板块资金流 + 东方财富实时行情" : "东方财富实时板块行情",
-      validation: pct != null || ak != null ? "live" : "unavailable",
+      source: akUsable ? `AKShare板块资金流 · ${akFreshness === "live" ? "实时快照" : "最近快照"} + 东方财富实时行情` : "东方财富实时板块行情",
+      validation: pct != null ? "live" : akValidation,
       flowScore: flow.score,
       flowSignal: flow.signal,
     };

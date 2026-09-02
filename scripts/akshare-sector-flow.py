@@ -40,20 +40,19 @@ def number(value):
     return value if math.isfinite(value) else None
 
 
-def normalize(df, sector_type):
+def normalize_eastmoney(df, sector_type):
     rows = []
     if df is None:
         return rows
     for _, row in df.iterrows():
-        name = str(
-            pick_value(row, "名称", "板块名称", "行业", "概念", "地域") or ""
-        ).strip()
+        name = str(pick_value(row, "名称", "板块名称", "行业", "概念", "地域") or "").strip()
         if not name:
             continue
         rows.append(
             {
                 "name": name,
                 "sector_type": sector_type,
+                "provider": "AKShare/EastMoney",
                 "change_pct": number(pick_value(row, "今日涨跌幅", "涨跌幅", "涨跌")),
                 "main_net_inflow": number(pick_value(row, "今日主力净流入-净额", "主力净流入-净额", "主力净流入")),
                 "main_net_ratio": number(pick_value(row, "今日主力净流入-净占比", "主力净流入-净占比")),
@@ -66,39 +65,101 @@ def normalize(df, sector_type):
     return rows
 
 
+def normalize_ths(df, sector_type):
+    rows = []
+    if df is None:
+        return rows
+    for _, row in df.iterrows():
+        name = str(pick_value(row, "行业", "概念", "名称", "板块名称") or "").strip()
+        if not name:
+            continue
+        net_yi = number(pick_value(row, "净额"))
+        rows.append(
+            {
+                "name": name,
+                "sector_type": sector_type,
+                "provider": "AKShare/THS",
+                "change_pct": number(pick_value(row, "行业-涨跌幅", "涨跌幅", "涨跌")),
+                "main_net_inflow": net_yi * 100_000_000 if net_yi is not None else None,
+                "main_net_ratio": None,
+                "super_net_inflow": None,
+                "large_net_inflow": None,
+                "mid_net_inflow": None,
+                "small_net_inflow": None,
+            }
+        )
+    return rows
+
+
 def fetch():
     now = datetime.now(ZoneInfo("Asia/Shanghai"))
     payload = {
         "ok": True,
         "source": "AKShare",
         "provider": "akshare",
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "fetchedAt": now.isoformat(),
         "marketDate": now.date().isoformat(),
         "rows": [],
         "errors": [],
+        "sources": [],
     }
 
     for sector_type, api_value in CATEGORIES.items():
+        rows = []
         try:
             frame = ak.stock_sector_fund_flow_rank(
                 indicator="今日",
                 sector_type=api_value,
             )
-            payload["rows"].extend(normalize(frame, sector_type))
+            rows = normalize_eastmoney(frame, sector_type)
+            if rows:
+                payload["sources"].append({"sector_type": sector_type, "provider": "AKShare/EastMoney"})
         except Exception as exc:
             payload["errors"].append(
                 {
                     "sector_type": sector_type,
+                    "provider": "AKShare/EastMoney",
                     "error": f"{type(exc).__name__}: {exc}",
                 }
             )
 
-    if not payload["rows"]:
-        raise RuntimeError("AKShare returned no sector-flow rows")
+        if not rows and sector_type == "industry":
+            try:
+                frame = ak.stock_fund_flow_industry(symbol="即时")
+                rows = normalize_ths(frame, sector_type)
+                if rows:
+                    payload["sources"].append({"sector_type": sector_type, "provider": "AKShare/THS"})
+            except Exception as exc:
+                payload["errors"].append(
+                    {
+                        "sector_type": sector_type,
+                        "provider": "AKShare/THS",
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
+                )
 
-    # Keep successful data even if one category endpoint failed.
-    payload["complete"] = not payload["errors"]
+        if not rows and sector_type == "concept":
+            try:
+                frame = ak.stock_fund_flow_concept(symbol="即时")
+                rows = normalize_ths(frame, sector_type)
+                if rows:
+                    payload["sources"].append({"sector_type": sector_type, "provider": "AKShare/THS"})
+            except Exception as exc:
+                payload["errors"].append(
+                    {
+                        "sector_type": sector_type,
+                        "provider": "AKShare/THS",
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
+                )
+
+        payload["rows"].extend(rows)
+
+    if not payload["rows"]:
+        raise RuntimeError("AKShare returned no sector-flow rows from any supported source")
+
+    payload["complete"] = len(payload["sources"]) == len(CATEGORIES)
     payload["rowCount"] = len(payload["rows"])
     return payload
 
@@ -111,6 +172,9 @@ def main():
         encoding="utf-8",
     )
     print(f"wrote {payload['rowCount']} AKShare rows to {OUTPUT}")
+    print(f"sources={payload['sources']}")
+    if payload["errors"]:
+        print(f"errors={payload['errors']}")
 
 
 if __name__ == "__main__":

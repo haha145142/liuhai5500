@@ -3,7 +3,9 @@ name: AKShare Sector Flow Snapshot
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
+      - fix/akshare-real-fallback
     paths:
       - ".github/workflows/akshare-sector-flow.yml"
       - "scripts/akshare-sector-flow.py"
@@ -19,10 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout main
+      - name: Checkout source ref
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
 
       - name: Setup Python
@@ -41,9 +43,10 @@ jobs:
         run: |
           set -euo pipefail
           test -s data/akshare/sector-flow.json
-          git fetch origin data/akshare:data/akshare
           cp data/akshare/sector-flow.json /tmp/sector-flow.json
-          git checkout data/akshare
+          rm -f data/akshare/sector-flow.json
+          git fetch origin data/akshare:refs/remotes/origin/data/akshare
+          git checkout -B data/akshare refs/remotes/origin/data/akshare
           mkdir -p data/akshare
           cp /tmp/sector-flow.json data/akshare/sector-flow.json
           git config user.name "github-actions[bot]"
