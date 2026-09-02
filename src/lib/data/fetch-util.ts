@@ -2,7 +2,7 @@ import { providerAllowedAsync, recordProviderFailureAsync, recordProviderSuccess
 
 export async function fetchText(url: string, timeout = 5000, headers: Record<string, string> = {}): Promise<string> {
   const safeTimeout = Math.min(Math.max(1000, timeout), 15_000);
-  const totalBudget = Math.min(3500, safeTimeout + 400);
+  const totalBudget = Math.min(15_000, safeTimeout * 3 + 400);
   const provider = providerFromUrl(url);
   const endpoint = url.split("?")[0];
   if (!(await providerAllowedAsync(provider, endpoint))) throw new Error(`provider-circuit-open:${provider}`);
