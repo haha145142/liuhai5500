@@ -14,13 +14,27 @@ export type ProviderHealth = {
 };
 
 type State = ProviderHealth & { openedAt: number };
-
 const FAILURE_THRESHOLD = 5;
 const OPEN_MS = 30_000;
 const states = new Map<string, State>();
 
 function key(provider: string, endpoint: string) {
   try { return `${provider}:${new URL(endpoint).host}`; } catch { return `${provider}:${endpoint}`; }
+}
+
+export function providerFromUrl(endpoint: string) {
+  try {
+    const host = new URL(endpoint).hostname.toLowerCase();
+    if (host.includes("eastmoney")) return "东方财富";
+    if (host.includes("gtimg")) return "腾讯财经";
+    if (host.includes("sina")) return "新浪财经";
+    if (host.includes("githubusercontent")) return "AKShare快照";
+    if (host.includes("10jqka")) return "同花顺";
+    if (host.includes("cls.cn")) return "财联社";
+    if (host.includes("jin10")) return "金十数据";
+    if (host.includes("wscn")) return "华尔街见闻";
+    return host;
+  } catch { return "unknown"; }
 }
 
 export function getProviderHealth(provider: string, endpoint: string): ProviderHealth {
@@ -62,4 +76,8 @@ export function recordProviderFailure(provider: string, endpoint: string, latenc
     current.state = "OPEN";
     current.openedAt = Date.now();
   }
+}
+
+export function listProviderHealth(): ProviderHealth[] {
+  return [...states.values()].map(({ openedAt: _openedAt, ...entry }) => ({ ...entry }));
 }
