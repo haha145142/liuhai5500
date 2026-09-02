@@ -45,19 +45,25 @@ export function providerAllowed(provider: string, endpoint: string) { return loc
 
 export async function providerAllowedAsync(provider: string, endpoint: string) {
   const local = localState(provider, endpoint);
-  if (local.state === "OPEN" && Date.now() - local.openedAt >= OPEN_MS) local.state = "HALF_OPEN";
+  const now = Date.now();
+  if (local.state === "OPEN" && now - local.openedAt >= OPEN_MS) local.state = "HALF_OPEN";
   if (local.state === "OPEN" || !sharedCacheConfigured()) return local.state !== "OPEN";
   const k = key(provider, endpoint);
   const lastRead = sharedReadAt.get(k) ?? 0;
-  if (Date.now() - lastRead < SHARED_HEALTH_READ_MS) return local.state !== "OPEN";
-  sharedReadAt.set(k, Date.now());
+  if (now - lastRead < SHARED_HEALTH_READ_MS) return local.state !== "OPEN";
+  sharedReadAt.set(k, now);
   const shared = await sharedCacheGet<State>(sharedKey(provider, endpoint));
   if (!shared?.value) return local.state !== "OPEN";
   const merged = shared.value;
-  if (merged.state === "OPEN" && Date.now() - merged.openedAt >= OPEN_MS) {
+  if (merged.state === "OPEN") {
+    if (now - merged.openedAt >= OPEN_MS) local.state = "HALF_OPEN";
+    else {
+      local.state = "OPEN";
+      local.consecutiveFailures = Math.max(local.consecutiveFailures, merged.consecutiveFailures);
+      local.openedAt = merged.openedAt;
+    }
+  } else if (merged.state === "HALF_OPEN") {
     local.state = "HALF_OPEN";
-  } else if (merged.state === "OPEN" || merged.state === "HALF_OPEN") {
-    local.state = merged.state;
     local.consecutiveFailures = Math.max(local.consecutiveFailures, merged.consecutiveFailures);
     local.openedAt = merged.openedAt;
   }
