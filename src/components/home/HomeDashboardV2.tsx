@@ -22,6 +22,7 @@ export function HomeDashboardV2() {
   const [expanded, setExpanded] = useState(false);
   const [periodTab, setPeriodTab] = useState<PeriodTab>("today");
   const summary = portfolio.length ? calcPortfolioReturn(portfolio, funds) : null;
+  const fullyPriced = summary != null && summary.pricedCount === summary.totalCount;
   const visible = expanded ? portfolio : portfolio.slice(0, 8);
   const periods = useMemo(() => ({
     week: calcPortfolioPeriodReturn("week", portfolio, funds),
@@ -33,24 +34,25 @@ export function HomeDashboardV2() {
     if (periodTab === "week") return { label: "一周收益", amount: periods.week.amount, pct: periods.week.pct };
     if (periodTab === "month") return { label: "一个月收益", amount: periods.month.amount, pct: periods.month.pct };
     if (periodTab === "quarter") return { label: "近三个月收益", amount: periods.quarter.amount, pct: periods.quarter.pct };
-    if (periodTab === "since") return { label: "买入以来收益", amount: summary.pricedCount === summary.totalCount ? summary.holdingPnl : null, pct: summary.holdingPnlPct };
+    if (periodTab === "since") return { label: "买入以来收益", amount: fullyPriced ? summary.holdingPnl : null, pct: fullyPriced ? summary.holdingPnlPct : null };
     return { label: "今日收益", amount: summary.todayPnl, pct: summary.todayPnlPct };
-  }, [periodTab, periods, summary]);
+  }, [fullyPriced, periodTab, periods, summary]);
   const validation = snapshot?.validation === "cross_checked" ? "双源核验" : snapshot?.validation === "cached_latest_trading_day" ? "最近交易日" : snapshot?.validation === "single_source" ? "单源可用" : "等待可靠行情";
   const latestNews = news?.items?.slice(0, 5) || [];
   const benchPct = snapshot?.indices?.[0]?.pct ?? null;
 
   return <div className="home-dashboard-v3 pb-4">
-    <section className="home-income-card" aria-label="总收益">
+    <section className="home-income-card" aria-label="持仓总收益">
       <Glass tight className="mt-0 rounded-[28px] bg-white/58 p-4 shadow-[0_18px_50px_rgba(38,78,112,.09),inset_0_1px_0_rgba(255,255,255,.96)] backdrop-blur-[28px]">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0"><div className="text-[11px] font-medium text-slate-500">持仓总收益</div><div className="mt-1 text-[30px] font-bold tracking-tight text-slate-950 tabular-nums">{summary?.holdingPnl == null ? "—" : fmtMoney(summary.holdingPnl)}</div><div className="mt-1 text-[10px] text-slate-400">当前全部持仓 · {portfolio.length ? `${portfolio.length}只基金` : "尚未建仓"}</div></div>
-          <span className="shrink-0 rounded-full bg-white/72 px-2.5 py-1 text-[9px] font-semibold text-slate-500">{summary?.holdingPnlPct == null ? "—" : fmtPctShort(summary.holdingPnlPct)}</span>
+          <div className="min-w-0"><div className="text-[11px] font-medium text-slate-500">持仓总收益</div><div className="mt-1 text-[30px] font-bold tracking-tight text-slate-950 tabular-nums">{!fullyPriced ? "—" : fmtMoney(summary.holdingPnl)}</div><div className="mt-1 text-[10px] text-slate-400">当前全部持仓 · {portfolio.length ? `${portfolio.length}只基金` : "尚未建仓"}</div></div>
+          <span className="shrink-0 rounded-full bg-white/72 px-2.5 py-1 text-[9px] font-semibold text-slate-500">{!fullyPriced || summary.holdingPnlPct == null ? "—" : fmtPctShort(summary.holdingPnlPct)}</span>
         </div>
         <div className="home-period-switch mt-3 grid grid-cols-5 gap-1 rounded-2xl bg-white/48 p-0.5 ring-1 ring-white/75">{(["today", "week", "month", "quarter", "since"] as const).map((tab) => { const label = tab === "today" ? "今天" : tab === "week" ? "一周" : tab === "month" ? "一个月" : tab === "quarter" ? "近3月" : "买入以来"; return <button key={tab} type="button" onClick={() => setPeriodTab(tab)} className={`home-period-btn rounded-[14px] px-1.5 py-2 text-[11px] font-medium transition ${periodTab === tab ? "is-active bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,.20)]" : "bg-white/66 text-muted"}`}>{label}</button>; })}</div>
         <div className="mt-2 rounded-[18px] bg-white/54 px-3 py-2.5 ring-1 ring-white/75"><div className="flex items-center justify-between gap-3"><div><div className="text-[9px] text-slate-400">{selected.label}</div><Tone v={selected.amount} className="mt-1 block text-[17px] font-bold tabular-nums">{selected.amount == null ? "—" : fmtMoney(selected.amount)}</Tone></div><Tone v={selected.pct} className="text-[11px] font-semibold tabular-nums">{selected.pct == null ? "—" : fmtPctShort(selected.pct)}</Tone></div></div>
-        <div className="mt-2 grid grid-cols-2 gap-2"><Metric label="持仓市值" value={summary?.marketValue == null ? "—" : fmtMoney(summary.marketValue)} tone={summary?.marketValue ?? null} /><Metric label="持有收益率" value={summary?.holdingPnlPct == null ? "—" : fmtPctShort(summary.holdingPnlPct)} tone={summary?.holdingPnlPct ?? null} /></div>
+        <div className="mt-2 grid grid-cols-2 gap-2"><Metric label="持仓市值" value={!fullyPriced ? "—" : fmtMoney(summary.marketValue)} tone={fullyPriced ? summary.marketValue : null} /><Metric label="持有收益率" value={!fullyPriced || summary.holdingPnlPct == null ? "—" : fmtPctShort(summary.holdingPnlPct)} tone={fullyPriced ? summary.holdingPnlPct : null} /></div>
         <div className="mt-3 flex items-center justify-between border-t border-white/75 pt-2.5 text-[9px] text-slate-400"><span>{snapshot?.marketDate || "等待行情日期"}</span><span>{validation}</span></div>
+        {!fullyPriced && summary ? <div className="mt-2 rounded-xl bg-amber-50/70 px-3 py-1.5 text-[9px] leading-relaxed text-slate-500">还有 {summary.totalCount - summary.pricedCount} 只持仓缺少可靠计价，组合总收益暂不显示；数据不完整时不猜。</div> : null}
         {periodTab !== "since" && selected.amount == null ? <div className="mt-2 rounded-xl bg-amber-50/70 px-3 py-1.5 text-[9px] leading-relaxed text-slate-500">该周期需要全部持仓具备对应历史净值；数据不完整时不猜收益。</div> : null}
       </Glass>
     </section>
