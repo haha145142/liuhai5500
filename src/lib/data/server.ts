@@ -17,9 +17,23 @@ export { testDeepSeek, analyzeDeepSeek } from "./deepseek";
 const FUND_CACHE_TTL_MS = 15_000;
 const fundResolved = new Map<string, { at: number; value: FundQuote }>();
 const fundPending = new Map<string, Promise<FundQuote>>();
+const postCloseEstimate = new Map<string, FundQuote>();
+
+function chinaDateLabel(date = new Date()) {
+  const shifted = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
+}
 
 function usableFundData(quote: FundQuote | null | undefined) {
   return !!quote && (quote.nav != null || quote.estimate != null || quote.historyPoints.length > 0 || quote.metrics != null);
+}
+
+function isSameDayEstimate(quote: FundQuote | null | undefined) {
+  return !!quote
+    && quote.officialNavPublished !== true
+    && quote.estimate != null
+    && quote.estimateTime != null
+    && quote.estimateTime.slice(0, 10) === chinaDateLabel();
 }
 
 function isIntradayPhase() {
@@ -28,12 +42,10 @@ function isIntradayPhase() {
 }
 
 async function loadFundQuote(code: string): Promise<FundQuote> {
-  // Run the calculated path after close as well: an official NAV can lag the
-  // market close, so the same-day provider estimate must remain visible until
-  // the official NAV is actually published. On weekends, the resilient fallback
-  // still supplies the latest reliable trading-day NAV.
+  const phase = getMarketPhase();
   try {
     const calculated = await getCalculatedFund({ data: { code } });
+    if (isSameDayEstimate(calculated)) postCloseEstimate.set(code, calculated);
     if (usableFundData(calculated) && (
       calculated.officialNavPublished
       || calculated.valuationStatus === "estimate"
@@ -43,9 +55,11 @@ async function loadFundQuote(code: string): Promise<FundQuote> {
     }
   } catch {}
 
-  // During an active session this fallback keeps the app responsive when the
-  // calculated path is temporarily unavailable. Outside the session it also
-  // provides the latest official NAV for weekends / pre-open.
+  if (phase === "postclose") {
+    const saved = postCloseEstimate.get(code);
+    if (isSameDayEstimate(saved)) return saved;
+  }
+
   return getResilientFund({ data: { code } });
 }
 
