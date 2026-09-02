@@ -15,6 +15,13 @@ export function loadAlertRules():AlertRule[] { return read<AlertRule[]>(RULE_KEY
 export function saveAlertRules(rules:AlertRule[]) { write(RULE_KEY,rules); }
 export function loadAlertEvents():AlertEvent[] { return read<AlertEvent[]>(EVENT_KEY,[]).filter((e)=>e&&typeof e.id==="string").slice(0,50); }
 
+export function notifyAlertEvents(events: AlertEvent[]) {
+  if(typeof window === "undefined" || !events.length || typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  for(const event of events.slice(0,3)) {
+    try { new Notification("Fund AI Pro · 智能提醒", { body: event.message, tag: `fap-alert-${event.ruleId}` }); } catch {}
+  }
+}
+
 function maxDrawdown(history:number[]) { let peak=-Infinity; let max=0; for(const v of history){ if(!Number.isFinite(v)||v<=0) continue; peak=Math.max(peak,v); if(peak>0) max=Math.max(max,(peak-v)/peak*100); } return max; }
 function matches(rule:AlertRule, quote:FundQuote) {
   const day=quote.dayPct;
