@@ -162,16 +162,18 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
       const fundName = valuation?.name || code;
       const fundType = valuation?.type || "";
       const policy = policyForFund(fundType, fundName);
-      const externalPct = valuation?.pct ?? null;
+      const externalPct = valuation?.pct ?? (valuation?.estimate != null && nav != null && nav > 0 ? (valuation.estimate / nav - 1) * 100 : null);
       const rawHoldings = policy.allowAshareLookThrough ? await getHoldings(code) : [];
       const holdings = policy.allowAshareLookThrough ? await crossCheckStockQuotes(rawHoldings) : [];
 
       const lookThroughResult = policy.allowAshareLookThrough
         ? estimateFundNav({ previousNav: nav ?? 0, positions: holdings, externalEstimatePct: externalPct })
         : null;
-      const externalEstimate = nav != null && externalPct != null && Number.isFinite(nav) && Number.isFinite(externalPct)
-        ? nav * (1 + externalPct / 100)
-        : null;
+      const externalEstimate = valuation?.estimate != null && Number.isFinite(valuation.estimate)
+        ? valuation.estimate
+        : nav != null && externalPct != null && Number.isFinite(nav) && Number.isFinite(externalPct)
+          ? nav * (1 + externalPct / 100)
+          : null;
       const externalConfidence = valuation?.validation === "双源外部估值一致"
         ? "medium" as const
         : "low" as const;
@@ -201,7 +203,7 @@ export const getCalculatedFund = createServerFn({ method: "POST" })
       const officialToday = latest?.date === today() && latest.nav > 0;
       const officialNav = officialToday ? latest.nav : nav;
       const officialNavDate = officialToday ? latest.date : navDate;
-      const dayPct = officialToday ? latest?.changePct ?? null : result?.pct ?? valuation?.pct ?? null;
+      const dayPct = officialToday ? latest?.changePct ?? null : result?.pct ?? externalPct ?? null;
       const externalValidation = valuation?.validation || "暂无外部估值验证";
       const estimateValue = result?.estimate ?? null;
       const estimatePct = result?.pct ?? null;
