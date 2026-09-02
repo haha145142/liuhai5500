@@ -28,14 +28,24 @@ function isIntradayPhase() {
 }
 
 async function loadFundQuote(code: string): Promise<FundQuote> {
-  if (isIntradayPhase()) {
-    try {
-      const calculated = await getCalculatedFund({ data: { code } });
-      if (usableFundData(calculated) && (calculated.valuationStatus === "estimate" || calculated.estimate != null || calculated.officialNavPublished)) {
-        return calculated;
-      }
-    } catch {}
-  }
+  // Run the calculated path after close as well: an official NAV can lag the
+  // market close, so the same-day provider estimate must remain visible until
+  // the official NAV is actually published. On weekends, the resilient fallback
+  // still supplies the latest reliable trading-day NAV.
+  try {
+    const calculated = await getCalculatedFund({ data: { code } });
+    if (usableFundData(calculated) && (
+      calculated.officialNavPublished
+      || calculated.valuationStatus === "estimate"
+      || calculated.estimate != null
+    )) {
+      return calculated;
+    }
+  } catch {}
+
+  // During an active session this fallback keeps the app responsive when the
+  // calculated path is temporarily unavailable. Outside the session it also
+  // provides the latest official NAV for weekends / pre-open.
   return getResilientFund({ data: { code } });
 }
 
