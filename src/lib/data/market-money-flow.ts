@@ -54,11 +54,7 @@ export const getMarketMoneyFlow = createServerFn({ method: "GET" }).handler(asyn
     const rows = await fetchEastMoney();
     const base = summarize(rows);
     if (base.count < 1000 || base.validation === "unreliable") return null;
-
-    const [sh, sz] = await Promise.all([
-      fetchTurnoverKline("1.000001").catch(() => []),
-      fetchTurnoverKline("0.399001").catch(() => []),
-    ]);
+    const [sh, sz] = await Promise.all([fetchTurnoverKline("1.000001").catch(() => []), fetchTurnoverKline("0.399001").catch(() => [])]);
     const merged = new Map<string, number>();
     for (const row of [...sh, ...sz]) merged.set(row.date, (merged.get(row.date) ?? 0) + row.amount);
     const dates = [...merged.keys()].sort();
@@ -66,7 +62,7 @@ export const getMarketMoneyFlow = createServerFn({ method: "GET" }).handler(asyn
     const previousTurnover = dates.length > 1 ? merged.get(dates.at(-2)!) ?? null : null;
     const turnoverChangePct = turnover != null && previousTurnover != null && previousTurnover > 0 ? (turnover / previousTurnover - 1) * 100 : null;
     const turnoverState: MarketMoneyFlow["turnoverState"] = turnoverChangePct == null ? "暂无可靠数据" : turnoverChangePct > 5 ? "放量" : turnoverChangePct < -5 ? "缩量" : "持平";
-    const result: MarketMoneyFlow = { ...base, marketDate: key, turnover, previousTurnover, turnoverChangePct, turnoverState, source: "东方财富全A资金流 + 沪深成交额日线", sourceCount: 1, confidence: base.validation === "fully_consistent" ? "high" : "medium" };
+    const result: MarketMoneyFlow = { ...base, marketDate: key, turnover, previousTurnover, turnoverChangePct, turnoverState, source: "东方财富全A资金流 + 沪深成交额日线（单独供应商，内部一致性校验）", sourceCount: 1, confidence: "low" };
     mem.set(key, { at: Date.now(), value: result });
     return result;
   } catch {
