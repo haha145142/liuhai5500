@@ -7,15 +7,16 @@ import test from "node:test";
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (name: string) => readFileSync(join(here, name), "utf8");
 
-test("official NAV publication truth comes only from historical NAV", () => {
+test("official NAV publication truth comes only from dated official NAV inputs", () => {
   const live = read("live-valuation-v2.ts");
   const validation = read("validation.ts");
 
-  assert.match(live, /const historyOfficialToday\s*=\s*latest\?\.date===today\(\)\s*&&\s*latest\.nav>0/);
-  assert.match(live, /const officialToday\s*=\s*historyOfficialToday/);
-  assert.match(live, /officialNavPublished:officialToday/);
-  assert.match(validation, /officialNavPublished:\s*q\.officialNavPublished/);
-  assert.doesNotMatch(validation, /officialNavPublished:\s*q\.navDate\s*!=\s*null\s*&&/);
+  assert.match(live, /const historyOfficialToday\s*=\s*latest\?\.date\s*===\s*today\(\)/);
+  assert.match(live, /const valuationOfficialToday\s*=\s*valuation\?\.nav\s*!=\s*null/);
+  assert.match(live, /const officialToday\s*=\s*historyOfficialToday\s*\|\|\s*valuationOfficialToday/);
+  assert.match(live, /officialNavPublished\s*:\s*officialToday/);
+  assert.match(validation, /officialNavPublished\s*:\s*q\.officialNavPublished/);
+  assert.doesNotMatch(validation, /officialNavPublished\s*:\s*q\.navDate\s*!=\s*null\s*&&/);
 });
 
 test("live fund validation can use complete single-source quotes at low confidence", () => {
