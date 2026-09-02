@@ -12,10 +12,17 @@ function sameChinaDate(value:string|null|undefined,now=new Date()){
   const cn=new Date(now.getTime()+8*60*60*1000);
   return Number(m[1])===cn.getUTCFullYear()&&Number(m[2])===cn.getUTCMonth()+1&&Number(m[3])===cn.getUTCDate();
 }
+function parseEstimateTime(value:string){
+  const raw=String(value).trim();
+  if(!raw)return NaN;
+  const normalized=raw.includes("T")?raw:raw.replace(/\s+/,"T");
+  const withZone=/(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized)?normalized:`${normalized}+08:00`;
+  const parsed=Date.parse(withZone);
+  return Number.isFinite(parsed)?parsed:NaN;
+}
 function isFreshEstimate(fund:FundQuote,now=new Date()){
   if(!fund.estimateTime)return false;
-  const raw=String(fund.estimateTime).trim().replace(" ","T");
-  const parsed=Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/.test(raw)?raw:`${raw}+08:00`);
+  const parsed=parseEstimateTime(fund.estimateTime);
   if(!Number.isFinite(parsed))return false;
   const age=now.getTime()-parsed;
   return age>=0&&age<=LIVE_ESTIMATE_MAX_AGE_MS;
@@ -24,7 +31,7 @@ function isValidatedIntraday(fund:FundQuote){
   if(fund.estimateConfidence==="high"||fund.estimateConfidence==="medium")return true;
   const routes=fund.estimateRoutes??[];
   const distinctSources=new Set(routes.map((r)=>String(r.source||"")).filter(Boolean));
-  return distinctSources.size>=2 && (fund.estimateRouteWarning==null);
+  return distinctSources.size>=2&&(fund.estimateRouteWarning==null);
 }
 function selectReturnQuote(fund:FundQuote|undefined,now=new Date()):ReturnQuote{
   if(!fund)return{price:null,mode:"none"};
