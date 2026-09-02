@@ -5,7 +5,7 @@ type ReturnQuote={price:number|null;mode:"live_estimate"|"official_today"|"lates
 export type HoldingReturn={costValue:number;marketValue:number|null;holdingPnl:number|null;holdingPnlPct:number|null;todayPnl:number|null;todayPnlPct:number|null;previousOfficialNav:number|null;price:number|null;quoteMode:ReturnQuote["mode"]};
 const LIVE_ESTIMATE_MAX_AGE_MS=10*60_000;
 function finitePositive(v:number|null|undefined){return v!=null&&Number.isFinite(v)&&v>0?v:null;}
-function sameChinaDate(value:string|null|undefined, now=new Date()){
+function sameChinaDate(value:string|null|undefined,now=new Date()){
   if(!value)return false;
   const m=String(value).trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
   if(!m)return false;
@@ -28,11 +28,12 @@ function isValidatedIntraday(fund:FundQuote){
 }
 function selectReturnQuote(fund:FundQuote|undefined,now=new Date()):ReturnQuote{
   if(!fund)return{price:null,mode:"none"};
+  const phase=getMarketPhase(now);
   const official=finitePositive(fund.nav)!=null&&fund.officialNavPublished===true&&fund.valuationStatus==="official_nav";
   if(official)return{price:finitePositive(fund.nav),mode:"official_today"};
   const current=finitePositive(fund.estimate);
-  if(current!=null&&isValidatedIntraday(fund)&&(fund.valuationStatus==="estimate"||fund.valuationStatus==="live_estimate")&&fund.officialNavPublished!==true&&sameChinaDate(fund.estimateTime,now)&&isFreshEstimate(fund,now))return{price:current,mode:"live_estimate"};
-  const phase=getMarketPhase(now);
+  const sameDayEstimate=current!=null&&isValidatedIntraday(fund)&&(fund.valuationStatus==="estimate"||fund.valuationStatus==="live_estimate")&&fund.officialNavPublished!==true&&sameChinaDate(fund.estimateTime,now);
+  if(sameDayEstimate&&(phase==="postclose"||isFreshEstimate(fund,now)))return{price:current,mode:"live_estimate"};
   if(phase==="morning"||phase==="afternoon")return{price:null,mode:"none"};
   const nav=finitePositive(fund.nav);
   if(nav!=null)return{price:nav,mode:"latest_official"};
