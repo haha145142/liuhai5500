@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CACHE_TTL_MS, cacheTtl, classifyMarketDataState, marketDataLabel } from "./cache-policy";
+import { CACHE_TTL_MS, cacheTtl, classifyMarketDataState, marketDataLabel } from "./cache-policy.ts";
 
 test("cache TTLs stay field-specific", () => {
   assert.equal(cacheTtl("index"), 15_000);
