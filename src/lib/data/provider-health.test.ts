@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getProviderHealth, providerAllowed, providerFromUrl, recordProviderFailure, recordProviderSuccess } from "./provider-health";
+import { getProviderHealth, providerAllowed, providerFromUrl, recordProviderFailure, recordProviderSuccess } from "./provider-health.ts";
 
 test("provider URL classification uses supplier names", () => {
   assert.equal(providerFromUrl("https://push2.eastmoney.com/api/qt/ulist"), "东方财富");
