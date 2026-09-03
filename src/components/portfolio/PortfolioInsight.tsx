@@ -1,21 +1,41 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Glass } from "@/components/ui/Glass";
 import { calcPortfolioAnalysis } from "@/lib/calc/portfolio";
 import { calcSixFactor } from "@/lib/calc/six-factor";
 import type { FundQuote, Holding, SectorQuote } from "@/lib/types";
 
+type SelectedBoard = { code: string; name: string };
+const BOARD_WATCH_KEY = "fund_ai_pro_board_watch_v8";
+
+function readSelectedBoards(): SelectedBoard[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(BOARD_WATCH_KEY) || "null") as { items?: unknown } | null;
+    if (!Array.isArray(raw?.items)) return [];
+    const seen = new Set<string>();
+    return raw.items.filter((item): item is SelectedBoard => {
+      if (!item || typeof item !== "object") return false;
+      const x = item as Partial<SelectedBoard>;
+      const code = String(x.code ?? "").trim();
+      const name = String(x.name ?? "").trim();
+      if (!code || !name || seen.has(code)) return false;
+      seen.add(code);
+      return true;
+    });
+  } catch { return []; }
+}
+
 function flowText(flow: number | null) {
   if (flow == null || !Number.isFinite(flow) || flow === 0) return "—";
   const amount = Math.abs(flow) / 100_000_000;
   return `${flow < 0 ? "卖" : "买"}+${amount.toFixed(2)}亿`;
 }
-
 function adviceClass(advice: string) {
   if (advice.includes("减仓") || advice.includes("回避") || advice.includes("空仓")) return "text-red-600";
   if (advice.includes("积极") || advice.includes("持有")) return "text-emerald-600";
   return "text-fg";
 }
-
 function signalClass(value: string) {
   if (value.includes("强") || value.includes("高位")) return "text-red-500";
   if (value.includes("弱") || value.includes("低位")) return "text-emerald-600";
@@ -23,6 +43,14 @@ function signalClass(value: string) {
 }
 
 export function PortfolioInsight({ holdings, funds, sectors }: { holdings: Holding[]; funds: FundQuote[]; sectors: SectorQuote[] }) {
+  const [selectedBoards, setSelectedBoards] = useState<SelectedBoard[]>([]);
+  useEffect(() => {
+    const sync = () => setSelectedBoards(readSelectedBoards());
+    sync();
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, []);
+
   if (!holdings.length) return null;
   const a = calcPortfolioAnalysis(holdings, funds, sectors);
   const concentrationHigh = a.concentrationTop1Pct >= 50 || a.risk === "高" || a.risk === "中高";
@@ -31,39 +59,38 @@ export function PortfolioInsight({ holdings, funds, sectors }: { holdings: Holdi
   const sameSector = a.sectorExposures.length === 1 ? "低" : a.sectorExposures.length <= 2 ? "中" : "低";
   const volatility = a.avgDayPct == null ? "数据不足" : Math.abs(a.avgDayPct) > 1.2 ? "偏高" : "低";
   const drawdown = concentrationHigh ? "中等" : "低";
-  const up = a.holdingRows.filter((x) => x.dayPct != null && x.dayPct > 0).length;
-  const down = a.holdingRows.filter((x) => x.dayPct != null && x.dayPct < 0).length;
+  const up = a.holdingRows.filter((x) => x.dayPnl != null && x.dayPnl > 0).length;
+  const down = a.holdingRows.filter((x) => x.dayPnl != null && x.dayPnl < 0).length;
   const sectorCount = a.sectorExposures.length;
   const main = a.sectorExposures[0];
   const suggestion = main && main.pct >= 50
     ? `当前组合${main.name}暴露较高（${main.pct.toFixed(0)}%），多个基金存在较强相关性。新增资金可降低同涨同跌风险。`
     : "当前组合分散度尚可，新增资金可继续关注不同方向。";
 
-  const operationSectors = sectors
-    .filter((s) => s.change != null || s.flow != null)
-    .sort((x, y) => {
-      const xs = Math.abs(x.change ?? 0) + Math.min(Math.abs(x.flow ?? 0) / 10_000_000_000, 1) * 0.2;
-      const ys = Math.abs(y.change ?? 0) + Math.min(Math.abs(y.flow ?? 0) / 10_000_000_000, 1) * 0.2;
-      return ys - xs;
-    })
-    .slice(0, 8);
-  const downMoreThan2 = sectors.filter((s) => (s.change ?? 0) <= -2).length;
-  const outflowDown = sectors.filter((s) => (s.change ?? 0) < 0 && (s.flow ?? 0) < 0).length;
+  const selectedNames = new Set(selectedBoards.map((board) => board.name));
+  const selectedCodes = new Set(selectedBoards.map((board) => board.code));
+  const operationSectors = selectedBoards
+    .map((board) => sectors.find((sector) => sector.name === board.name || sector.id === board.code))
+    .filter((sector): sector is SectorQuote => !!sector && (sector.change != null || sector.flow != null));
+  const uniqueOperationSectors = operationSectors.filter((sector, index, list) => list.findIndex((item) => item.id === sector.id) === index);
+
+  const downMoreThan2 = uniqueOperationSectors.filter((s) => (s.change ?? 0) <= -2).length;
+  const outflowDown = uniqueOperationSectors.filter((s) => (s.change ?? 0) < 0 && (s.flow ?? 0) < 0).length;
   const riskTips = [
-    outflowDown > 0 ? `主力持续流出（${outflowDown}个下跌板块同时净流出），注意短期调整` : "",
-    downMoreThan2 >= 4 ? `${sectors.length || 0}板块中${downMoreThan2}个跌幅超2%，系统性风险偏高` : "",
+    outflowDown > 0 ? `自选板块中有 ${outflowDown} 个下跌板块同时净流出，注意短期调整` : "",
+    downMoreThan2 >= 2 ? `自选板块中有 ${downMoreThan2} 个跌幅超2%，短期风险偏高` : "",
     up === 0 && down > 0 ? "当前持仓全线走弱，短期波动风险上升" : "",
   ].filter(Boolean);
 
   return (
     <Glass className="mb-3 overflow-hidden rounded-[24px] border border-white/75 bg-white/50 p-3 shadow-[0_14px_38px_rgba(38,78,112,.07),inset_0_1px_0_rgba(255,255,255,.95)] backdrop-blur-[20px] saturate-150">
-      <section aria-label="操作建议" className="rounded-[18px] border border-white/80 bg-white/66 p-2.5">
-        <div className="flex items-end justify-between gap-2"><div><div className="text-[15px] font-semibold tracking-tight text-fg">🎯 操作建议 <span className="ml-1 text-[9px] font-normal text-muted">数据规则生成 · 仅供参考</span></div><div className="mt-0.5 text-[9px] text-muted">趋势 + 波段 + 资金方向 + 六因子量化模型，证据不足时不强行给方向</div></div></div>
-        <div className="mt-2 text-[13px] font-semibold text-fg">⚡ 短期策略（逐板块）</div>
-        {operationSectors.length ? <div className="mt-1.5 overflow-x-auto rounded-[14px] border border-white/80 bg-white/58">
+      <section aria-label="自选板块操作建议" className="rounded-[18px] border border-white/80 bg-white/66 p-2.5">
+        <div className="flex items-end justify-between gap-2"><div><div className="text-[15px] font-semibold tracking-tight text-fg">🎯 自选板块 · 操作建议 <span className="ml-1 text-[9px] font-normal text-muted">数据规则生成 · 仅供参考</span></div><div className="mt-0.5 text-[9px] text-muted">你在“自选板块”添加什么，这里就分析什么：涨跌、资金、趋势、波段、建议、置信度统一显示。</div></div></div>
+        {selectedBoards.length ? <div className="mt-2 text-[13px] font-semibold text-fg">⚡ 当前关注板块</div> : null}
+        {uniqueOperationSectors.length ? <div className="mt-1.5 overflow-x-auto rounded-[14px] border border-white/80 bg-white/58">
           <div className="min-w-[620px]">
             <div className="grid grid-cols-[1.3fr_.7fr_1fr_.75fr_.75fr_1fr_.7fr] gap-1 border-b border-black/[.04] bg-white/60 px-2 py-1.5 text-[8px] text-muted"><span>板块</span><span>涨跌</span><span>资金</span><span>趋势</span><span>波段</span><span>建议</span><span>置信</span></div>
-            {operationSectors.map((s) => {
+            {uniqueOperationSectors.map((s) => {
               const model = calcSixFactor(s, null);
               return <div key={s.id} className="grid min-h-10 grid-cols-[1.3fr_.7fr_1fr_.75fr_.75fr_1fr_.7fr] items-center gap-1 border-b border-black/[.035] px-2 py-1.5 last:border-b-0">
                 <span className="truncate text-[9px] font-medium text-fg">{s.name}</span>
@@ -76,9 +103,8 @@ export function PortfolioInsight({ holdings, funds, sectors }: { holdings: Holdi
               </div>;
             })}
           </div>
-        </div> : <div className="mt-1.5 rounded-xl bg-bg-elevated px-2.5 py-2 text-[9px] text-muted">等待板块资金与涨跌数据。</div>}
-        <div className="mt-1.5 rounded-[14px] border border-blue-100/80 bg-blue-50/45 px-2.5 py-2 text-[8px] leading-[1.5] text-muted"><b className="text-blue-700">六因子量化模型：</b>将板块价格变化、资金方向、相对强弱、连涨跌与波动风险等当前可用证据合并评分；这里的“波段”是信号区间判断，不冒充历史高低点。</div>
-
+        </div> : <div className="mt-1.5 rounded-xl bg-bg-elevated px-2.5 py-3 text-[9px] leading-[1.5] text-muted">{selectedBoards.length ? "已添加自选板块，但当前还没有取得可靠的涨跌/资金数据；有数据后会自动出现在这里。" : "还没有自选板块。去“自选板块”添加半导体、存储芯片、通信等你关注的方向，这里会自动生成对应的行情、趋势、波段和建议。"}</div>}
+        <div className="mt-1.5 rounded-[14px] border border-blue-100/80 bg-blue-50/45 px-2.5 py-2 text-[8px] leading-[1.5] text-muted"><b className="text-blue-700">六因子量化模型：</b>将板块价格变化、资金方向、相对强弱、连涨跌与波动风险等当前可用证据合并评分；“波段”用于位置/信号区间判断，不伪造历史高低点。</div>
         {riskTips.length ? <div className="mt-2 rounded-[15px] border border-red-200/70 bg-red-50/55 p-2.5"><div className="text-[12px] font-semibold text-red-600">⚠️ 风险提示</div>{riskTips.map((tip) => <div key={tip} className="mt-1 text-[9px] leading-[1.45] text-red-500">⚠️ {tip}</div>)}</div> : null}
       </section>
 
