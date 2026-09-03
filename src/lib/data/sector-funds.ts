@@ -25,6 +25,8 @@ export type SectorFundRow = {
 // Board fund-pool source is configurable here; the live universe currently uses Eastmoney's fund ranking feed.
 const RANK_URL = "https://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=rzf&st=desc&pi=1&pn=2000&dx=1";
 const CACHE_MS = 60 * 60 * 1000;
+const UNIVERSE_TIMEOUT_MS = 6_000;
+const TRUST_ENRICH_TIMEOUT_MS = 2_500;
 let cached: { savedAt: number; rows: SectorFundRow[] } | null = null;
 
 type TrustQuote = { estimate:number|null; valuationStatus?:FundQuoteStatus; estimateRoutes?:{pct:number|null;source:string}[]; estimateRouteSpreadPct?:number|null; estimateTime:string|null; estimateCoverage?:number; usableWeight?:number; crossCheckedWeightPct?:number|null };
@@ -54,7 +56,7 @@ function parseRows(value: unknown): SectorFundRow[] {
 async function fetchFundUniverse() {
   if (cached && Date.now() - cached.savedAt < CACHE_MS) return cached.rows;
   try {
-    const raw = await fetchText(`${RANK_URL}&_=${Date.now()}`, 12_000, { Referer: "https://fund.eastmoney.com/" });
+    const raw = await fetchText(`${RANK_URL}&_=${Date.now()}`, UNIVERSE_TIMEOUT_MS, { Referer: "https://fund.eastmoney.com/" });
     const rows = parseRows(parseMaybeJsonp(raw));
     if (rows.length) cached = { savedAt: Date.now(), rows };
     return rows;
@@ -133,9 +135,16 @@ function trustFromQuote(quote: TrustQuote): SectorFundTrust | undefined {
 }
 
 async function enrichValuationTrust(rows: SectorFundRow[]) {
-  const targets = rows.slice(0, 6);
+  const targets = rows.slice(0, 3);
   if (!targets.length) return rows;
-  const settled = await Promise.allSettled(targets.map((row) => getCalculatedFund({ data: { code: row.code } })));
+  const enrich = Promise.allSettled(targets.map((row) => getCalculatedFund({ data: { code: row.code } })));
+  let settled: PromiseSettledResult<unknown>[] = [];
+  try {
+    settled = await Promise.race([
+      enrich,
+      new Promise<PromiseSettledResult<unknown>[]>((resolve) => setTimeout(() => resolve([]), TRUST_ENRICH_TIMEOUT_MS)),
+    ]);
+  } catch {}
   const byCode = new Map<string, SectorFundTrust>();
   settled.forEach((result, index) => {
     if (result.status !== "fulfilled") return;

@@ -55,11 +55,19 @@ export function OperationAdvice({ sectors, benchPct }:{ sectors:SectorQuote[]; b
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const sync = () => setWatchedCodes(readWatchedCodes());
+    const sync = () => {
+      const next = readWatchedCodes();
+      setWatchedCodes((prev) => prev.length === next.length && prev.every((code, index) => code === next[index]) ? prev : next);
+    };
     sync();
-    const timer = window.setInterval(sync, 800);
+    const timer = window.setInterval(sync, 3_000);
     window.addEventListener("storage", sync);
-    return () => { window.clearInterval(timer); window.removeEventListener("storage", sync); };
+    window.addEventListener("fap-board-watch-change", sync);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("fap-board-watch-change", sync);
+    };
   }, []);
 
   const selectedCodes = useMemo(() => [...new Set(watchedCodes)], [watchedCodes]);

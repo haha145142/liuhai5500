@@ -1,82 +1,52 @@
-export async function fetchText(
-  url: string,
-  timeout = 5000,
-  headers: Record<string, string> = {},
-): Promise<string> {
-  const safeTimeout = Math.min(Math.max(1000, timeout), 5000);
-  const delays = [0, 250, 700];
-  let lastError: unknown = null;
+import { providerAllowedAsync, recordProviderFailureAsync, recordProviderSuccessAsync, providerFromUrl } from "./provider-health";
 
+export async function fetchText(url: string, timeout = 5000, headers: Record<string, string> = {}): Promise<string> {
+  const safeTimeout = Math.min(Math.max(1000, timeout), 15_000);
+  const totalBudget = Math.min(15_000, safeTimeout * 3 + 400);
+  const provider = providerFromUrl(url);
+  const endpoint = url.split("?")[0];
+  if (!(await providerAllowedAsync(provider, endpoint))) throw new Error(`provider-circuit-open:${provider}`);
+  const started = Date.now();
+  const delays = [0, 120, 240];
+  let lastError: unknown = null;
   for (let attempt = 0; attempt < delays.length; attempt += 1) {
     if (delays[attempt] > 0) await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+    const elapsed = Date.now() - started;
+    const remaining = totalBudget - elapsed;
+    if (remaining <= 150) break;
+    const attemptTimeout = Math.min(safeTimeout, remaining);
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), safeTimeout);
+    const timer = setTimeout(() => ctrl.abort(), attemptTimeout);
     try {
-      const r = await fetch(url, {
-        signal: ctrl.signal,
-        cache: "no-store",
-        headers: {
-          Accept: "application/json,text/plain,*/*",
-          "User-Agent":
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          ...headers,
-        },
-      });
-
-      if (!r.ok) {
-        const retryable = r.status === 408 || r.status === 425 || r.status === 429 || r.status >= 500;
-        if (!retryable || attempt === delays.length - 1) throw new Error(`HTTP ${r.status}`);
+      const response = await fetch(url, { signal: ctrl.signal, cache: "no-store", headers: { Accept: "application/json,text/plain,*/*", "User-Agent": "Mozilla/5.0 (compatible; FundAIPro/1.0)", ...headers } });
+      if (!response.ok) {
+        const retryable = response.status === 408 || response.status === 425 || response.status === 429 || response.status >= 500;
+        lastError = new Error(`HTTP ${response.status}`);
+        if (!retryable || attempt === delays.length - 1) throw lastError;
         continue;
       }
-      return await r.text();
+      const text = await response.text();
+      void recordProviderSuccessAsync(provider, endpoint, Date.now() - started).catch(() => {});
+      return text;
     } catch (error) {
-      lastError = error;
-      if (error instanceof Error && error.name === "AbortError") {
-        lastError = new Error(`请求超时（${Math.ceil(safeTimeout / 1000)}秒）`);
-      }
-      if (attempt === delays.length - 1) break;
-    } finally {
-      clearTimeout(t);
-    }
+      lastError = error instanceof Error && error.name === "AbortError" ? new Error(`请求超时（${Math.ceil(attemptTimeout / 1000)}秒）`) : error;
+      if (attempt === delays.length - 1 || Date.now() - started >= totalBudget) break;
+    } finally { clearTimeout(timer); }
   }
-
+  void recordProviderFailureAsync(provider, endpoint, Date.now() - started).catch(() => {});
   throw lastError instanceof Error ? lastError : new Error("请求失败");
 }
 
 export function parseMaybeJsonp(text: string): unknown {
   const trimmed = text.trim();
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    const m = trimmed.match(/^[a-zA-Z_$][\w$]*\((.*)\)\s*;?\s*$/s);
-    if (m) {
-      try {
-        return JSON.parse(m[1]);
-      } catch {
-        return null;
-      }
-    }
-    const i = trimmed.indexOf("{");
-    const j = trimmed.lastIndexOf("}");
-    if (i >= 0 && j > i) {
-      try {
-        return JSON.parse(trimmed.slice(i, j + 1));
-      } catch {
-        return null;
-      }
-    }
+  try { return JSON.parse(trimmed); } catch {
+    const match = trimmed.match(/^[a-zA-Z_$][\w$]*\((.*)\)\s*;?\s*$/s);
+    if (match) { try { return JSON.parse(match[1]); } catch { return null; } }
+    const start = trimmed.indexOf("{"); const end = trimmed.lastIndexOf("}");
+    if (start >= 0 && end > start) { try { return JSON.parse(trimmed.slice(start, end + 1)); } catch { return null; } }
     return null;
   }
 }
 
-export function asArr(v: unknown): Record<string, unknown>[] {
-  if (Array.isArray(v)) return v as Record<string, unknown>[];
-  if (v && typeof v === "object") return Object.values(v) as Record<string, unknown>[];
-  return [];
-}
-
-export function n(v: unknown): number | null {
-  if (v == null || v === "" || v === "-" || v === "—") return null;
-  const x = typeof v === "number" ? v : parseFloat(String(v).replace(/,/g, ""));
-  return Number.isFinite(x) ? x : null;
-}
+export function asArr(value: unknown): Record<string, unknown>[] { if (Array.isArray(value)) return value as Record<string, unknown>[]; if (value && typeof value === "object") return Object.values(value) as Record<string, unknown>[]; return []; }
+export function n(value: unknown): number | null { if (value == null || value === "" || value === "-" || value === "—") return null; const parsed = typeof value === "number" ? value : parseFloat(String(value).replace(/,/g, "")); return Number.isFinite(parsed) ? parsed : null; }

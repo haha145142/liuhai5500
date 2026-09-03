@@ -1,0 +1,25 @@
+name: Fund AI Pro Official NAV
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Asia/Shanghai 18:00-22:00 = UTC 10:00-14:00.
+    # Run every 15 minutes from 18:00 through 21:45, plus the final 22:00 scan.
+    - cron: "*/15 10-13 * * 1-5"
+    - cron: "0 14 * * 1-5"
+
+jobs:
+  official-nav:
+    if: ${{ secrets.CRON_SECRET != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Scan held funds for published official NAV
+        env:
+          PREWARM_NAV_URL: https://liuhai5500.vercel.app/api/prewarm-nav
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 180 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PREWARM_NAV_URL}"

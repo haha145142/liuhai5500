@@ -1,0 +1,24 @@
+name: Fund AI Pro Prewarm
+
+on:
+  workflow_dispatch:
+  schedule:
+    # UTC 00:00-07:00 = Asia/Shanghai 08:00-15:00.
+    # The endpoint still rejects exchange holidays/weekends.
+    - cron: "*/5 0-7 * * 1-5"
+
+jobs:
+  prewarm:
+    if: ${{ secrets.PREWARM_URL != '' && secrets.CRON_SECRET != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Warm shared market cache
+        env:
+          PREWARM_URL: ${{ secrets.PREWARM_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 20 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PREWARM_URL}"
