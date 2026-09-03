@@ -35,8 +35,29 @@ async function assertHealthyPage(page, routePath) {
   if (await root.count() && !(await root.innerText()).trim()) throw new Error(`${routePath} root is empty after hydration`);
 }
 
+async function stopDevServer() {
+  if (!server || server.killed) return;
+  const pid = server.pid;
+  if (pid && process.platform !== "win32") {
+    try { process.kill(-pid, "SIGTERM"); } catch {}
+  } else {
+    server.kill("SIGTERM");
+  }
+  await Promise.race([
+    once(server, "exit"),
+    new Promise((resolve) => setTimeout(resolve, 2_000)),
+  ]);
+  if (pid && process.platform !== "win32") {
+    try { process.kill(-pid, "SIGKILL"); } catch {}
+  }
+}
+
 async function main() {
-  server = spawn("npm", ["run", "dev", "--", "--port", String(port)], { stdio: "pipe", env: { ...process.env, PORT: String(port) } });
+  server = spawn("npm", ["run", "dev", "--", "--port", String(port)], {
+    stdio: "pipe",
+    env: { ...process.env, PORT: String(port) },
+    detached: process.platform !== "win32",
+  });
   server.stdout.on("data", (b) => process.stdout.write(`[dev] ${b}`));
   server.stderr.on("data", (b) => process.stderr.write(`[dev-err] ${b}`));
   await waitForServer(`${base}/`);
@@ -87,8 +108,5 @@ async function main() {
 try {
   await main();
 } finally {
-  if (server) {
-    server.kill("SIGTERM");
-    await Promise.race([once(server, "exit"), new Promise((resolve) => setTimeout(resolve, 2_000))]);
-  }
+  await stopDevServer();
 }
