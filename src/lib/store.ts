@@ -187,7 +187,6 @@ export const useApp = create<AppState>((set, get) => ({
     const list = get().portfolio;
     if (!list.length) return;
     const phase = getMarketPhase();
-    if (phase === "lunch") return;
     const currentFunds = get().funds;
     const codes = [...new Set(list.map((h) => h.code))];
     const referenceDate = phase === "weekend" || phase === "preopen" ? tradingDateLabel() : chinaTodayLabel();
@@ -243,9 +242,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (i >= 0) list[i] = { ...list[i], ...h };
     else list.push(h);
     const currentFunds = get().funds;
-    const nextFunds = quote && (quote.nav != null || quote.estimate != null || quote.history.length > 0)
-      ? { ...currentFunds, [h.code]: quote }
-      : currentFunds;
+    const nextFunds = quote && (quote.nav != null || quote.estimate != null || quote.history.length > 0) ? { ...currentFunds, [h.code]: quote } : currentFunds;
     savePortfolio(list);
     if (nextFunds !== currentFunds) saveCachedFunds(nextFunds);
     set({ portfolio: list, funds: nextFunds });
