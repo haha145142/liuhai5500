@@ -1,8 +1,8 @@
 .home-dashboard-v3 [class*="text-[8px]"]{font-size:10px!important}.home-dashboard-v3 [class*="text-[9px]"]{font-size:10px!important}.home-dashboard-v3 .home-sector-section [class*="text-[8px]"]{font-size:10px!important}.home-dashboard-v3 .home-sector-section [class*="text-[9px]"]{font-size:11px!important}.home-dashboard-v3 .home-sector-section [class*="text-[10px]"]{font-size:12px!important}.home-dashboard-v3 .home-sector-section [class*="text-[11px]"]{font-size:12px!important}.home-dashboard-v3 .home-sector-section [class*="text-[12px]"]{font-size:13px!important}.home-dashboard-v3 .home-sector-section [class*="text-[13px]"]{font-size:14px!important}.home-dashboard-v3 .home-sector-section button{line-height:1.25}.home-dashboard-v3 .home-sector-section p{line-height:1.45}
 
-/* 自选板块与操作建议是同一个功能：视觉上合并为一张连续玻璃卡。 */
+/* 自选板块与操作建议保持为同一张连续玻璃卡。 */
 .home-dashboard-v3 .home-sector-section + section.mb-3{margin-top:-1rem!important;border-top:0!important;border-radius:0 0 24px 24px!important;box-shadow:0 14px 38px rgba(38,78,112,.07),inset 0 1px 0 rgba(255,255,255,.95)!important;}
 .home-dashboard-v3 .home-sector-section + section.mb-3>div{border-top-left-radius:0!important;border-top-right-radius:0!important;}
 
-/* 保留图三的“趋势/波段/建议/置信”量化表，移除重复的中长期布局与整体仓位卡。 */
-.home-dashboard-v3 .home-sector-section + section.mb-3>section>div.grid.grid-cols-2{display:none!important;}
+/* 板块只保留今日涨跌；删除无法稳定取得的主力资金字段。 */
+.home-dashboard-v3 .home-sector-section button>span:nth-child(3)>span:nth-child(2){display:none!important;}
