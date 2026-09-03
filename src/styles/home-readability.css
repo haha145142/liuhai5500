@@ -6,3 +6,7 @@
 
 /* 板块只保留今日涨跌；删除无法稳定取得的主力资金字段。 */
 .home-dashboard-v3 .home-sector-section button>span:nth-child(3)>span:nth-child(2){display:none!important;}
+
+/* 文案同步调整：不再承诺资金流数据。 */
+.home-dashboard-v3 .home-sector-section>section>div:first-child p{font-size:0!important;}
+.home-dashboard-v3 .home-sector-section>section>div:first-child p::after{content:"按行业分类快速添加，也可搜索全市场板块；添加后显示今日涨跌和相关基金池。";font-size:10px;color:inherit;}
