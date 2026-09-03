@@ -79,8 +79,6 @@ export function PortfolioInsight({ holdings, funds, sectors }: { holdings: Holdi
         </div> : <div className="mt-1.5 rounded-xl bg-bg-elevated px-2.5 py-2 text-[9px] text-muted">等待板块资金与涨跌数据。</div>}
         <div className="mt-1.5 rounded-[14px] border border-blue-100/80 bg-blue-50/45 px-2.5 py-2 text-[8px] leading-[1.5] text-muted"><b className="text-blue-700">六因子量化模型：</b>将板块价格变化、资金方向、相对强弱、连涨跌与波动风险等当前可用证据合并评分；这里的“波段”是信号区间判断，不冒充历史高低点。</div>
 
-        <div className="mt-2.5 rounded-[15px] bg-white/58 px-2.5 py-2"><div className="text-[13px] font-semibold text-fg">🏗 中长期布局</div><div className="mt-1 text-[9px] leading-[1.45] text-muted">{main ? `当前主要配置方向为${main.name}（约 ${main.pct.toFixed(1)}%），中长期新增资金优先考虑降低单一方向集中度。` : "当前暂无可靠行业暴露结果。"}</div><div className="mt-1 text-[8px] text-muted">💡 配置 DeepSeek Key 后开启 AI 一句话点评（页面底部）</div></div>
-        <div className="mt-2 rounded-[15px] bg-white/58 px-2.5 py-2"><div className="text-[13px] font-semibold text-fg">📊 整体仓位</div><div className="mt-1 text-[9px] leading-[1.45] text-muted">当前持仓 {holdings.length} 只，最大板块暴露 {main ? `${main.pct.toFixed(1)}%` : "—"}。{concentrationHigh ? "建议新增资金优先补低相关方向。" : "仓位结构暂未出现明显单一方向挤压。"}</div><div className="mt-1 text-[8px] text-muted">💡 配置 DeepSeek Key 后开启 AI 一句话点评（页面底部）</div></div>
         {riskTips.length ? <div className="mt-2 rounded-[15px] border border-red-200/70 bg-red-50/55 p-2.5"><div className="text-[12px] font-semibold text-red-600">⚠️ 风险提示</div>{riskTips.map((tip) => <div key={tip} className="mt-1 text-[9px] leading-[1.45] text-red-500">⚠️ {tip}</div>)}</div> : null}
       </section>
 
