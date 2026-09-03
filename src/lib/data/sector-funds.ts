@@ -138,10 +138,13 @@ async function enrichValuationTrust(rows: SectorFundRow[]) {
   const targets = rows.slice(0, 3);
   if (!targets.length) return rows;
   const enrich = Promise.allSettled(targets.map((row) => getCalculatedFund({ data: { code: row.code } })));
-  const settled = await Promise.race([
-    enrich,
-    new Promise<PromiseSettledResult<unknown>[]>((resolve) => window.setTimeout(() => resolve([]), TRUST_ENRICH_TIMEOUT_MS)),
-  ]);
+  let settled: PromiseSettledResult<unknown>[] = [];
+  try {
+    settled = await Promise.race([
+      enrich,
+      new Promise<PromiseSettledResult<unknown>[]>((resolve) => setTimeout(() => resolve([]), TRUST_ENRICH_TIMEOUT_MS)),
+    ]);
+  } catch {}
   const byCode = new Map<string, SectorFundTrust>();
   settled.forEach((result, index) => {
     if (result.status !== "fulfilled") return;
