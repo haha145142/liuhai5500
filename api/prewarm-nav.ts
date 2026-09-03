@@ -1,7 +1,3 @@
-import { refreshFundQuote, getPrewarmFundCodes } from "../src/lib/data/server";
-import { sharedCacheConfigured } from "../src/lib/data/shared-cache";
-import { getMarketPhase } from "../src/lib/market-hours";
-
 type Request = { method?: string; headers: Record<string, string | string[] | undefined> };
 type Response = { status(code: number): Response; json(value: unknown): Response };
 
@@ -35,6 +31,11 @@ export default async function handler(req: Request, res: Response) {
   const auth = Array.isArray(header) ? header[0] : String(header || "");
   if (!secret && !isLocalDevelopment(req)) return res.status(503).json({ ok: false, error: "cron-secret-not-configured" });
   if (secret && auth !== `Bearer ${secret}`) return res.status(401).json({ ok: false, error: "unauthorized" });
+
+  const [{ getMarketPhase }, { sharedCacheConfigured }] = await Promise.all([
+    import("../src/lib/market-hours"),
+    import("../src/lib/data/shared-cache"),
+  ]);
   if (!sharedCacheConfigured()) return res.status(200).json({ ok: false, skipped: true, reason: "shared-cache-not-configured" });
 
   const phase = getMarketPhase();
@@ -42,6 +43,7 @@ export default async function handler(req: Request, res: Response) {
     return res.status(200).json({ ok: true, skipped: true, reason: phase === "weekend" ? "market-closed-weekend" : "official-nav-window-not-active", phase });
   }
 
+  const { refreshFundQuote, getPrewarmFundCodes } = await import("../src/lib/data/server");
   const codes = await getPrewarmFundCodes();
   if (!codes.length) return res.status(200).json({ ok: true, skipped: true, reason: "no-fund-codes-registered", phase });
 
