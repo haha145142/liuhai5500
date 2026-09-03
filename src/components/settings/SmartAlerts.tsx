@@ -5,6 +5,8 @@ import { alertKindLabel, evaluateFundAlerts, loadAlertEvents, loadAlertRules, no
 
 const ALERT_CHECK_MS = 180_000;
 
+type NotificationState = NotificationPermission | "unsupported";
+
 export function SmartAlerts() {
   const funds = useApp((s) => s.funds);
   const portfolio = useApp((s) => s.portfolio);
@@ -14,7 +16,7 @@ export function SmartAlerts() {
   const [code, setCode] = useState("");
   const [kind, setKind] = useState<AlertKind>("fund_up");
   const [threshold, setThreshold] = useState("3");
-  const [notificationState, setNotificationState] = useState<NotificationPermission | "unsupported">(() => typeof Notification === "undefined" ? "unsupported" : Notification.permission);
+  const [notificationState, setNotificationState] = useState<NotificationState>("unsupported");
   const fundsCodes = useMemo(() => [...new Set(portfolio.map((h) => h.code))], [portfolio]);
   const sectorCodes = useMemo(() => [...new Map((snapshot?.sectors || []).map((s) => [s.bkCode, s.name])).entries()], [snapshot?.sectors]);
   const isSectorRule = kind === "sector_change";
@@ -25,6 +27,14 @@ export function SmartAlerts() {
     if (created.length) notifyAlertEvents(created);
     setEvents(loadAlertEvents());
   };
+
+  useEffect(() => {
+    if (typeof Notification === "undefined") {
+      setNotificationState("unsupported");
+      return;
+    }
+    setNotificationState(Notification.permission);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(refreshAlerts, ALERT_CHECK_MS);
