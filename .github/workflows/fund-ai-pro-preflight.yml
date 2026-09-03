@@ -36,4 +36,4 @@ jobs:
       - name: Deterministic tests
         run: node scripts/run-deterministic-tests.mjs
       - name: Runtime contract smoke
-        run: npm run test:runtime
+        run: timeout --signal=TERM --kill-after=30s 10m npm run test:runtime
