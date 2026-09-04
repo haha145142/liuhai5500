@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { fetchText, parseMaybeJsonp, n } from "./fetch-util";
+import { tradingDateLabel } from "./trading-day";
 import type { RankRow } from "../types";
 
 export const searchFund = createServerFn({ method: "POST" }).validator((input: { q: string }) => input).handler(async ({ data }) => {
@@ -27,14 +28,37 @@ function parseRankPayload(text: string): { datas?: string[] } | null {
   } catch { return null; }
 }
 
+function rankWindow(sort: string, now = new Date()) {
+  const end = tradingDateLabel(now);
+  const startDate = new Date(`${end}T00:00:00+08:00`);
+  const days = sort === "z" ? 7 : sort === "6y" ? 183 : sort === "1n" ? 366 : 1;
+  startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
+  const start = `${startDate.getUTCFullYear()}-${String(startDate.getUTCMonth() + 1).padStart(2, "0")}-${String(startDate.getUTCDate()).padStart(2, "0")}`;
+  return { start, end };
+}
+
+async function requestRank(sc: string, start: string, end: string) {
+  const urls = [
+    `https://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=${sc}&st=desc&sd=${start}&ed=${end}&qdii=&tabSubtype=,,,,,&pi=1&pn=80&dx=1&v=${Math.random().toString(36).slice(2)}`,
+    `https://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=${sc}&st=desc&sd=&ed=&qdii=&tabSubtype=,,,,,&pi=1&pn=80&dx=1&v=${Math.random().toString(36).slice(2)}`,
+  ];
+  for (const url of urls) {
+    try {
+      const text = await fetchText(url, 12000, { Referer: "https://fund.eastmoney.com/data/fundranking.html", Accept: "application/javascript,text/plain,*/*" });
+      const j = (parseMaybeJsonp(text) as { datas?: string[] } | null) || parseRankPayload(text);
+      if (j?.datas?.length) return j.datas;
+    } catch {}
+  }
+  return [];
+}
+
 export const getFundRank = createServerFn({ method: "POST" }).validator((input: { sort?: string }) => input).handler(async ({ data }) => {
   const sort = data.sort || "r";
   const sc = sort === "z" ? "zzf" : sort === "1n" ? "1nzf" : sort === "6y" ? "6yzf" : "rzf";
+  const { start, end } = rankWindow(sort);
   try {
-    const url = `https://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=${sc}&st=desc&sd=&ed=&qdii=&tabSubtype=,,,,,&pi=1&pn=80&dx=1&v=${Math.random().toString(36).slice(2)}`;
-    const text = await fetchText(url, 12000, { Referer: "https://fund.eastmoney.com/data/fundranking.html", Accept: "application/javascript,text/plain,*/*" });
-    const j = (parseMaybeJsonp(text) as { datas?: string[] } | null) || parseRankPayload(text);
-    const rows: RankRow[] = (j?.datas || []).map(line => {
+    const datas = await requestRank(sc, start, end);
+    const rows: RankRow[] = datas.map(line => {
       const a = String(line).split(",");
       return {
         code: a[0] || "",
