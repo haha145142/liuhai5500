@@ -9,13 +9,25 @@ import { OperationAdvice } from "@/components/market/OperationAdvice";
 import { EmptyNote, Glass, Tone } from "@/components/ui/Glass";
 import { fmtPctShort } from "@/lib/format";
 import { useApp } from "@/lib/store";
+import { getSnapshot } from "@/lib/data/server";
 
-export const Route = createFileRoute("/market")({ component: MarketPage });
+export const Route = createFileRoute("/market")({
+  loader: async () => {
+    try {
+      return { initialSnapshot: await getSnapshot() };
+    } catch {
+      return { initialSnapshot: null };
+    }
+  },
+  component: MarketPage,
+});
 
 type FoldKey = "advice" | "valuation" | "money" | "global";
 
 function MarketPage() {
-  const snapshot = useApp((s) => s.snapshot);
+  const initialSnapshot = Route.useLoaderData().initialSnapshot;
+  const storeSnapshot = useApp((s) => s.snapshot);
+  const snapshot = storeSnapshot ?? initialSnapshot;
   const benchPct = snapshot?.indices[0]?.pct ?? null;
   const [open, setOpen] = useState<Record<FoldKey, boolean>>({ advice: false, valuation: false, money: false, global: false });
   const toggle = (key: FoldKey) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
