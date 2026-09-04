@@ -106,7 +106,7 @@ async function readFieldCachedSnapshot(): Promise<Snapshot | null> {
 }
 async function buildSnapshot(): Promise<Snapshot> {
   const [baseSnapshot, moneyFlow] = await Promise.all([preserveReliableSnapshot(await getStableSnapshot()), getMarketMoneyFlow().catch(() => null)]);
-  const snapshot = moneyFlow ? { ...baseSnapshot, flow: moneyFlow, sources: baseSnapshot.sources.map((s) => s.name === "资金" ? { ...s, status: "ok" as const, note: `全A资金流 ${moneyFlow.count} 条 · ${moneyFlow.sourceCount} 个供应商 · ${moneyFlow.confidence}置信` } : s) } : baseSnapshot;
+  const snapshot = moneyFlow ? { ...baseSnapshot, flow: moneyFlow, sources: baseSnapshot.sources.map((s) => s.name === "资金" ? { ...s, status: "ok" as const, note: moneyFlow.super == null && moneyFlow.large == null && moneyFlow.mid == null && moneyFlow.small == null ? `板块主力净流入快照 ${moneyFlow.count} 项 · ${moneyFlow.sourceCount} 个供应商 · ${moneyFlow.confidence}置信` : `全A资金流 ${moneyFlow.count} 条 · ${moneyFlow.sourceCount} 个供应商 · ${moneyFlow.confidence}置信` } : s) } : baseSnapshot;
   const [checked, global] = await Promise.all([
     Promise.all(INDEX_CODES.map(async (code) => { try { return { code, quote: await getMultiSourceQuote(code) }; } catch { return { code, quote: null }; } })),
     validateGlobalQuotes(snapshot.global),
