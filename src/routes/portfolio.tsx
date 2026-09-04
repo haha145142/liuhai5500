@@ -12,7 +12,7 @@ import { calcPortfolioPeriodReturn } from "@/lib/calc/portfolio-periods";
 import { calcPortfolioReturn, calcHoldingReturn } from "@/lib/calc/portfolio-returns";
 
 export const Route = createFileRoute("/portfolio")({ component: PortfolioPage });
-type SummaryTab = "today" | "week" | "month" | "year" | "since";
+type SummaryTab = "today" | "week" | "month" | "quarter" | "since";
 function monthKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`; }
 function monthCells(cursor: Date) { const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1); const start = new Date(first); start.setDate(1 - first.getDay()); return Array.from({ length: 42 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; }); }
 type CalendarPnl = Map<string, { pnl: number; found: boolean }>;
@@ -31,17 +31,17 @@ function PortfolioPage() {
   const fullyPriced = summary.pricedCount === summary.totalCount;
   const week = useMemo(() => calcPortfolioPeriodReturn("week", portfolio, funds), [funds, portfolio]);
   const month = useMemo(() => calcPortfolioPeriodReturn("month", portfolio, funds), [funds, portfolio]);
-  const year = useMemo(() => calcPortfolioPeriodReturn("year", portfolio, funds), [funds, portfolio]);
+  const quarter = useMemo(() => calcPortfolioPeriodReturn("quarter", portfolio, funds), [funds, portfolio]);
   const holdingReturns = useMemo(() => new Map(portfolio.map((h) => [h.code, calcHoldingReturn(h, funds[h.code])])), [funds, portfolio]);
   const downCount = portfolio.filter((h) => (holdingReturns.get(h.code)?.todayPnlPct ?? 0) < 0).length;
   const upCount = portfolio.filter((h) => (holdingReturns.get(h.code)?.todayPnlPct ?? 0) > 0).length;
   const selectedSummary = useMemo(() => {
-    if (summaryTab === "week") return { label: "本周收益", amount: week.amount, pct: week.pct };
-    if (summaryTab === "month") return { label: "本月收益", amount: month.amount, pct: month.pct };
-    if (summaryTab === "year") return { label: "今年收益", amount: year.amount, pct: year.pct };
+    if (summaryTab === "week") return { label: "一周收益", amount: week.amount, pct: week.pct };
+    if (summaryTab === "month") return { label: "一个月收益", amount: month.amount, pct: month.pct };
+    if (summaryTab === "quarter") return { label: "近3个月收益", amount: quarter.amount, pct: quarter.pct };
     if (summaryTab === "since") return { label: fullyPriced ? "买入以来收益" : "买入以来收益（已计价部分）", amount: summary.holdingPnl, pct: summary.pricedHoldingPnlPct };
     return { label: summary.todayPnl == null ? "今日收益（已计价部分）" : "今日收益", amount: summary.todayPnl, pct: summary.todayPnlPct };
-  }, [fullyPriced, month, summary, summaryTab, week, year]);
+  }, [fullyPriced, month, quarter, summary, summaryTab, week]);
   const calendar = useMemo(() => { const cells = monthCells(calendarCursor); const activeMonth = monthKey(calendarCursor); return cells.map((date) => ({ date, key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`, inMonth: monthKey(date) === activeMonth })); }, [calendarCursor]);
   const calendarPnl = useMemo<CalendarPnl>(() => {
     const result: CalendarPnl = new Map();
@@ -66,7 +66,7 @@ function PortfolioPage() {
         <div className="flex items-center justify-between gap-2"><div className="min-w-0"><div className="text-[17px] font-bold tracking-tight text-fg">💼 我的持仓 <span className="ml-1 text-[9px] font-normal text-muted">盘中估算 · 收盘以官方净值为准</span></div></div><span className="shrink-0 rounded-full bg-blue-100/75 px-2.5 py-1 text-[10px] font-semibold text-blue-600">{portfolio.length}只</span></div>
         <div className="mt-2 flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-[10px] text-muted">{fullyPriced ? "持仓总收益" : "持仓总收益（已计价部分）"}</div><Tone v={summary.holdingPnl} className="mt-1 block text-[26px] font-bold leading-none tracking-tight">{summary.totalCount > 0 ? fmtMoney(summary.holdingPnl) : "—"}</Tone><Tone v={summary.pricedHoldingPnlPct} className="mt-1 block text-[12px] font-semibold">{summary.pricedHoldingPnlPct == null ? "—" : fmtPctShort(summary.pricedHoldingPnlPct)}</Tone></div><div className="shrink-0 pt-3 text-right text-[9px] leading-relaxed text-muted"><div>今日 {downCount} 跌 / {upCount} 涨 / {Math.max(0, portfolio.length - downCount - upCount)} 平</div><div>成本 {fmtMoney(summary.costValue)}</div><div>持仓市值 {summary.marketValue == null ? "—" : fmtMoney(summary.marketValue)}</div></div></div>
         <div className="mt-2 flex items-center justify-between rounded-2xl bg-white/48 px-1 py-1 ring-1 ring-white/75"><span className="px-2 text-[9px] text-muted">基金详情</span><div className="flex gap-1"><button type="button" onClick={() => setBulkExpanded(true)} className="rounded-full bg-white/75 px-2.5 py-1.5 text-[9px] font-medium text-slate-600 shadow-sm">一键打开</button><button type="button" onClick={() => setBulkExpanded(false)} className="rounded-full bg-white/75 px-2.5 py-1.5 text-[9px] font-medium text-slate-600 shadow-sm">一键折叠</button></div></div>
-        <div className="mt-2.5 grid grid-cols-5 gap-1 rounded-2xl bg-white/48 p-0.5 ring-1 ring-white/75">{(["today","week","month","year","since"] as const).map((tab) => { const label = tab === "today" ? "今日" : tab === "week" ? "本周" : tab === "month" ? "本月" : tab === "year" ? "今年" : "以来"; return <button key={tab} type="button" onClick={() => setSummaryTab(tab)} className={`rounded-[13px] px-1 py-1.5 text-[10px] font-medium transition ${summaryTab === tab ? "bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,.20)]" : "bg-white/66 text-muted"}`}>{label}</button>; })}</div>
+        <div className="mt-2.5 grid grid-cols-5 gap-1 rounded-2xl bg-white/48 p-0.5 ring-1 ring-white/75">{(["today","week","month","quarter","since"] as const).map((tab) => { const label = tab === "today" ? "今天" : tab === "week" ? "一周" : tab === "month" ? "一个月" : tab === "quarter" ? "近3月" : "买入以来"; return <button key={tab} type="button" onClick={() => setSummaryTab(tab)} className={`rounded-[13px] px-1 py-1.5 text-[10px] font-medium transition ${summaryTab === tab ? "bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,.20)]" : "bg-white/66 text-muted"}`}>{label}</button>; })}</div>
         <div className="mt-2 rounded-2xl bg-white/54 px-2.5 py-1.5 ring-1 ring-white/70"><div className="flex items-center justify-between gap-3"><span className="text-[10px] text-muted">{selectedSummary.label}</span><Tone v={selectedSummary.amount} className="text-[16px] font-bold">{selectedSummary.amount == null ? "—" : fmtMoney(selectedSummary.amount)}</Tone></div><div className="mt-0.5 text-right"><Tone v={selectedSummary.pct} className="text-[10px] font-semibold">{selectedSummary.pct == null ? "—" : fmtPctShort(selectedSummary.pct)}</Tone></div></div>
         {summary.totalCount > summary.pricedCount ? <div className="mt-1 rounded-xl bg-amber-50/70 px-2.5 py-1 text-[8px] text-muted">还有 {summary.totalCount - summary.pricedCount} 只基金暂未取得可靠行情；无法确认的数字不猜。</div> : null}
         {summaryTab !== "today" && selectedSummary.amount == null ? <div className="mt-1 rounded-xl bg-amber-50/70 px-2.5 py-1 text-[8px] text-muted">该周期暂缺足够历史净值，无法可靠计算时保持空白。</div> : null}
