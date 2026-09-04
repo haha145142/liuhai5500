@@ -1,0 +1,10 @@
+export type RiskStats = { returnPct: number | null; volatilityPct: number | null; maxDrawdownPct: number | null; sharpe: number | null; sample: number };
+
+function clean(values: number[]) { return values.filter((v) => Number.isFinite(v) && v > 0); }
+export function periodReturn(values: number[]): number | null { const v = clean(values); if (v.length < 2) return null; return (v[v.length - 1] / v[0] - 1) * 100; }
+export function maxDrawdown(values: number[]): number | null { const v = clean(values); if (v.length < 2) return null; let peak = v[0]; let max = 0; for (const x of v) { peak = Math.max(peak, x); if (peak > 0) max = Math.max(max, (peak - x) / peak * 100); } return max; }
+export function dailyReturns(values: number[]): number[] { const v = clean(values); const out: number[] = []; for (let i = 1; i < v.length; i += 1) { if (v[i - 1] > 0) out.push(v[i] / v[i - 1] - 1); } return out; }
+export function volatilityAnnualized(values: number[]): number | null { const r = dailyReturns(values); if (r.length < 2) return null; const mean = r.reduce((a, b) => a + b, 0) / r.length; const variance = r.reduce((s, x) => s + (x - mean) ** 2, 0) / (r.length - 1); return Math.sqrt(Math.max(0, variance)) * Math.sqrt(252) * 100; }
+export function sharpeAnnualized(values: number[], riskFreeAnnualPct = 1.5): number | null { const r = dailyReturns(values); if (r.length < 2) return null; const mean = r.reduce((a, b) => a + b, 0) / r.length; const variance = r.reduce((s, x) => s + (x - mean) ** 2, 0) / (r.length - 1); const sd = Math.sqrt(Math.max(0, variance)); if (sd === 0) return null; const rfDaily = Math.pow(1 + riskFreeAnnualPct / 100, 1 / 252) - 1; return ((mean - rfDaily) / sd) * Math.sqrt(252); }
+export function riskStats(values: number[]): RiskStats { const v = clean(values); const vol = volatilityAnnualized(v); const dd = maxDrawdown(v); const ret = periodReturn(v); return { returnPct: ret, volatilityPct: vol, maxDrawdownPct: dd, sharpe: sharpeAnnualized(v), sample: v.length }; }
+export function normalized(values: number[]): number[] { const v = clean(values); if (!v.length || v[0] <= 0) return []; return v.map((x) => x / v[0]); }
