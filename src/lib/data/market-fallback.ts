@@ -1,63 +1,94 @@
 import { createServerFn } from "@tanstack/react-start";
-import { fetchText, n, parseMaybeJsonp } from "./fetch-util";
+import { fetchText, n, parseMaybeJsonp, asArr } from "./fetch-util";
 import { INDEX_DEFS, SECTOR_RULES } from "./sectors";
 import type { IndexQuote, SectorQuote } from "../types";
 
-function latestKline(raw: unknown): { date: string | null; close: number | null; pct: number | null } {
-  const data = raw as { data?: { klines?: string[] } } | null;
-  const lines = data?.data?.klines || [];
-  const last = lines.at(-1)?.split(",") || [];
-  if (!last.length) return { date: null, close: null, pct: null };
-  return { date: last[0] || null, close: n(last[2]), pct: n(last[8]) };
+const EM_UT = "fa5fd1943c7b386f172d6893dbfba10b";
+
+function cleanPct(value: unknown) {
+  const x = n(value);
+  return x != null && Number.isFinite(x) && Math.abs(x) <= 30 ? x : null;
 }
 
-async function fetchKline(secid: string): Promise<{ date: string | null; close: number | null; pct: number | null }> {
-  try {
-    const text = await fetchText(
-      `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${encodeURIComponent(secid)}&fields1=f1,f2,f3&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&end=20500101&lmt=2&ut=fa5fd1943c7b386f172d6893dbfba10b&_=${Date.now()}`,
-      8000,
-    );
-    return latestKline(parseMaybeJsonp(text));
-  } catch {
-    return { date: null, close: null, pct: null };
-  }
+function cleanMoney(value: unknown) {
+  const x = n(value);
+  return x != null && Number.isFinite(x) && Math.abs(x) <= 1e14 ? x : null;
+}
+
+async function fetchLatestSnapshot() {
+  const [indexResult, sectorResult] = await Promise.allSettled([
+    fetchText(
+      `https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&fields=f12,f14,f2,f3,f4&secids=${INDEX_DEFS.map((x) => x.secid).join(",")}&ut=${EM_UT}&_=${Date.now()}`,
+      7000,
+      { Referer: "https://quote.eastmoney.com/", Accept: "application/json,text/plain,*/*" },
+    ),
+    fetchText(
+      `https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=1200&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:90+t:2,m:90+t:3&fields=f12,f14,f3,f62,f66,f72,f78,f84,f6&ut=${EM_UT}&_=${Date.now()}`,
+      7000,
+      { Referer: "https://quote.eastmoney.com/", Accept: "application/json,text/plain,*/*" },
+    ),
+  ]);
+
+  const indexJson = indexResult.status === "fulfilled" ? (parseMaybeJsonp(indexResult.value) as { data?: { diff?: unknown } } | null) : null;
+  const sectorJson = sectorResult.status === "fulfilled" ? (parseMaybeJsonp(sectorResult.value) as { data?: { diff?: unknown } } | null) : null;
+  const indexRows = asArr(indexJson?.data?.diff);
+  const boardRows = asArr(sectorJson?.data?.diff);
+
+  const indices: IndexQuote[] = INDEX_DEFS.map((def) => {
+    const row = indexRows.find((x) => String(x.f12 ?? "") === def.code);
+    return {
+      name: def.name,
+      code: def.code,
+      secid: def.secid,
+      price: cleanMoney(row?.f2),
+      pct: cleanPct(row?.f3),
+      change: cleanMoney(row?.f4),
+    };
+  });
+
+  const sectors: SectorQuote[] = SECTOR_RULES.map((rule) => {
+    const row = boardRows.find((x) => String(x.f12 ?? "") === rule.bkCode);
+    return {
+      id: rule.id,
+      name: rule.name,
+      bkCode: rule.bkCode,
+      change: cleanPct(row?.f3),
+      flow: cleanMoney(row?.f62),
+      super: cleanMoney(row?.f66),
+      large: cleanMoney(row?.f72),
+      mid: cleanMoney(row?.f78),
+      small: cleanMoney(row?.f84),
+      turnover: cleanMoney(row?.f6),
+      available: cleanPct(row?.f3) != null,
+      streak: 0,
+      etfCode: rule.etf?.code,
+      etfName: rule.etf?.name,
+      validation: cleanPct(row?.f3) != null ? "single_source" : "unavailable",
+    };
+  });
+
+  const marketDate = new Date().toISOString().slice(0, 10);
+  return { marketDate, indices, sectors };
 }
 
 export const getLatestTradingMarketData = createServerFn({ method: "GET" })
   .handler(async (): Promise<{ marketDate: string | null; indices: IndexQuote[]; sectors: SectorQuote[]; note: string }> => {
-    const indexRows = await Promise.all(INDEX_DEFS.map(async (d) => ({ def: d, row: await fetchKline(d.secid) })));
-    const marketDate = indexRows.map((x) => x.row.date).find(Boolean) || null;
-    const indices = indexRows.map(({ def, row }) => ({
-      name: def.name,
-      code: def.code,
-      secid: def.secid,
-      price: row.close,
-      pct: row.pct,
-      change: null,
-    }));
-
-    const sectorRows = await Promise.all(SECTOR_RULES.map(async (r) => ({ rule: r, row: await fetchKline(`90.${r.bkCode}`) })));
-    const sectors = sectorRows.map(({ rule, row }) => ({
-      id: rule.id,
-      name: rule.name,
-      bkCode: rule.bkCode,
-      change: row.pct,
-      flow: null,
-      super: null,
-      large: null,
-      mid: null,
-      small: null,
-      turnover: null,
-      available: row.pct != null,
-      streak: 0,
-      etfCode: rule.etf?.code,
-      etfName: rule.etf?.name,
-    }));
-
-    return {
-      marketDate,
-      indices,
-      sectors,
-      note: marketDate ? `最近交易日历史行情（${marketDate}）` : "最近交易日历史行情暂不可用",
-    };
+    try {
+      const result = await fetchLatestSnapshot();
+      const hasIndices = result.indices.some((x) => x.price != null || x.pct != null);
+      const hasSectors = result.sectors.some((x) => x.change != null);
+      return {
+        ...result,
+        note: hasIndices || hasSectors
+          ? `最近交易日历史行情（${result.marketDate || "最近可用交易日"}）`
+          : "最近交易日历史行情暂不可用",
+      };
+    } catch {
+      return {
+        marketDate: null,
+        indices: INDEX_DEFS.map((def) => ({ name: def.name, code: def.code, secid: def.secid, price: null, pct: null, change: null })),
+        sectors: SECTOR_RULES.map((rule) => ({ id: rule.id, name: rule.name, bkCode: rule.bkCode, change: null, flow: null, super: null, large: null, mid: null, small: null, turnover: null, available: false, streak: 0, etfCode: rule.etf?.code, etfName: rule.etf?.name, validation: "unavailable" as const })),
+        note: "最近交易日历史行情暂不可用",
+      };
+    }
   });
