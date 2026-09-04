@@ -24,8 +24,9 @@ async function fetchValuation(code: string) { const results = await Promise.all(
 async function fetchHistory(code: string): Promise<FundHistoryPoint[]> { try { const text = await fetchText(`${NAV}?fundCode=${code}&pageIndex=1&pageSize=300`,10_000,{Referer:"https://fund.eastmoney.com/"}); const j = parseMaybeJsonp(text) as any; return (j?.Data?.LSJZList || []).map((x:any)=>({date:String(x.FSRQ||""),nav:n(x.DWJZ)??0,changePct:n(x.JZZL)})).filter((x:FundHistoryPoint)=>x.date&&x.nav>0).reverse(); } catch { return []; } }
 async function getHoldings(code: string): Promise<LiveHolding[]> { try { const raw=await fetchText(`${HOLDING}?type=jjcc&code=${code}&topline=10&year=&month=&rt=${Date.now()}`,10_000,{Referer:"https://fund.eastmoney.com/"}); const m=raw.match(/content:\\?"([\s\S]*?)\\?",arryear/i); if(!m)return[]; let html=m[1]; try{html=JSON.parse(`"${html}"`);}catch{} const out:LiveHolding[]=[]; const seen=new Set<string>(); for(const tr of html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)){const row=tr[1]; const codeMatch=row.match(/(?:quote\.eastmoney\.com\/|href=['"][^'"]*?)(?:sz|sh)(\d{6})/i)||row.match(/(?:0|1)\.(\d{6})/); if(!codeMatch)continue; const stockCode=codeMatch[1]; if(seen.has(stockCode))continue; const anchors=[...row.matchAll(/<a[^>]*>([^<]+)<\/a>/gi)].map((x)=>stripTags(x[1])).filter(Boolean); const name=anchors.find((x)=>!/^\d{6}$/.test(x))||""; const values=[...row.matchAll(/<td[^>]*class=['"][^'"]*(?:tor|toc)[^'"]*['"][^>]*>([\s\S]*?)<\/td>/gi)].map((x)=>stripTags(x[1])).map((x)=>n(x)); const weight=values.filter((x):x is number=>x!=null&&x>0&&x<=15).at(-1); if(!weight)continue; seen.add(stockCode); out.push({code:stockCode,name,weight,price:null,pct:null,source:"东方财富基金持仓"}); if(out.length>=10)break;} return out; } catch{return[];} }
 async function getLookThrough(code: string, policy: ReturnType<typeof policyForFund>, nav: number | null, externalPct: number | null) {
-  if (!policy.allowAshareLookThrough) return { holdings: [] as CrossCheckedHolding[], result: null };
-  const deepWork = (async () => {
+  type LookThroughResult = Awaited<ReturnType<typeof getLookThrough>>;
+  if (!policy.allowAshareLookThrough) return { holdings: [] as CrossCheckedHolding[], result: null } as LookThroughResult;
+  const deepWork = (async (): Promise<Exclude<LookThroughResult, never>> => {
     const rawHoldings = await getHoldings(code);
     const holdings = await crossCheckStockQuotes(rawHoldings);
     const result = estimateFundNav({ previousNav: nav ?? 0, positions: holdings, externalEstimatePct: externalPct });
@@ -35,8 +36,8 @@ async function getLookThrough(code: string, policy: ReturnType<typeof policyForF
   try {
     return await Promise.race([
       deepWork,
-      new Promise<Awaited<typeof deepWork>>((resolve) => {
-        timer = setTimeout(() => resolve({ holdings: [], result: null }), LOOK_THROUGH_TIMEOUT_MS);
+      new Promise<LookThroughResult>((resolve) => {
+        timer = setTimeout(() => resolve({ holdings: [] as CrossCheckedHolding[], result: null }), LOOK_THROUGH_TIMEOUT_MS);
       }),
     ]);
   } finally {
