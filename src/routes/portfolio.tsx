@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ChevronsDown, ChevronsUp } from "lucide-react";
 import { FundCard } from "@/components/portfolio/FundCard";
 import { PortfolioInsight } from "@/components/portfolio/PortfolioInsight";
+import { DeepFundIntelligence } from "@/components/portfolio/DeepFundIntelligence";
 import { QuickAddFund } from "@/components/portfolio/QuickAddFund";
 import { SmartAlerts } from "@/components/settings/SmartAlerts";
 import { EmptyNote, Glass, Tone } from "@/components/ui/Glass";
@@ -75,6 +76,7 @@ function PortfolioPage() {
         <QuickAddFund />
       </Glass>
       <PortfolioInsight holdings={portfolio} funds={Object.values(funds)} sectors={snapshot?.sectors || []} />
+      <DeepFundIntelligence holdings={portfolio} funds={funds} />
       <Glass>
         <div className="mb-3 flex items-center justify-between"><div className="text-base font-semibold text-fg">收益日历</div><span className="text-xs text-muted">{calendarCursor.getFullYear()}/{String(calendarCursor.getMonth() + 1).padStart(2, "0")}</span></div>
         <div className="flex items-center justify-between rounded-2xl bg-bg-elevated px-3 py-2"><button type="button" onClick={() => setCalendarCursor(new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1))} className="size-9 rounded-full bg-white/70 text-lg">‹</button><b>{calendarCursor.getFullYear()}年{calendarCursor.getMonth() + 1}月</b><button type="button" onClick={() => setCalendarCursor(new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 1))} className="size-9 rounded-full bg-white/70 text-lg">›</button></div>
