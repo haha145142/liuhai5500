@@ -33,7 +33,7 @@ function PortfolioPage() {
   const week = useMemo(() => calcPortfolioPeriodReturn("week", portfolio, funds), [funds, portfolio]);
   const month = useMemo(() => calcPortfolioPeriodReturn("month", portfolio, funds), [funds, portfolio]);
   const quarter = useMemo(() => calcPortfolioPeriodReturn("quarter", portfolio, funds), [funds, portfolio]);
-  const holdingReturns = useMemo(() => new Map(portfolio.map((h) => [h.code, calcHoldingReturn(h, funds[h.code]))]), [funds, portfolio]);
+  const holdingReturns = useMemo(() => new Map(portfolio.map((h) => [h.code, calcHoldingReturn(h, funds[h.code])])), [funds, portfolio]);
   const downCount = portfolio.filter((h) => (holdingReturns.get(h.code)?.todayPnlPct ?? 0) < 0).length;
   const upCount = portfolio.filter((h) => (holdingReturns.get(h.code)?.todayPnlPct ?? 0) > 0).length;
   const selectedSummary = useMemo(() => {
