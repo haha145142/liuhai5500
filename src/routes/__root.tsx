@@ -18,68 +18,19 @@ import uiFinalPassCss from "../ui-final-pass.css?url";
 import compactPolishCss from "../predeploy-compact-polish.css?url";
 
 const APP_NAME = "Fund AI Pro";
-
-function HydrationMarker() {
-  useEffect(() => {
-    document.body.dataset.fapHydrated = "true";
-  }, []);
-  return null;
-}
-
-function RootNotFound() {
-  return (
-    <main className="fap-empty-state" role="status" aria-live="polite">
-      <h1>页面不存在</h1>
-      <p>找不到你访问的页面，请返回 Fund AI Pro 首页。</p>
-      <a className="fap-action-button" href="/">返回首页</a>
-    </main>
-  );
-}
+function HydrationMarker() { useEffect(() => { document.body.dataset.fapHydrated = "true"; }, []); return null; }
+function ServiceWorkerRegistration() { useEffect(() => { if (typeof window === "undefined" || !("serviceWorker" in navigator)) return; window.addEventListener("load", () => { void navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch(() => {}); }, { once: true }); }, []); return null; }
+function RootNotFound() { return (<main className="fap-empty-state" role="status" aria-live="polite"><h1>页面不存在</h1><p>找不到你访问的页面，请返回 Fund AI Pro 首页。</p><a className="fap-action-button" href="/">返回首页</a></main>); }
 
 export const Route = createRootRoute({
   head: () => ({
     meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: APP_NAME },
-      { name: "theme-color", content: "#EEF3F9" },
-      { name: "color-scheme", content: "light" },
-      { name: "apple-mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
-      { name: "description", content: "基金智能决策台 · 持仓估值、板块资金、新闻证据链" },
+      { charSet: "utf-8" }, { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" }, { title: APP_NAME }, { name: "theme-color", content: "#EEF3F9" }, { name: "color-scheme", content: "light" }, { name: "apple-mobile-web-app-capable", content: "yes" }, { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" }, { name: "description", content: "基金智能决策台 · 持仓估值、板块资金、新闻证据链" },
     ],
     links: [
-      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
-      { rel: "stylesheet", href: appCss },
-      { rel: "stylesheet", href: uiPerformanceCss },
-      { rel: "stylesheet", href: liquidGlassCss },
-      { rel: "stylesheet", href: finalPolishCss },
-      { rel: "stylesheet", href: homeLayoutCss },
-      { rel: "stylesheet", href: lightThemeCss },
-      { rel: "stylesheet", href: mobilePerformanceCss },
-      { rel: "stylesheet", href: fundAiProV6Css },
-      { rel: "stylesheet", href: finalIos26Css },
-      { rel: "stylesheet", href: designSystemCss },
-      { rel: "stylesheet", href: uiFinalPassCss },
-      { rel: "stylesheet", href: compactPolishCss },
-      { rel: "manifest", href: "/__grok/manifest.webmanifest" },
-      { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }, { rel: "stylesheet", href: appCss }, { rel: "stylesheet", href: uiPerformanceCss }, { rel: "stylesheet", href: liquidGlassCss }, { rel: "stylesheet", href: finalPolishCss }, { rel: "stylesheet", href: homeLayoutCss }, { rel: "stylesheet", href: lightThemeCss }, { rel: "stylesheet", href: mobilePerformanceCss }, { rel: "stylesheet", href: fundAiProV6Css }, { rel: "stylesheet", href: finalIos26Css }, { rel: "stylesheet", href: designSystemCss }, { rel: "stylesheet", href: uiFinalPassCss }, { rel: "stylesheet", href: compactPolishCss }, { rel: "manifest", href: "/manifest.webmanifest" }, { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
   notFoundComponent: RootNotFound,
-  component: () => (
-    <html lang="zh-CN" className="antialiased" suppressHydrationWarning>
-      <head><HeadContent /></head>
-      <body>
-        <PreviewHostBridge />
-        <AuthProvider>
-          <AppErrorBoundary>
-            <HydrationMarker />
-            <AppShell><Outlet /></AppShell>
-          </AppErrorBoundary>
-        </AuthProvider>
-        <Scripts />
-      </body>
-    </html>
-  ),
+  component: () => (<html lang="zh-CN" className="antialiased" suppressHydrationWarning><head><HeadContent /></head><body><PreviewHostBridge /><AuthProvider><AppErrorBoundary><HydrationMarker /><ServiceWorkerRegistration /><AppShell><Outlet /></AppShell></AppErrorBoundary></AuthProvider><Scripts /></body></html>),
 });
