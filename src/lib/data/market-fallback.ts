@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { fetchText, n, parseMaybeJsonp, asArr } from "./fetch-util";
 import { INDEX_DEFS, SECTOR_RULES } from "./sectors";
+import { tradingDateLabel } from "./trading-day";
 import type { IndexQuote, SectorQuote } from "../types";
 
 const EM_UT = "fa5fd1943c7b386f172d6893dbfba10b";
@@ -48,27 +49,27 @@ async function fetchLatestSnapshot() {
 
   const sectors: SectorQuote[] = SECTOR_RULES.map((rule) => {
     const row = boardRows.find((x) => String(x.f12 ?? "") === rule.bkCode);
+    const change = cleanPct(row?.f3);
     return {
       id: rule.id,
       name: rule.name,
       bkCode: rule.bkCode,
-      change: cleanPct(row?.f3),
+      change,
       flow: cleanMoney(row?.f62),
       super: cleanMoney(row?.f66),
       large: cleanMoney(row?.f72),
       mid: cleanMoney(row?.f78),
       small: cleanMoney(row?.f84),
       turnover: cleanMoney(row?.f6),
-      available: cleanPct(row?.f3) != null,
+      available: change != null,
       streak: 0,
       etfCode: rule.etf?.code,
       etfName: rule.etf?.name,
-      validation: cleanPct(row?.f3) != null ? "single_source" : "unavailable",
+      validation: change != null ? "single_source" : "unavailable",
     };
   });
 
-  const marketDate = new Date().toISOString().slice(0, 10);
-  return { marketDate, indices, sectors };
+  return { marketDate: tradingDateLabel(), indices, sectors };
 }
 
 export const getLatestTradingMarketData = createServerFn({ method: "GET" })
