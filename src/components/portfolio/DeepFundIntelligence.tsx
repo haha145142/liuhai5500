@@ -1,0 +1,40 @@
+import { useEffect, useMemo, useState } from "react";
+import { Glass, SectionTitle } from "@/components/ui/Glass";
+import { getFundDeepReport, type FundDeepReport } from "@/lib/data/fund-lookthrough-deep";
+import { getHiddenSectorRegression, type HiddenSectorRegressionReport } from "@/lib/data/hidden-sector-regression";
+import type { Holding, FundQuote } from "@/lib/types";
+
+function pct(v:number|null|undefined,d=1){return v==null||!Number.isFinite(v)?"—":`${v.toFixed(d)}%`;}
+
+export function DeepFundIntelligence({ holdings, funds }:{holdings:Holding[];funds:Record<string,FundQuote>}){
+  const codes=useMemo(()=>holdings.map((x)=>x.code).filter((x)=>/^\d{6}$/.test(x)),[holdings]);
+  const [code,setCode]=useState(codes[0]||"");
+  const [deep,setDeep]=useState<FundDeepReport|null>(null);const [reg,setReg]=useState<HiddenSectorRegressionReport|null>(null);const [loading,setLoading]=useState(false);const [error,setError]=useState("");
+  useEffect(()=>{if(!codes.includes(code))setCode(codes[0]||"");},[code,codes]);
+  useEffect(()=>{if(!code)return;let alive=true;setLoading(true);setError("");Promise.all([getFundDeepReport({data:{code}}),getHiddenSectorRegression({data:{code}})]).then(([a,b])=>{if(!alive)return;setDeep(a);setReg(b);}).catch((e)=>{if(alive)setError(e instanceof Error?e.message:"深度分析暂不可用");}).finally(()=>{if(alive)setLoading(false);});return()=>{alive=false;};},[code]);
+  if(!codes.length)return null;
+  const f=funds[code];
+  return <Glass tight className="mt-3 overflow-hidden"><SectionTitle title="深度穿透与隐含调仓" hint="真实披露 + 回归证据" />
+    <div className="flex gap-1.5 overflow-x-auto pb-1">{codes.map((x)=><button key={x} type="button" onClick={()=>setCode(x)} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-semibold ${x===code?"bg-fg text-bg":"bg-bg-elevated text-muted"}`}>{funds[x]?.name?.slice(0,9)||x}</button>)}</div>
+    {loading?<div className="mt-3 rounded-2xl bg-bg-elevated px-3 py-4 text-center text-[11px] text-muted">正在读取最新披露并计算回归…</div>:error?<div className="mt-3 rounded-2xl bg-amber-50/70 px-3 py-3 text-[10px] text-muted">{error}</div>:deep&&reg?<>
+      <div className="mt-3 grid grid-cols-4 gap-1.5 text-[10px]">
+        <div className="rounded-2xl bg-bg-elevated px-2.5 py-2"><div className="text-subtle">穿透层级</div><div className="mt-0.5 font-bold text-fg">{deep.maxDepth}层</div></div>
+        <div className="rounded-2xl bg-bg-elevated px-2.5 py-2"><div className="text-subtle">可识别覆盖</div><div className="mt-0.5 font-bold text-fg">{pct(deep.exposure.coveragePct)}</div></div>
+        <div className="rounded-2xl bg-bg-elevated px-2.5 py-2"><div className="text-subtle">回归R²</div><div className="mt-0.5 font-bold text-fg">{reg.r2==null?"—":(reg.r2*100).toFixed(0)+"%"}</div></div>
+        <div className="rounded-2xl bg-bg-elevated px-2.5 py-2"><div className="text-subtle">模型置信</div><div className="mt-0.5 font-bold text-fg">{reg.confidence==="unavailable"?"不足":reg.confidence}</div></div>
+      </div>
+      <div className="mt-3 rounded-2xl bg-bg-elevated/70 px-3 py-3">
+        <div className="flex items-center justify-between"><span className="text-xs font-semibold text-fg">跨层资产暴露</span><span className="text-[9px] text-subtle">披露日 {deep.asOf}</span></div>
+        <div className="mt-2 grid grid-cols-4 gap-2 text-[10px]"><div><div className="text-subtle">A股</div><b>{pct(deep.exposure.aSharePct)}</b></div><div><div className="text-subtle">港股</div><b>{pct(deep.exposure.hkPct)}</b></div><div><div className="text-subtle">美国</div><b>{pct(deep.exposure.usPct)}</b></div><div><div className="text-subtle">未识别</div><b>{pct(deep.exposure.unknownPct)}</b></div></div>
+        {deep.qdii?<div className="mt-2 rounded-xl bg-blue-50/70 px-2.5 py-2 text-[9px] text-muted">QDII 含美量：{pct(deep.exposure.usPct)} · {deep.qdiiUsConfidence==='unavailable'?"暂无可靠含美量":"按可确认海外持仓计算"}</div>:null}
+      </div>
+      <div className="mt-3 rounded-2xl bg-bg-elevated/70 px-3 py-3">
+        <div className="flex items-center justify-between"><span className="text-xs font-semibold text-fg">隐含行业权重</span><span className="text-[9px] text-subtle">样本 {reg.sample} 日 · 残差 {pct(reg.residualPct,2)}</span></div>
+        <div className="mt-2 space-y-1.5">{reg.weights.slice(0,7).map((w)=><div key={w.id} className="grid grid-cols-[1fr_48px_48px_54px] items-center gap-1 text-[10px]"><span className="truncate text-fg">{w.name}</span><span className="text-right text-subtle">隐含 {pct(w.weightPct)}</span><span className="text-right text-subtle">披露 {pct(w.disclosedPct)}</span><span className={`text-right font-semibold ${w.deltaPct>0?"text-emerald-600":w.deltaPct<0?"text-rose-600":"text-muted"}`}>{w.deltaPct>0?"+":""}{pct(w.deltaPct)}</span></div>)}</div>
+        {reg.drifts.length?<div className="mt-2 space-y-1.5">{reg.drifts.slice(0,5).map((d)=><div key={d.id} className="rounded-xl bg-white/55 px-2.5 py-2 text-[9px] text-muted"><span className="font-semibold text-fg">{d.name}</span> · 偏离 {d.deltaPct>0?"+":""}{pct(d.deltaPct)} · 连续窗口 {d.persistentWindows} · {d.probableRebalance?"疑似调仓":"偏离观察"}</div>)}</div>:<div className="mt-2 rounded-xl bg-white/55 px-2.5 py-2 text-[9px] text-subtle">当前没有达到阈值的持续行业权重偏离。</div>}
+      </div>
+      <div className="mt-2 space-y-1 text-[9px] leading-relaxed text-subtle">{[...deep.notes,...reg.notes].map((x,i)=><div key={i}>• {x}</div>)}</div>
+      <div className="mt-2 text-[9px] text-subtle">{f?.officialNavPublished?"净值状态：今日官方净值已确认":"净值状态：盘中/最近官方净值口径，收盘后以官方净值确认"}</div>
+    </>:null}
+  </Glass>;
+}
