@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChevronDown, RefreshCw, Sparkles } from "lucide-react";
 import { EmptyNote, Glass } from "@/components/ui/Glass";
-import { ageLabel, clockStr, formatPublishedAt } from "@/lib/format";
+import { ageLabel, clockStr, cnTime, formatPublishedAt } from "@/lib/format";
 import { analyzeNews } from "@/lib/data/server";
 import { getDSKey, getDSModel } from "@/lib/storage";
 import { useApp } from "@/lib/store";
@@ -38,6 +38,12 @@ function filterItem(item: NewsItem, filter: FilterId) {
 function sentimentLabel(item: NewsItem) { return item.sentiment === "bull" ? "偏利好" : item.sentiment === "bear" ? "偏利空" : "中性"; }
 function sentimentClass(item: NewsItem) { return item.sentiment === "bull" ? "bg-emerald-50/75 text-emerald-700" : item.sentiment === "bear" ? "bg-rose-50/75 text-rose-700" : "bg-slate-50/80 text-slate-600"; }
 function cacheSignature(items: NewsItem[]) { return items.slice(0, 5).map((x) => `${x.id}:${x.title}`).join("|"); }
+function newsDateTime(ts: number | null | undefined) {
+  if (ts == null || !Number.isFinite(ts) || ts <= 0) return "时间未知";
+  const d = cnTime(new Date(ts));
+  const p = (x: number) => String(x).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+}
 function readAiCache(signature: string): Record<string, AiInsight> {
   if (typeof window === "undefined") return {};
   try {
@@ -100,16 +106,7 @@ function NewsPage() {
     if (!items.length || aiBusy) return;
     setAiBusy(true);
     try {
-      const evidence = items.map((item) => ({
-        id: item.id,
-        title: item.title,
-        summary: item.summary,
-        source: item.source,
-        publishedAt: item.publishedAt ? formatPublishedAt(item.publishedAt) : "暂无可靠时间",
-        category: item.category,
-        sentiment: item.sentiment,
-        relatedSectors: item.relatedSectors,
-      }));
+      const evidence = items.map((item) => ({ id: item.id, title: item.title, summary: item.summary, source: item.source, publishedAt: item.publishedAt ? formatPublishedAt(item.publishedAt) : "暂无可靠时间", category: item.category, sentiment: item.sentiment, relatedSectors: item.relatedSectors }));
       const prompt = [
         "你是基金投资者的新闻研判助手。逐条解读下面最多5条新闻，每条只输出一段非常短、但有事实依据的判断。",
         "核心规则：新闻提到某行业，不等于该行业上涨；新闻提到某公司，不等于相关基金已经受益；没有行情数据就不能说趋势成立；没有资金数据就不能说资金流入或流出。",
@@ -144,31 +141,17 @@ function NewsPage() {
       <Glass className="overflow-hidden rounded-[26px] bg-white/56 p-3 shadow-[0_16px_42px_rgba(38,78,112,.07)] backdrop-blur-[24px]">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-[17px] font-bold tracking-tight text-slate-950">📰 市场资讯</span>
-              <span className="text-[10px] font-medium text-slate-400">最新快讯</span>
-            </div>
+            <div className="flex items-center gap-2"><span className="text-[17px] font-bold tracking-tight text-slate-950">📰 市场资讯</span><span className="text-[10px] font-medium text-slate-400">最新快讯</span></div>
             <div className="mt-1 text-[9px] text-slate-400">最后更新 {news?.fetchedAt ? clockStr(new Date(news.fetchedAt)) : "等待数据"}</div>
           </div>
           <button type="button" onClick={() => void refreshNews()} disabled={newsLoading} className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/80 bg-white/70 text-slate-600 shadow-sm disabled:opacity-50" aria-label="刷新资讯"><RefreshCw className={`size-4 ${newsLoading ? "animate-spin" : ""}`} /></button>
         </div>
-
-        <div className={`mt-2 rounded-[16px] border px-3 py-2 text-[9px] font-medium ${liveSourceCount > 0 ? "border-emerald-200/65 bg-emerald-50/55 text-emerald-700" : "border-slate-200/70 bg-slate-50/65 text-slate-500"}`}>
-          {connectionText} {latest ? ` · 最新 ${formatPublishedAt(latest)} · ${ageLabel(latest)}` : ""}
-        </div>
+        <div className={`mt-2 rounded-[16px] border px-3 py-2 text-[9px] font-medium ${liveSourceCount > 0 ? "border-emerald-200/65 bg-emerald-50/55 text-emerald-700" : "border-slate-200/70 bg-slate-50/65 text-slate-500"}`}>{connectionText} {latest ? ` · 最新 ${newsDateTime(latest)} · ${ageLabel(latest)}` : ""}</div>
         <div className="mt-1.5 truncate px-1 text-[8px] text-slate-400">来源：{sourceNames}</div>
-
-        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none]">
-          {FILTERS.map((item) => <button key={item.id} type="button" onClick={() => setFilter(item.id)} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${filter === item.id ? "bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,.20)]" : "bg-white/72 text-slate-500 ring-1 ring-white/80"}`}>{item.label}</button>)}
-        </div>
+        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none]">{FILTERS.map((item) => <button key={item.id} type="button" onClick={() => setFilter(item.id)} className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${filter === item.id ? "bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,.20)]" : "bg-white/72 text-slate-500 ring-1 ring-white/80"}`}>{item.label}</button>)}</div>
       </Glass>
-
-      {visibleItems.length ? <div className="mt-2.5 space-y-2">
-        {visibleItems.map((item, index) => <NewsCard key={`${item.id}-${item.source}`} item={item} insight={aiMap[item.id]} index={index} />)}
-      </div> : <EmptyNote>{newsLoading ? "正在抓取资讯…" : "暂无可靠资讯，请稍后刷新"}</EmptyNote>}
-
+      {visibleItems.length ? <div className="mt-2.5 space-y-2">{visibleItems.map((item, index) => <NewsCard key={`${item.id}-${item.source}`} item={item} insight={aiMap[item.id]} index={index} />)}</div> : <EmptyNote>{newsLoading ? "正在抓取资讯…" : "暂无可靠资讯，请稍后刷新"}</EmptyNote>}
       {filteredItems.length > VISIBLE_DEFAULT ? <button type="button" onClick={() => setExpanded((v) => !v)} className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-[18px] border border-white/80 bg-white/58 py-2.5 text-[10px] font-semibold text-slate-500 shadow-sm backdrop-blur-xl">{expanded ? "收起其余资讯" : `展开更多资讯（还有 ${filteredItems.length - VISIBLE_DEFAULT} 条）`}<ChevronDown className={`size-3.5 transition ${expanded ? "rotate-180" : ""}`} /></button> : null}
-
       <div className="mt-2 flex items-center justify-between px-1 text-[8px] text-slate-400"><span>{aiBusy ? "🤖 AI正在重新研判前5条资讯…" : "🤖 每条新闻独立判断，未被强行绑定持仓"}</span><button type="button" onClick={() => void runBatchAI(filteredItems.slice(0, VISIBLE_DEFAULT), snapshot, portfolio.map((p) => funds[p.code]?.name || p.name))} className="rounded-full bg-blue-50/75 px-2 py-1 font-semibold text-blue-600"><Sparkles className="mr-0.5 inline size-3" />重新解读</button></div>
     </div>
   );
@@ -177,14 +160,10 @@ function NewsPage() {
 function NewsCard({ item, insight, index }: { item: NewsItem; insight?: AiInsight; index: number }) {
   const aiTone = insight?.validation?.includes("已被行情验证") ? "border-emerald-200/70 bg-emerald-50/45" : insight?.relation === "暂无直接关联" ? "border-slate-200/80 bg-slate-50/60" : "border-blue-100/80 bg-blue-50/45";
   return <article className="overflow-hidden rounded-[22px] border border-white/80 bg-white/58 p-3 shadow-[0_12px_32px_rgba(38,78,112,.06)] backdrop-blur-[22px]">
-    <div className="flex items-center gap-2 text-[9px] text-slate-400"><span className="font-medium text-slate-500">{item.source}</span><span>·</span><span>{formatPublishedAt(item.publishedAt)}</span><span className="ml-auto rounded-full bg-white/72 px-2 py-0.5 text-[8px]">{ageLabel(item.publishedAt)}</span></div>
+    <div className="flex items-center gap-2 text-[10px] text-slate-500"><span className="font-semibold text-slate-600">{item.source}</span><span className="text-slate-300">·</span><span className="tabular-nums">发布 {newsDateTime(item.publishedAt)}</span><span className="ml-auto rounded-full bg-white/72 px-2 py-0.5 text-[8px] text-slate-500">{ageLabel(item.publishedAt)}</span></div>
     <div className="mt-1.5 flex items-start gap-2"><div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-slate-100/80 text-[9px] font-bold text-slate-400">{index + 1}</div><h2 className="min-w-0 flex-1 text-[14px] font-bold leading-[1.45] tracking-tight text-slate-900">{item.title}</h2></div>
     {item.summary ? <p className="mt-1 line-clamp-2 text-[10px] leading-[1.55] text-slate-500">{item.summary}</p> : null}
     <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className={`rounded-full px-2 py-0.5 text-[8px] font-semibold ${sentimentClass(item)}`}>{sentimentLabel(item)}</span>{item.relatedSectors.slice(0, 3).map((s) => <span key={s} className="rounded-full bg-white/72 px-2 py-0.5 text-[8px] text-slate-500 ring-1 ring-white/80">{s}</span>)}</div>
-    <div className={`mt-2.5 rounded-[16px] border px-2.5 py-2.5 ${aiTone}`}>
-      <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-1 text-[10px] font-bold text-blue-700">🤖 AI解读</span><span className="text-[8px] text-slate-400">{insight?.importance ? `重要度 ${insight.importance}` : "当前证据"}</span></div>
-      <p className="mt-1 text-[10px] font-medium leading-[1.55] text-slate-700">{insight?.text || "正在结合新闻主题、指数、板块与资金证据判断；没有可靠验证时不会强行下结论。"}</p>
-      {insight ? <div className="mt-1.5 flex flex-wrap gap-1.5 text-[8px]"><span className="rounded-full bg-white/72 px-2 py-0.5 text-slate-500">{insight.relation}</span><span className="rounded-full bg-white/72 px-2 py-0.5 text-slate-500">{insight.validation}</span></div> : null}
-    </div>
+    <div className={`mt-2.5 rounded-[16px] border px-2.5 py-2.5 ${aiTone}`}><div className="flex items-center justify-between gap-2"><span className="flex items-center gap-1 text-[10px] font-bold text-blue-700">🤖 AI解读</span><span className="text-[8px] text-slate-400">{insight?.importance ? `重要度 ${insight.importance}` : "当前证据"}</span></div><p className="mt-1 text-[10px] font-medium leading-[1.55] text-slate-700">{insight?.text || "正在结合新闻主题、指数、板块与资金证据判断；没有可靠验证时不会强行下结论。"}</p>{insight ? <div className="mt-1.5 flex flex-wrap gap-1.5 text-[8px]"><span className="rounded-full bg-white/72 px-2 py-0.5 text-slate-500">{insight.relation}</span><span className="rounded-full bg-white/72 px-2 py-0.5 text-slate-500">{insight.validation}</span></div> : null}</div>
   </article>;
 }

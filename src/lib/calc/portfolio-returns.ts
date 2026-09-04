@@ -1,5 +1,6 @@
 import type { FundQuote, Holding } from "../types";
 import { getMarketPhase } from "../market-hours.ts";
+import { tradingDateLabel } from "../data/trading-day.ts";
 
 type ReturnQuote={price:number|null;mode:"live_estimate"|"official_today"|"latest_official"|"none"};
 export type HoldingReturn={costValue:number;marketValue:number|null;holdingPnl:number|null;holdingPnlPct:number|null;todayPnl:number|null;todayPnlPct:number|null;previousOfficialNav:number|null;price:number|null;quoteMode:ReturnQuote["mode"]};
@@ -36,8 +37,10 @@ function isValidatedIntraday(fund:FundQuote){
 function selectReturnQuote(fund:FundQuote|undefined,now=new Date()):ReturnQuote{
   if(!fund)return{price:null,mode:"none"};
   const phase=getMarketPhase(now);
-  const official=finitePositive(fund.nav)!=null&&fund.officialNavPublished===true&&fund.valuationStatus==="official_nav";
-  if(official)return{price:finitePositive(fund.nav),mode:"official_today"};
+  const latestTradingDate=tradingDateLabel(now);
+  const officialFlag=finitePositive(fund.nav)!=null&&fund.officialNavPublished===true&&fund.valuationStatus==="official_nav";
+  const latestTradingDayOfficial=finitePositive(fund.nav)!=null&&fund.navDate===latestTradingDate&&phase!=="morning"&&phase!=="afternoon"&&phase!=="lunch";
+  if(officialFlag||latestTradingDayOfficial)return{price:finitePositive(fund.nav),mode:"official_today"};
   const current=finitePositive(fund.estimate);
   const sameDayEstimate=current!=null&&isValidatedIntraday(fund)&&(fund.valuationStatus==="estimate"||fund.valuationStatus==="live_estimate")&&fund.officialNavPublished!==true&&sameChinaDate(fund.estimateTime,now);
   if(sameDayEstimate&&(phase==="postclose"||isFreshEstimate(fund,now)))return{price:current,mode:"live_estimate"};

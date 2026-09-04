@@ -14,12 +14,26 @@ export const searchFund = createServerFn({ method: "POST" }).validator((input: {
   }
 });
 
+function parseRankPayload(text: string): { datas?: string[] } | null {
+  const trimmed = text.trim();
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  const body = trimmed.slice(start, end + 1);
+  try { return JSON.parse(body) as { datas?: string[] }; } catch {}
+  try {
+    const normalized = body.replace(/([{,])\s*([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":');
+    return JSON.parse(normalized) as { datas?: string[] };
+  } catch { return null; }
+}
+
 export const getFundRank = createServerFn({ method: "POST" }).validator((input: { sort?: string }) => input).handler(async ({ data }) => {
   const sort = data.sort || "r";
   const sc = sort === "z" ? "zzf" : sort === "1n" ? "1nzf" : sort === "6y" ? "6yzf" : "rzf";
   try {
-    const text = await fetchText(`https://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=${sc}&st=desc&pi=1&pn=40&dx=1&_=${Date.now()}`, 12000, { Referer: "https://fund.eastmoney.com/" });
-    const j = parseMaybeJsonp(text) as { datas?: string[] } | null;
+    const url = `https://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=${sc}&st=desc&sd=&ed=&qdii=&tabSubtype=,,,,,&pi=1&pn=80&dx=1&v=${Math.random().toString(36).slice(2)}`;
+    const text = await fetchText(url, 12000, { Referer: "https://fund.eastmoney.com/data/fundranking.html", Accept: "application/javascript,text/plain,*/*" });
+    const j = (parseMaybeJsonp(text) as { datas?: string[] } | null) || parseRankPayload(text);
     const rows: RankRow[] = (j?.datas || []).map(line => {
       const a = String(line).split(",");
       return {
@@ -33,10 +47,10 @@ export const getFundRank = createServerFn({ method: "POST" }).validator((input: 
         oneYear: n(a[11]),
         ytd: n(a[14]),
       };
-    }).filter(x => x.code && x.name);
-    return { rows, source: rows.length ? "天天基金/东方财富排行" : "数据源暂不可用", fetchedAt: Date.now() };
+    }).filter(x => /^\d{6}$/.test(x.code) && !!x.name);
+    return { rows, source: rows.length ? "天天基金/东方财富排行" : "排行数据源返回空结果", fetchedAt: Date.now() };
   } catch {
-    return { rows: [], source: "数据源暂不可用", fetchedAt: Date.now() };
+    return { rows: [], source: "排行数据源暂不可用", fetchedAt: Date.now() };
   }
 });
 
