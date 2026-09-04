@@ -3,7 +3,7 @@
   "source": "AKShare",
   "provider": "akshare",
   "schemaVersion": 3,
-  "fetchedAt": "2026-09-04T15:32:00.561074+08:00",
+  "fetchedAt": "2026-09-04T15:46:54.761639+08:00",
   "marketDate": "2026-09-04",
   "rows": [
     {
@@ -1891,11 +1891,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "房屋检测",
+      "name": "免税店",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.86,
-      "main_net_inflow": 72000000.0,
+      "main_net_inflow": 307000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -1903,11 +1903,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "免税店",
+      "name": "房屋检测",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.86,
-      "main_net_inflow": 307000000.0,
+      "main_net_inflow": 72000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4159,11 +4159,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "军工",
+      "name": "华为数字能源",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.66,
-      "main_net_inflow": -10415000000.0,
+      "main_net_inflow": -164000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4171,11 +4171,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "华为数字能源",
+      "name": "军工",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.66,
-      "main_net_inflow": -164000000.0,
+      "main_net_inflow": -10415000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4807,11 +4807,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "空气能热泵",
+      "name": "钠离子电池",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.22,
-      "main_net_inflow": -1117000000.0,
+      "main_net_inflow": -3864000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4819,11 +4819,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "钠离子电池",
+      "name": "空气能热泵",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.22,
-      "main_net_inflow": -3864000000.0,
+      "main_net_inflow": -1117000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5215,11 +5215,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "宁德时代概念",
+      "name": "无线充电",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.61,
-      "main_net_inflow": -9928000000.0,
+      "main_net_inflow": -1486000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5227,11 +5227,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "无线充电",
+      "name": "宁德时代概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.61,
-      "main_net_inflow": -1486000000.0,
+      "main_net_inflow": -9928000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
