@@ -1,0 +1,25 @@
+name: Fund AI Pro Push Alerts
+
+on:
+  workflow_dispatch:
+  schedule:
+    # China 09:00-15:45 = UTC 01:00-07:45, weekdays.
+    - cron: "*/15 1-7 * * 1-5"
+    # China 18:00-22:00 = UTC 10:00-14:00, weekdays for official NAV publication scans.
+    - cron: "*/15 10-14 * * 1-5"
+
+jobs:
+  push-alerts:
+    if: ${{ secrets.CRON_SECRET != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Dispatch background push alerts
+        env:
+          PUSH_URL: https://liuhai5500.vercel.app/api/push/dispatch
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 180 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PUSH_URL}"
