@@ -19,12 +19,17 @@ export function dedupeNews(items: NewsItem[]): NewsItem[] {
       seen.set(key, item);
       continue;
     }
-    // Keep the richer record: summary, URL and publication timestamp are preferred.
-    const richer = [item, previous].sort((a, b) => {
-      const score = (x: NewsItem) => (x.summary ? 2 : 0) + (x.url ? 1 : 0) + (x.publishedAt != null ? 1 : 0);
-      return score(b) - score(a);
-    })[0];
-    seen.set(key, richer);
+    // Never let an older duplicate replace a newer publication timestamp.
+    // When timestamps tie (or both are unavailable), keep the richer record.
+    const itemTs = item.publishedAt ?? -1;
+    const previousTs = previous.publishedAt ?? -1;
+    if (itemTs > previousTs) {
+      seen.set(key, item);
+      continue;
+    }
+    if (itemTs < previousTs) continue;
+    const score = (x: NewsItem) => (x.summary ? 2 : 0) + (x.url ? 1 : 0) + (x.publishedAt != null ? 1 : 0);
+    seen.set(key, score(item) > score(previous) ? item : previous);
   }
   return [...seen.values()].sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0));
 }
