@@ -44,7 +44,10 @@ export type FundPeriodReturn = { id: FundPeriodId; amount: number | null; pct: n
 
 function baseForHolding(holding: Holding, points: HistoryPoint[], start: string): { nav: number; date: string } | null {
   const purchaseDate = holding.purchaseDate && /^\d{4}-\d{2}-\d{2}$/.test(holding.purchaseDate) ? holding.purchaseDate : null;
-  if (purchaseDate && purchaseDate > start) return { nav: holding.cost, date: purchaseDate };
+  if (purchaseDate && purchaseDate > start) {
+    const purchaseNav = Number(holding.cost);
+    return Number.isFinite(purchaseNav) && purchaseNav > 0 ? { nav: purchaseNav, date: purchaseDate } : null;
+  }
   const base = atOrBefore(points, start);
   return base && base.nav > 0 ? base : null;
 }
