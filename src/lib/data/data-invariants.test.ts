@@ -30,3 +30,12 @@ test("multi-source validation requires explicit cross-check status", () => {
   assert.match(multi, /validation = agreement === "three_source" \|\| agreement === "two_source"/);
   assert.match(multi, /agreement === "single_source" \? "single_source"/);
 });
+
+test("macro news is classified as macro and the UI macro filter selects macro items", () => {
+  const serverNews = read("server-news.ts");
+  const newsRoute = read(join(here, "../../routes/news.tsx"));
+  assert.match(serverNews, /宏观经济|经济数据|CPI|PPI|PMI/);
+  assert.match(serverNews, /\? \"macro\" : \/美股/);
+  assert.match(newsRoute, /if \(filter === \"macro\"\)/);
+  assert.match(newsRoute, /return item\.category === \"macro\"/);
+});
