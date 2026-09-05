@@ -54,13 +54,14 @@ export const Route = createFileRoute("/market")({
 });
 
 type FoldKey = "heat" | "money" | "valuation" | "global";
+const BENCHMARK_CODE = "000300";
 
 function MarketPage() {
   const initial = Route.useLoaderData();
   const storeSnapshot = useApp((s) => s.snapshot);
   const snapshot = initial?.snapshot ?? storeSnapshot;
   const macro = initial?.macro as ChinaMacro | null | undefined;
-  const benchPct = snapshot?.indices[0]?.pct ?? null;
+  const benchPct = snapshot?.indices.find((x) => x.code === BENCHMARK_CODE)?.pct ?? null;
   const [open, setOpen] = useState<Record<FoldKey, boolean>>({ heat: true, money: true, valuation: false, global: true });
   const toggle = (key: FoldKey) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
   const sectors = (snapshot?.sectors || []).filter((x) => x.change != null).sort((a, b) => (b.change ?? 0) - (a.change ?? 0));
