@@ -5,6 +5,7 @@ import { tradingDateLabel } from "../data/trading-day.ts";
 type ReturnQuote={price:number|null;mode:"live_estimate"|"official_today"|"latest_official"|"none"};
 export type HoldingReturn={costValue:number;marketValue:number|null;holdingPnl:number|null;holdingPnlPct:number|null;todayPnl:number|null;todayPnlPct:number|null;previousOfficialNav:number|null;price:number|null;quoteMode:ReturnQuote["mode"]};
 const LIVE_ESTIMATE_MAX_AGE_MS=10*60_000;
+const NAV_EPSILON=1e-6;
 function finitePositive(v:number|null|undefined){return v!=null&&Number.isFinite(v)&&v>0?v:null;}
 function sameChinaDate(value:string|null|undefined,now=new Date()){
   if(!value)return false;
@@ -53,10 +54,20 @@ function previousOfficialNav(fund:FundQuote|undefined,currentPrice:number|null,m
   if(!fund||currentPrice==null)return null;
   const latest=finitePositive(fund.nav);
   if(mode==="live_estimate")return latest;
-  if(latest!=null&&Math.abs(currentPrice-latest)>Math.max(0.0000001,latest*0.000001))return latest;
+
+  const points=Array.isArray(fund.historyPoints)
+    ? fund.historyPoints.filter((x)=>Number.isFinite(x.nav)&&x.nav>0&&typeof x.date==="string"&&x.date.length>0)
+    : [];
+  if(mode==="official_today"&&fund.navDate){
+    const previous=points.filter((x)=>x.date<fund.navDate).at(-1)?.nav;
+    const previousNav=finitePositive(previous);
+    if(previousNav!=null)return previousNav;
+  }
+
+  if(latest!=null&&Math.abs(currentPrice-latest)>Math.max(NAV_EPSILON,latest*NAV_EPSILON))return latest;
   const history=Array.isArray(fund.history)?fund.history.filter(x=>Number.isFinite(x)&&x>0):[];
-  if(history.length<2)return null;
-  return history[history.length-2];
+  if(history.length>=2)return history[history.length-2];
+  return history.length===1?history[0]:null;
 }
 export function calcHoldingReturn(holding:Holding,fund?:FundQuote,now=new Date()):HoldingReturn{
   const shares=Number(holding.shares); const cost=Number(holding.cost); const safeShares=Number.isFinite(shares)&&shares>0?shares:0; const safeCost=finitePositive(cost)??0; const costValue=safeShares*safeCost; const quote=selectReturnQuote(fund,now); const marketValue=quote.price!=null?safeShares*quote.price:null; const holdingPnl=marketValue!=null?marketValue-costValue:null; const holdingPnlPct=holdingPnl!=null&&costValue>0?holdingPnl/costValue*100:null; const previousNav=previousOfficialNav(fund,quote.price,quote.mode); const canToday=quote.price!=null&&previousNav!=null&&(quote.mode==="live_estimate"||quote.mode==="official_today"); const todayPnl=canToday?(quote.price!-previousNav!)*safeShares:null; const todayPnlPct=canToday&&previousNav!>0?(quote.price!-previousNav!)/previousNav!*100:null; return{costValue,marketValue,holdingPnl,holdingPnlPct,todayPnl,todayPnlPct,previousOfficialNav:previousNav,price:quote.price,quoteMode:quote.mode};
@@ -70,7 +81,7 @@ export function calcPortfolioReturn(holdings:Holding[],funds:Record<string,FundQ
   const holdingPnl=priced.reduce((s,x)=>s+(x.holdingPnl??0),0);
   const todayResults=results.filter(x=>x.todayPnl!=null);
   const todayPnl=todayResults.length>0?todayResults.reduce((s,x)=>s+(x.todayPnl??0),0):null;
-  const todayBaseValue=results.filter(x=>x.todayPnl!=null&&x.previousOfficialNav!=null).reduce((s,x)=>s+(x.previousOfficialNav!*Number(holdings[results.indexOf(x)]?.shares||0)),0);
+  const todayBaseValue=results.reduce((s,x,i)=>s+(x.todayPnl!=null&&x.previousOfficialNav!=null?x.previousOfficialNav!*Number(holdings[i]?.shares||0):0),0);
   const pricedHoldingPnlPct=pricedCostValue>0?holdingPnl/pricedCostValue*100:null;
   const fullHoldingPnlPct=costValue>0&&priced.length===holdings.length?holdingPnl/costValue*100:null;
   const todayPnlPct=todayPnl!=null&&todayBaseValue>0?todayPnl/todayBaseValue*100:null;
