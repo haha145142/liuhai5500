@@ -26,7 +26,7 @@ function inferSectors(text: string) {
 }
 function toNews(title: string, summary: string, name: string, ts: number | null, url: string, fetchedAt: number): NewsItem | null {
   const t = safeText(title); if (!t) return null; const s = stripHtml(summary).slice(0, 220); const full = `${t} ${s}`;
-  const category = /政策|国务院|央行|财政部|证监会|商务部|发改委/.test(full) ? "policy" : /美股|美联储|美元|黄金|原油|港股|恒生|纳指|标普/.test(full) ? "global" : /半导体|芯片|白酒|新能源|军工|医药|人工智能|机器人|光伏|储能/.test(full) ? "sector" : /A股|上证|深成|创业板|大盘|沪深300/.test(full) ? "market" : "other";
+  const category = /政策|国务院|央行|财政部|证监会|商务部|发改委/.test(full) ? "policy" : /GDP|CPI|PPI|PMI|通胀|就业|非农|失业率|利率|降息|加息|经济数据|宏观经济|经济增长|衰退|制造业数据|服务业数据/.test(full) ? "macro" : /美股|美联储|美元|黄金|原油|港股|恒生|纳指|标普/.test(full) ? "global" : /半导体|芯片|白酒|新能源|军工|医药|人工智能|机器人|光伏|储能/.test(full) ? "sector" : /A股|上证|深成|创业板|大盘|沪深300/.test(full) ? "market" : "other";
   const sentiment = /上涨|新高|净流入|利好|突破|反弹|超预期|增长|上调/.test(t) ? "bull" : /下跌|跳水|净流出|利空|制裁|冲突|暴雷|处罚|下滑|下调/.test(t) ? "bear" : "neutral";
   return { id: makeId(name + t + String(ts ?? "")), title: t, summary: s, source: name, url, publishedAt: ts, fetchedAt, category: category as NewsItem["category"], sentiment: sentiment as NewsItem["sentiment"], relatedSectors: inferSectors(full) };
 }
