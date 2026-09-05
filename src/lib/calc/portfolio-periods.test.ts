@@ -28,9 +28,16 @@ test("weekly period uses calendar start, not a fixed trading-day count", () => {
 
 test("a purchase inside the selected period uses purchase cost as its baseline", () => {
   const result = calcFundPeriodReturn("week", { code: "000001", name: "测试基金", shares: 10, cost: 1.25, purchaseDate: "2026-08-26", purchaseDateSource: "manual" }, baseFund, new Date("2026-08-28T20:00:00+08:00"));
-  assert.ok(Math.abs((result.amount ?? 0) - 2.5) < 1e-12);
+  assert.ok(Math.abs((result.amount ?? 0) - 1.5) < 1e-12);
   assert.equal(result.baseDate, "2026-08-26");
-  assert.ok(Math.abs((result.pct ?? 0) - 20) < 1e-12);
+  assert.ok(Math.abs((result.pct ?? 0) - 12) < 1e-12);
+});
+
+test("invalid purchase cost never becomes a fabricated period baseline", () => {
+  const result = calcFundPeriodReturn("week", { code: "000001", name: "测试基金", shares: 10, cost: Number.NaN, purchaseDate: "2026-08-26", purchaseDateSource: "manual" }, baseFund, new Date("2026-08-28T20:00:00+08:00"));
+  assert.equal(result.amount, null);
+  assert.equal(result.pct, null);
+  assert.equal(result.baseDate, null);
 });
 
 test("daily P&L uses official NAV changes only", () => {
