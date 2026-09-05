@@ -14,9 +14,6 @@ function parseLine(raw: string, name: string): GlobalQuote | null {
   const p = m[1].split(",");
   const symbol = SINA_SYMBOLS[name];
   if (!symbol) return null;
-
-  // Sina international-index fields are generally name, price, change, pct.
-  // HSI uses a longer HK-style payload where current price/pct are fields 6/7.
   const price = symbol === "int_hangseng" ? n(p[6]) : n(p[1]);
   const pct = symbol === "int_hangseng" ? n(p[7]) : n(p[3]);
   return price != null || pct != null ? { name, price, pct } : null;
@@ -26,11 +23,16 @@ function closeEnough(a: number | null, b: number | null, tolerance = 0.35) {
   return a != null && b != null && Math.abs(a - b) <= tolerance;
 }
 
+function relativeDiff(a: number | null, b: number | null) {
+  if (a == null || b == null || b === 0) return null;
+  return Math.abs(a - b) / Math.abs(b);
+}
+
 /**
- * Reconcile the existing Tencent global snapshot with Sina as an independent
- * fallback/cross-check. Sina only replaces a missing Tencent value; when both
- * exist, a material disagreement is surfaced but the Tencent value remains the
- * displayed anchor to avoid silently switching conventions between sources.
+ * Reconcile the primary global snapshot with Sina independently.
+ * A duplicated price across different indices is treated as a hard anomaly:
+ * when Sina has a distinct valid quote, prefer the independent value instead
+ * of allowing an obviously copied number to survive the validation layer.
  */
 export async function validateGlobalQuotes(base: GlobalQuote[]) {
   const names = Object.keys(SINA_SYMBOLS);
@@ -49,6 +51,13 @@ export async function validateGlobalQuotes(base: GlobalQuote[]) {
       if (quote) parsed.set(name, quote);
     }
 
+    const priceCounts = new Map<number, number>();
+    for (const item of base) {
+      if (item.price == null || !Number.isFinite(item.price)) continue;
+      const rounded = Number(item.price.toFixed(4));
+      priceCounts.set(rounded, (priceCounts.get(rounded) ?? 0) + 1);
+    }
+
     let checked = 0;
     let agreed = 0;
     let fallback = 0;
@@ -57,7 +66,17 @@ export async function validateGlobalQuotes(base: GlobalQuote[]) {
       const s = parsed.get(item.name);
       if (!s) return item;
       checked++;
-      if (item.pct != null && s.pct != null && closeEnough(item.pct, s.pct)) {
+
+      const duplicateBasePrice = item.price != null && (priceCounts.get(Number(item.price.toFixed(4))) ?? 0) > 1;
+      const priceGap = relativeDiff(item.price, s.price);
+      const materialPriceDisagreement = priceGap != null && priceGap > 0.02;
+      const pctAgrees = item.pct != null && s.pct != null && closeEnough(item.pct, s.pct);
+
+      if (duplicateBasePrice && s.price != null && Number.isFinite(s.price) && (!pctAgrees || materialPriceDisagreement)) {
+        fallback++;
+        return { ...item, price: s.price, pct: s.pct ?? item.pct };
+      }
+      if (item.pct != null && s.pct != null && pctAgrees) {
         agreed++;
         return item;
       }
@@ -69,7 +88,15 @@ export async function validateGlobalQuotes(base: GlobalQuote[]) {
         fallback++;
         return { ...item, price: s.price, pct: item.pct ?? s.pct };
       }
-      if (item.pct != null && s.pct != null && !closeEnough(item.pct, s.pct)) disputed++;
+      if (item.pct != null && s.pct != null && !closeEnough(item.pct, s.pct)) {
+        disputed++;
+        // A sufficiently large price disagreement plus pct disagreement means
+        // the primary quote is stale or malformed; prefer the independent quote.
+        if (materialPriceDisagreement && s.price != null) {
+          fallback++;
+          return { ...item, price: s.price, pct: s.pct };
+        }
+      }
       return item;
     });
 
