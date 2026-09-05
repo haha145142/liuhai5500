@@ -1,14 +1,13 @@
 import { getFund, getPrewarmFundCodes } from "../../src/lib/data/server";
 import { sharedCacheGet, sharedCacheSet } from "../../src/lib/data/shared-cache";
-import { sendWebPush } from "../../src/lib/push/web-push";
+import { getVapidPublicKey, sendWebPush } from "../../src/lib/push/web-push";
 
 type Response={status(code:number):Response;json(value:unknown):Response};
 type StoredSubscription={endpoint:string;keys:{p256dh:string;auth:string};createdAt:number;updatedAt:number};
 const SUB_KEY="fund-ai-pro:push:subscriptions";const SUB_TTL=180*24*60*60_000;
 function chinaDate(){const d=new Date(Date.now()+8*60*60*1000);return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;}
 function auth(req:Request){const secret=String(process.env.CRON_SECRET||"").trim();if(!secret)return true;return req.headers.get("authorization")===`Bearer ${secret}`;}
-export default async function handler(req:Request,res:Response){if(req.method!=="GET"&&req.method!=="POST")return res.status(405).json({ok:false,error:"method-not-allowed"});if(!auth(req))return res.status(401).json({ok:false,error:"unauthorized"});
-  const configured=String(process.env.VAPID_PUBLIC_KEY||"").trim()&&String(process.env.VAPID_PRIVATE_KEY||"").trim();if(!configured)return res.status(200).json({ok:true,skipped:true,reason:"vapid-not-configured"});
+export default async function handler(req:Request,res:Response){if(req.method!=="GET"&&req.method!=="POST")return res.status(405).json({ok:false,error:"method-not-allowed"});if(!auth(req))return res.status(401).json({ok:false,error:"unauthorized"});let vapidPublic:string;try{vapidPublic=getVapidPublicKey();}catch(error){return res.status(200).json({ok:true,skipped:true,reason:error instanceof Error?error.message:"vapid-not-configured"});}if(!vapidPublic)return res.status(200).json({ok:true,skipped:true,reason:"vapid-not-configured"});
   const hit=await sharedCacheGet<StoredSubscription[]>(SUB_KEY);const subscriptions=Array.isArray(hit?.value)?hit!.value:[];if(!subscriptions.length)return res.status(200).json({ok:true,skipped:true,reason:"no-subscriptions"});
   const codes=await getPrewarmFundCodes();if(!codes.length)return res.status(200).json({ok:true,skipped:true,reason:"no-fund-codes"});
   const date=chinaDate();const sent:string[]=[];const failed:string[]=[];const expired:string[]=[];
