@@ -13,7 +13,7 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -34,8 +34,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Tests
+      - name: Unit and invariant tests
         run: npm test
+
+      - name: Runtime contract smoke test
+        run: npm run test:runtime
 
       - name: Production build
         run: npm run build
