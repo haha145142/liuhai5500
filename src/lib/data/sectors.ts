@@ -24,7 +24,7 @@ export const SECTOR_RULES: SectorRule[] = [
   { id: "liquor", name: "白酒", bkCode: "BK0896", prefer: "concept", searchKeys: ["白酒"], keys: ["白酒", "白酒ETF"], etf: { code: "512690", name: "酒ETF" } },
   { id: "pharma", name: "创新药", bkCode: "BK1143", prefer: "concept", searchKeys: ["创新药"], keys: ["创新药", "生物医药", "CXO"], etf: { code: "159992", name: "创新药ETF" } },
   { id: "gold", name: "黄金", bkCode: "BK0547", prefer: "concept", searchKeys: ["黄金"], keys: ["黄金", "黄金ETF"], etf: { code: "518880", name: "黄金ETF" } },
-  { id: "defense", name: "军工", bkCode: "BK0490", prefer: "industry", searchKeys: ["军工", "国防"], keys: ["军工", "国防", "航空"] , etf: { code: "512660", name: "军工ETF" } },
+  { id: "defense", name: "军工", bkCode: "BK0490", prefer: "industry", searchKeys: ["军工", "国防"], keys: ["军工", "国防", "航空"], etf: { code: "512660", name: "军工ETF" } },
   { id: "space", name: "商业航天", bkCode: "BK0963", prefer: "concept", searchKeys: ["商业航天", "卫星互联网"], keys: ["商业航天", "卫星互联网", "卫星", "航天"] },
   { id: "nonferrous", name: "有色金属", bkCode: "BK0478", prefer: "industry", searchKeys: ["有色金属"], keys: ["有色金属", "有色"] },
   { id: "lithium", name: "锂矿", bkCode: "BK1173", prefer: "concept", searchKeys: ["锂矿", "锂资源"], keys: ["锂矿", "锂资源", "盐湖提锂"] },
@@ -35,6 +35,8 @@ export const DEFAULT_SECTOR_IDS = SECTOR_RULES.slice(0, 8).map((s) => s.id);
 export const INDEX_DEFS = [
   { name: "上证指数", secid: "1.000001", code: "000001" },
   { name: "深证成指", secid: "0.399001", code: "399001" },
+  { name: "沪深300", secid: "1.000300", code: "000300" },
+  { name: "中证500", secid: "1.000905", code: "000905" },
   { name: "创业板指", secid: "0.399006", code: "399006" },
   { name: "科创50", secid: "1.000688", code: "000688" },
 ] as const;
