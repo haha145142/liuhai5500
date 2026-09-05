@@ -33,7 +33,7 @@ function filterItem(item: NewsItem, filter: FilterId) {
   if (filter === "policy") return item.category === "policy";
   if (filter === "market") return item.category === "market";
   if (filter === "global") return item.category === "global";
-  return item.category === "other";
+  return item.category === "macro";
 }
 function sentimentLabel(item: NewsItem) { return item.sentiment === "bull" ? "偏利好" : item.sentiment === "bear" ? "偏利空" : "中性"; }
 function sentimentClass(item: NewsItem) { return item.sentiment === "bull" ? "bg-emerald-50/75 text-emerald-700" : item.sentiment === "bear" ? "bg-rose-50/75 text-rose-700" : "bg-slate-50/80 text-slate-600"; }
