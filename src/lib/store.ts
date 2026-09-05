@@ -234,6 +234,9 @@ export const useApp = create<AppState>((set, get) => ({
       if (updatedCount > 0) saveCachedFunds(funds);
       set({ funds });
       if ((phase === "weekend" || phase === "preopen") && updatedCount > 0) lastFundRoutineKey = `${phase}:${referenceDate}:${codes.join(",")}`;
+    } catch (error) {
+      const cachedFunds = get().funds || loadCachedFunds();
+      set({ funds: cachedFunds, lastError: "基金数据源暂不可用 · 已保留最近可靠数据" });
     } finally { set({ fundsLoading: false }); }
   },
   addHolding: (h, quote) => {
@@ -248,9 +251,20 @@ export const useApp = create<AppState>((set, get) => ({
     set({ portfolio: list, funds: nextFunds });
     void get().refreshFunds();
   },
-  updateHolding: (code, patch) => { const list = get().portfolio.map((x) => (x.code === code ? { ...x, ...patch } : x)); savePortfolio(list); set({ portfolio: list }); },
-  removeHolding: (code) => { const list = get().portfolio.filter((x) => x.code !== code); savePortfolio(list); set({ portfolio: list }); },
+  updateHolding: (code, patch) => {
+    const list = get().portfolio.map((h) => h.code === code ? { ...h, ...patch } : h);
+    savePortfolio(list);
+    set({ portfolio: list });
+  },
+  removeHolding: (code) => {
+    const list = get().portfolio.filter((h) => h.code !== code);
+    const funds = { ...get().funds };
+    delete funds[code];
+    savePortfolio(list);
+    saveCachedFunds(funds);
+    set({ portfolio: list, funds });
+  },
   setSectors: (ids) => { saveSelectedSectors(ids); set({ selectedSectors: ids }); },
-  toggleWatch: (code) => { const cur = get().watchlist; const next = cur.includes(code) ? cur.filter((c) => c !== code) : [...cur.filter((c) => c !== code), code]; saveWatchlist(next); set({ watchlist: next }); },
-  setSettings: (s) => { const next = { ...get().settings, ...s }; saveSettings(next); set({ settings: next }); },
+  toggleWatch: (code) => { const setWatch = new Set(get().watchlist); if (setWatch.has(code)) setWatch.delete(code); else setWatch.add(code); const watchlist = [...setWatch]; saveWatchlist(watchlist); set({ watchlist }); },
+  setSettings: (patch) => { const settings = { ...get().settings, ...patch }; saveSettings(settings); set({ settings }); },
 }));
