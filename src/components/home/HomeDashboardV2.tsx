@@ -42,7 +42,7 @@ export function HomeDashboardV2() {
   }, [fullyPriced, periodTab, periods, summary]);
   const validation = snapshot?.validation === "cross_checked" ? "双源核验" : snapshot?.validation === "cached_latest_trading_day" ? "最近交易日" : snapshot?.validation === "single_source" ? "单源可用" : "等待可靠行情";
   const latestNews = news?.items?.slice(0, 5) || [];
-  const benchPct = snapshot?.indices?.[0]?.pct ?? null;
+  const benchPct = snapshot?.indices?.find((x) => x.code === "000300")?.pct ?? null;
 
   return <div className="home-dashboard-v3 pb-4">
     <section className="home-income-card" aria-label="持仓总收益">
