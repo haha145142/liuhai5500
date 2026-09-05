@@ -83,7 +83,7 @@ export const getFund = async ({ data }: { data: { code: string } }): Promise<Fun
   fundPending.set(code, request); return request;
 };
 
-const INDEX_CODES = ["000001", "399001", "399006", "000688"] as const;
+const INDEX_CODES = ["000001", "399001", "000300", "000905", "399006", "000688"] as const;
 async function cacheSnapshotFields(snapshot: Snapshot) {
   const generation = `${snapshot.fetchedAt}:${snapshot.marketDate ?? "none"}`;
   void Promise.all([
