@@ -16,7 +16,7 @@ type AiInsight = { id: string; text: string; relation: string; validation: strin
 const FILTERS: Array<{ id: FilterId; label: string }> = [
   { id: "all", label: "全部" },
   { id: "fund", label: "基金" },
-  { id: "sector", label: "科技" },
+  { id: "sector", label: "板块" },
   { id: "policy", label: "政策" },
   { id: "market", label: "市场" },
   { id: "macro", label: "宏观" },
@@ -61,7 +61,7 @@ function parseAi(text: string): AiInsight[] {
   const cleaned = text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
   try {
     const parsed = JSON.parse(cleaned) as unknown;
-    const arr = Array.isArray(parsed) ? parsed : typeof parsed === "object" && parsed && Array.isArray((parsed as { items?: unknown[] }).items) ? (parsed as { items: unknown[] }).items : [];
+    const arr = Array.isArray(parsed) ? parsed : typeof parsed === "object" && parsed && Array.isArray((parsed as { items?: unknown[] }).items) ? (parsed as { items?: unknown[] }).items : [];
     return arr.map((x) => {
       const v = x as Partial<AiInsight>;
       return {
