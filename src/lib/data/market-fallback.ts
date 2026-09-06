@@ -14,7 +14,6 @@ function cleanMoney(value: unknown) {
   const x = n(value);
   return x != null && Number.isFinite(x) && Math.abs(x) <= 1e14 ? x : null;
 }
-
 function parseTencentIndices(text: string) {
   const lines = text.split(";");
   return INDEX_DEFS.map((def, index): IndexQuote => {
@@ -30,12 +29,28 @@ function parseTencentIndices(text: string) {
     };
   });
 }
+function parseSinaIndices(text: string) {
+  const lines = text.split(";");
+  return INDEX_DEFS.map((def, index): IndexQuote => {
+    const match = (lines[index] || "").match(/=\"([^\"]*)\"/);
+    const fields = match ? match[1].split(",") : [];
+    return {
+      name: def.name,
+      code: def.code,
+      secid: def.secid,
+      price: cleanMoney(fields[1]),
+      pct: cleanPct(fields[3]),
+      change: cleanMoney(fields[2]),
+    };
+  });
+}
 
 async function fetchLatestSnapshot() {
-  const [indexResult, sectorResult, tencentIndexResult] = await Promise.allSettled([
+  const [indexResult, sectorResult, tencentIndexResult, sinaIndexResult] = await Promise.allSettled([
     fetchText(`https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&fields=f12,f14,f2,f3,f4&secids=${INDEX_DEFS.map((x) => x.secid).join(",")}&ut=${EM_UT}&_=${Date.now()}`, 7000, { Referer: "https://quote.eastmoney.com/", Accept: "application/json,text/plain,*/*" }),
     fetchText(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=1200&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:90+t:2,m:90+t:3&fields=f12,f14,f3,f62,f66,f69,f72,f75,f6&ut=${EM_UT}&_=${Date.now()}`, 7000, { Referer: "https://quote.eastmoney.com/", Accept: "application/json,text/plain,*/*" }),
     fetchText("https://qt.gtimg.cn/q=sh000001,sz399001,sh000300,sh000905,sz399006,sh000688", 7000, { Referer: "https://qt.gtimg.cn/", Accept: "text/plain,*/*" }),
+    fetchText("https://hq.sinajs.cn/list=s_sh000001,s_sz399001,s_sh000300,s_sh000905,s_sz399006,s_sh000688", 7000, { Referer: "https://finance.sina.com.cn/", Accept: "text/plain,*/*" }),
   ]);
 
   const indexJson = indexResult.status === "fulfilled" ? (parseMaybeJsonp(indexResult.value) as { data?: { diff?: unknown } } | null) : null;
@@ -43,17 +58,19 @@ async function fetchLatestSnapshot() {
   const indexRows = asArr(indexJson?.data?.diff);
   const boardRows = asArr(sectorJson?.data?.diff);
   const tencentIndices = tencentIndexResult.status === "fulfilled" ? parseTencentIndices(tencentIndexResult.value) : [];
+  const sinaIndices = sinaIndexResult.status === "fulfilled" ? parseSinaIndices(sinaIndexResult.value) : [];
 
   const indices: IndexQuote[] = INDEX_DEFS.map((def) => {
     const eastmoney = indexRows.find((x) => String(x.f12 ?? "") === def.code);
     const tencent = tencentIndices.find((x) => x.code === def.code);
+    const sina = sinaIndices.find((x) => x.code === def.code);
     return {
       name: def.name,
       code: def.code,
       secid: def.secid,
-      price: cleanMoney(eastmoney?.f2) ?? tencent?.price ?? null,
-      pct: cleanPct(eastmoney?.f3) ?? tencent?.pct ?? null,
-      change: cleanMoney(eastmoney?.f4) ?? tencent?.change ?? null,
+      price: cleanMoney(eastmoney?.f2) ?? tencent?.price ?? sina?.price ?? null,
+      pct: cleanPct(eastmoney?.f3) ?? tencent?.pct ?? sina?.pct ?? null,
+      change: cleanMoney(eastmoney?.f4) ?? tencent?.change ?? sina?.change ?? null,
     };
   });
 
