@@ -1,5 +1,12 @@
 import { providerAllowedAsync, recordProviderFailureAsync, recordProviderSuccessAsync, providerFromUrl } from "./provider-health";
 
+const EASTMONEY_HOSTS = ["push2.eastmoney.com", "82.push2.eastmoney.com", "73.push2.eastmoney.com"];
+
+function requestUrls(url: string): string[] {
+  if (!url.includes("push2.eastmoney.com")) return [url];
+  return EASTMONEY_HOSTS.map((host) => url.replace(/https:\/\/[^/]*push2\.eastmoney\.com/, `https://${host}`));
+}
+
 export async function fetchText(url: string, timeout = 5000, headers: Record<string, string> = {}): Promise<string> {
   const safeTimeout = Math.min(Math.max(1000, timeout), 8_000);
   const totalBudget = Math.min(9_000, safeTimeout + 1_200);
@@ -8,6 +15,7 @@ export async function fetchText(url: string, timeout = 5000, headers: Record<str
   if (!(await providerAllowedAsync(provider, endpoint))) throw new Error(`provider-circuit-open:${provider}`);
   const started = Date.now();
   const delays = [0, 120, 240];
+  const urls = requestUrls(url);
   let lastError: unknown = null;
   for (let attempt = 0; attempt < delays.length; attempt += 1) {
     if (delays[attempt] > 0) await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
@@ -17,8 +25,9 @@ export async function fetchText(url: string, timeout = 5000, headers: Record<str
     const attemptTimeout = Math.min(safeTimeout, remaining);
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), attemptTimeout);
+    const requestUrl = urls[attempt % urls.length];
     try {
-      const response = await fetch(url, { signal: ctrl.signal, cache: "no-store", headers: { Accept: "application/json,text/plain,*/*", "User-Agent": "Mozilla/5.0 (compatible; FundAIPro/1.0)", ...headers } });
+      const response = await fetch(requestUrl, { signal: ctrl.signal, cache: "no-store", headers: { Accept: "application/json,text/plain,*/*", "User-Agent": "Mozilla/5.0 (compatible; FundAIPro/1.0)", ...headers } });
       if (!response.ok) {
         const retryable = response.status === 408 || response.status === 425 || response.status === 429 || response.status >= 500;
         lastError = new Error(`HTTP ${response.status}`);
