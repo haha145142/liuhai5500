@@ -16,6 +16,14 @@ function arr(value: unknown): Record<string, unknown>[] { if (Array.isArray(valu
 function parseRows(text: string): Record<string, unknown>[] { try { const j = parseMaybeJsonp(text) as { data?: { diff?: unknown } }; return arr(j?.data?.diff); } catch { return []; } }
 async function fetchBoards(): Promise<Record<string, unknown>[]> { try { const text = await fetchText(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=${LIMIT}&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:90+t:2,m:90+t:3&fields=${encodeURIComponent(SEARCH_FIELDS)}&ut=${UT}&_=${Date.now()}`, 2500, { Referer: "https://quote.eastmoney.com/" }); return parseRows(text); } catch { return []; } }
 async function fetchBoardByCode(code: string): Promise<Record<string, unknown> | null> { try { const text = await fetchText(`https://push2.eastmoney.com/api/qt/stock/get?secid=90.${encodeURIComponent(code)}&fields=${encodeURIComponent(QUOTE_FIELDS)}&ut=${UT}&_=${Date.now()}`, 2200, { Referer: "https://quote.eastmoney.com/" }); const j = parseMaybeJsonp(text) as { data?: Record<string, unknown> | null }; return j?.data && typeof j.data === "object" ? j.data : null; } catch { return null; } }
+async function fetchBoardQuotesBatch(codes: string[]): Promise<Record<string, unknown>[]> {
+  if (!codes.length) return [];
+  try {
+    const text = await fetchText(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=${LIMIT}&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:90+t:2,m:90+t:3&fields=${encodeURIComponent(QUOTE_FIELDS)}&ut=${UT}&_=${Date.now()}`, 5000, { Referer: "https://quote.eastmoney.com/" });
+    const wanted = new Set(codes);
+    return parseRows(text).filter((row) => wanted.has(String(row.f12 ?? "").trim()));
+  } catch { return []; }
+}
 function rowCode(row: Record<string, unknown>) { return String(row.f12 ?? "").trim(); }
 function rowName(row: Record<string, unknown>) { return String(row.f14 ?? "").trim(); }
 function iconFor(name: string) { const hit = SECTOR_RULES.find((s) => name.includes(s.name) || s.name.includes(name)); return hit?.id === "semi" ? "🔬" : hit?.id === "ai" ? "🤖" : hit?.id === "gold" ? "🥇" : hit?.id === "robot" ? "🦾" : "📈"; }
@@ -25,4 +33,35 @@ function resolveBoardName(code: string, remoteName?: string | null) { const remo
 
 export const searchFundBoards = createServerFn({ method: "POST" }).validator((input: { query?: string }) => input).handler(async ({ data }): Promise<{ items: BoardCandidate[] }> => { const q = String(data.query ?? "").trim(); if (!q) return { items: [] }; const local = SECTOR_RULES.map((rule): (BoardCandidate & { _score: number }) | null => { const hay = [rule.name, ...rule.searchKeys].map((x) => x.toLowerCase()); const k = q.toLowerCase(); const s = hay.some((x) => x === k) ? 100 : hay.some((x) => x.startsWith(k)) ? 90 : hay.some((x) => x.includes(k)) ? 70 : 0; return s ? { code: rule.bkCode, name: rule.name, icon: iconFor(rule.name), type: rule.prefer, _score: s } : null; }).filter((x): x is BoardCandidate & { _score: number } => !!x); const rows = await fetchBoards(); const remote = rows.map((row): (BoardCandidate & { _score: number }) | null => { const code = rowCode(row); const name = resolveBoardName(code, rowName(row)); const s = score(name, q); return code && name && s ? { code, name, icon: iconFor(name), type: typeFor(code), _score: s } : null; }).filter((x): x is BoardCandidate & { _score: number } => !!x); const merged = [...local, ...remote].sort((a, b) => b._score - a._score).filter((item, index, list) => list.findIndex((x) => x.code === item.code) === index); return { items: merged.slice(0, 20).map(({ _score: _ignore, ...item }) => item) }; });
 
-export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator((input: { codes?: string[] }) => input).handler(async ({ data }): Promise<{ rows: BoardWatchQuote[]; fetchedAt: number; weekend: boolean }> => { const codes = [...new Set((data.codes ?? []).map((x) => String(x).trim()).filter(Boolean))].slice(0, 30); const closed = isExchangeClosed(); const marketDate = tradingDateLabel(); if (!codes.length) return { rows: [], fetchedAt: Date.now(), weekend: closed }; const rows = await Promise.all(codes.map((code) => fetchBoardByCode(code))); const result: BoardWatchQuote[] = rows.map((row, index) => { const code = codes[index]; const pct = row ? n(row.f3) : null; const name = resolveBoardName(code, row ? rowName(row) : ""); const mainFlow = row ? n(row.f62) : null; const superFlow = row ? n(row.f66) : null; const largeFlow = row ? n(row.f72) : null; const midFlow = row ? n(row.f78) : null; const smallFlow = row ? n(row.f84) : null; const turnover = row ? n(row.f6) : null; const priceStatus: BoardWatchQuote["priceStatus"] = !closed && pct != null ? "live" : pct != null ? "recent" : "unavailable"; const validation: BoardWatchQuote["validation"] = priceStatus === "unavailable" ? "unavailable" : priceStatus === "live" ? "live" : "recent"; const flowAvailable = mainFlow != null || superFlow != null || largeFlow != null || midFlow != null || smallFlow != null; const flowScore = flowAvailable ? mainFlow : null; const flowSignal: BoardWatchQuote["flowSignal"] = flowScore == null ? "暂无" : flowScore >= 100000000 ? "强流入" : flowScore >= 20000000 ? "流入" : flowScore <= -100000000 ? "强流出" : flowScore <= -20000000 ? "流出" : "中性"; const flowStatus: BoardWatchQuote["flowStatus"] = flowAvailable ? (closed ? "stale" : "fresh") : "unavailable"; return { code, name, icon: iconFor(name || KNOWN.get(code)?.name || ""), pct, mainFlow, superFlow, largeFlow, midFlow, smallFlow, turnover, marketDate, source: row ? (closed ? "东方财富板块行情 · 最近交易日" : "东方财富板块实时行情") : "当前暂无可靠板块涨跌数据", validation, priceStatus, flowStatus, flowScore, flowSignal }; }); return { rows: result, fetchedAt: Date.now(), weekend: closed }; });
+export const getBoardWatchQuotes = createServerFn({ method: "POST" }).validator((input: { codes?: string[] }) => input).handler(async ({ data }): Promise<{ rows: BoardWatchQuote[]; fetchedAt: number; weekend: boolean }> => {
+  const codes = [...new Set((data.codes ?? []).map((x) => String(x).trim()).filter(Boolean))].slice(0, 30);
+  const closed = isExchangeClosed();
+  const marketDate = tradingDateLabel();
+  if (!codes.length) return { rows: [], fetchedAt: Date.now(), weekend: closed };
+
+  const directRows = await Promise.all(codes.map((code) => fetchBoardByCode(code)));
+  const missingCodes = codes.filter((_, index) => !directRows[index]);
+  const batchRows = await fetchBoardQuotesBatch(missingCodes);
+  const batchByCode = new Map(batchRows.map((row) => [rowCode(row), row]));
+  const rows = directRows.map((row, index) => row || batchByCode.get(codes[index]) || null);
+
+  const result: BoardWatchQuote[] = rows.map((row, index) => {
+    const code = codes[index];
+    const pct = row ? n(row.f3) : null;
+    const name = resolveBoardName(code, row ? rowName(row) : "");
+    const mainFlow = row ? n(row.f62) : null;
+    const superFlow = row ? n(row.f66) : null;
+    const largeFlow = row ? n(row.f72) : null;
+    const midFlow = row ? n(row.f78) : null;
+    const smallFlow = row ? n(row.f84) : null;
+    const turnover = row ? n(row.f6) : null;
+    const priceStatus: BoardWatchQuote["priceStatus"] = !closed && pct != null ? "live" : pct != null ? "recent" : "unavailable";
+    const validation: BoardWatchQuote["validation"] = priceStatus === "unavailable" ? "unavailable" : priceStatus === "live" ? "live" : "recent";
+    const flowAvailable = mainFlow != null || superFlow != null || largeFlow != null || midFlow != null || smallFlow != null;
+    const flowScore = flowAvailable ? mainFlow : null;
+    const flowSignal: BoardWatchQuote["flowSignal"] = flowScore == null ? "暂无" : flowScore >= 100000000 ? "强流入" : flowScore >= 20000000 ? "流入" : flowScore <= -100000000 ? "强流出" : flowScore <= -20000000 ? "流出" : "中性";
+    const flowStatus: BoardWatchQuote["flowStatus"] = flowAvailable ? (closed ? "stale" : "fresh") : "unavailable";
+    return { code, name, icon: iconFor(name || KNOWN.get(code)?.name || ""), pct, mainFlow, superFlow, largeFlow, midFlow, smallFlow, turnover, marketDate, source: row ? (closed ? "东方财富板块行情 · 最近交易日" : "东方财富板块实时行情") : "当前暂无可靠板块涨跌数据", validation, priceStatus, flowStatus, flowScore, flowSignal };
+  });
+  return { rows: result, fetchedAt: Date.now(), weekend: closed };
+});
