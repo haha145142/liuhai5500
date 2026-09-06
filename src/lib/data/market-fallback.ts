@@ -15,20 +15,46 @@ function cleanMoney(value: unknown) {
   return x != null && Number.isFinite(x) && Math.abs(x) <= 1e14 ? x : null;
 }
 
+function parseTencentIndices(text: string) {
+  const lines = text.split(";");
+  return INDEX_DEFS.map((def, index): IndexQuote => {
+    const match = (lines[index] || "").match(/=\"([^\"]*)\"/);
+    const fields = match ? match[1].split("~") : [];
+    return {
+      name: def.name,
+      code: def.code,
+      secid: def.secid,
+      price: cleanMoney(fields[3]),
+      pct: cleanPct(fields[32]),
+      change: cleanMoney(fields[31]),
+    };
+  });
+}
+
 async function fetchLatestSnapshot() {
-  const [indexResult, sectorResult] = await Promise.allSettled([
+  const [indexResult, sectorResult, tencentIndexResult] = await Promise.allSettled([
     fetchText(`https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&fields=f12,f14,f2,f3,f4&secids=${INDEX_DEFS.map((x) => x.secid).join(",")}&ut=${EM_UT}&_=${Date.now()}`, 7000, { Referer: "https://quote.eastmoney.com/", Accept: "application/json,text/plain,*/*" }),
     fetchText(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=1200&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:90+t:2,m:90+t:3&fields=f12,f14,f3,f62,f66,f69,f72,f75,f6&ut=${EM_UT}&_=${Date.now()}`, 7000, { Referer: "https://quote.eastmoney.com/", Accept: "application/json,text/plain,*/*" }),
+    fetchText("https://qt.gtimg.cn/q=sh000001,sz399001,sh000300,sh000905,sz399006,sh000688", 7000, { Referer: "https://qt.gtimg.cn/", Accept: "text/plain,*/*" }),
   ]);
 
   const indexJson = indexResult.status === "fulfilled" ? (parseMaybeJsonp(indexResult.value) as { data?: { diff?: unknown } } | null) : null;
   const sectorJson = sectorResult.status === "fulfilled" ? (parseMaybeJsonp(sectorResult.value) as { data?: { diff?: unknown } } | null) : null;
   const indexRows = asArr(indexJson?.data?.diff);
   const boardRows = asArr(sectorJson?.data?.diff);
+  const tencentIndices = tencentIndexResult.status === "fulfilled" ? parseTencentIndices(tencentIndexResult.value) : [];
 
   const indices: IndexQuote[] = INDEX_DEFS.map((def) => {
-    const row = indexRows.find((x) => String(x.f12 ?? "") === def.code);
-    return { name: def.name, code: def.code, secid: def.secid, price: cleanMoney(row?.f2), pct: cleanPct(row?.f3), change: cleanMoney(row?.f4) };
+    const eastmoney = indexRows.find((x) => String(x.f12 ?? "") === def.code);
+    const tencent = tencentIndices.find((x) => x.code === def.code);
+    return {
+      name: def.name,
+      code: def.code,
+      secid: def.secid,
+      price: cleanMoney(eastmoney?.f2) ?? tencent?.price ?? null,
+      pct: cleanPct(eastmoney?.f3) ?? tencent?.pct ?? null,
+      change: cleanMoney(eastmoney?.f4) ?? tencent?.change ?? null,
+    };
   });
 
   const sectors: SectorQuote[] = SECTOR_RULES.map((rule) => {
