@@ -11,8 +11,6 @@ export async function fetchText(url: string, timeout = 5000, headers: Record<str
   const safeTimeout = Math.min(Math.max(1000, timeout), 8_000);
   const totalBudget = Math.min(9_000, safeTimeout + 1_200);
   const provider = providerFromUrl(url);
-  const endpoint = url.split("?")[0];
-  if (!(await providerAllowedAsync(provider, endpoint))) throw new Error(`provider-circuit-open:${provider}`);
   const started = Date.now();
   const delays = [0, 120, 240];
   const urls = requestUrls(url);
@@ -23,9 +21,14 @@ export async function fetchText(url: string, timeout = 5000, headers: Record<str
     const remaining = totalBudget - elapsed;
     if (remaining <= 150) break;
     const attemptTimeout = Math.min(safeTimeout, remaining);
+    const requestUrl = urls[attempt % urls.length];
+    const requestEndpoint = requestUrl.split("?")[0];
+    if (!(await providerAllowedAsync(providerFromUrl(requestEndpoint), requestEndpoint))) {
+      lastError = new Error(`provider-circuit-open:${providerFromUrl(requestEndpoint)}`);
+      continue;
+    }
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), attemptTimeout);
-    const requestUrl = urls[attempt % urls.length];
     try {
       const response = await fetch(requestUrl, { signal: ctrl.signal, cache: "no-store", headers: { Accept: "application/json,text/plain,*/*", "User-Agent": "Mozilla/5.0 (compatible; FundAIPro/1.0)", ...headers } });
       if (!response.ok) {
@@ -35,14 +38,14 @@ export async function fetchText(url: string, timeout = 5000, headers: Record<str
         continue;
       }
       const text = await response.text();
-      void recordProviderSuccessAsync(provider, endpoint, Date.now() - started).catch(() => {});
+      void recordProviderSuccessAsync(providerFromUrl(requestEndpoint), requestEndpoint, Date.now() - started).catch(() => {});
       return text;
     } catch (error) {
       lastError = error instanceof Error && error.name === "AbortError" ? new Error(`请求超时（${Math.ceil(attemptTimeout / 1000)}秒）`) : error;
       if (attempt === delays.length - 1 || Date.now() - started >= totalBudget) break;
     } finally { clearTimeout(timer); }
   }
-  void recordProviderFailureAsync(provider, endpoint, Date.now() - started).catch(() => {});
+  void recordProviderFailureAsync(provider, url.split("?")[0], Date.now() - started).catch(() => {});
   throw lastError instanceof Error ? lastError : new Error("请求失败");
 }
 
