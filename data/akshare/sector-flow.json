@@ -3,7 +3,7 @@
   "source": "AKShare",
   "provider": "akshare",
   "schemaVersion": 3,
-  "fetchedAt": "2026-09-08T15:43:24.958831+08:00",
+  "fetchedAt": "2026-09-08T15:55:28.598090+08:00",
   "marketDate": "2026-09-08",
   "rows": [
     {
@@ -1411,11 +1411,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "重组蛋白",
+      "name": "知识产权保护",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 2.07,
-      "main_net_inflow": 635000000.0,
+      "main_net_inflow": -220000000.00000003,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -1423,11 +1423,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "知识产权保护",
+      "name": "重组蛋白",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 2.07,
-      "main_net_inflow": -220000000.00000003,
+      "main_net_inflow": 635000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3283,11 +3283,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "ST板块",
+      "name": "脑机接口",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.65,
-      "main_net_inflow": -188000000.0,
+      "main_net_inflow": -93000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3295,11 +3295,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "脑机接口",
+      "name": "ST板块",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.65,
-      "main_net_inflow": -93000000.0,
+      "main_net_inflow": -188000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3535,11 +3535,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "AI应用",
+      "name": "超导概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.55,
-      "main_net_inflow": -10528000000.0,
+      "main_net_inflow": 3000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3547,11 +3547,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "超导概念",
+      "name": "AI应用",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.55,
-      "main_net_inflow": 3000000.0,
+      "main_net_inflow": -10528000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3619,11 +3619,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "快手概念",
+      "name": "太赫兹",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.5,
-      "main_net_inflow": -2141000000.0,
+      "main_net_inflow": 340000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3631,11 +3631,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "太赫兹",
+      "name": "快手概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.5,
-      "main_net_inflow": 340000000.0,
+      "main_net_inflow": -2141000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5359,11 +5359,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "小米汽车",
+      "name": "星闪概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.59,
-      "main_net_inflow": -3019000000.0,
+      "main_net_inflow": -1761000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5371,11 +5371,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "星闪概念",
+      "name": "小米汽车",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.59,
-      "main_net_inflow": -1761000000.0,
+      "main_net_inflow": -3019000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
