@@ -3,7 +3,7 @@
   "source": "AKShare",
   "provider": "akshare",
   "schemaVersion": 3,
-  "fetchedAt": "2026-09-09T12:48:49.923745+08:00",
+  "fetchedAt": "2026-09-09T12:57:17.419560+08:00",
   "marketDate": "2026-09-09",
   "rows": [
     {
@@ -1615,11 +1615,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "养鸡",
+      "name": "证金持股",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.36,
-      "main_net_inflow": -12000000.0,
+      "main_net_inflow": 1025000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -1627,11 +1627,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "证金持股",
+      "name": "养鸡",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.36,
-      "main_net_inflow": 1025000000.0,
+      "main_net_inflow": -12000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -1759,11 +1759,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "商业航天",
+      "name": "TOPCON电池",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.27,
-      "main_net_inflow": 2986000000.0,
+      "main_net_inflow": 198000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -1771,11 +1771,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "TOPCON电池",
+      "name": "商业航天",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.27,
-      "main_net_inflow": 198000000.0,
+      "main_net_inflow": 2986000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3163,18 +3163,6 @@
       "small_net_inflow": null
     },
     {
-      "name": "硅能源",
-      "sector_type": "concept",
-      "provider": "AKShare/THS",
-      "change_pct": -0.28,
-      "main_net_inflow": -1126000000.0,
-      "main_net_ratio": null,
-      "super_net_inflow": null,
-      "large_net_inflow": null,
-      "mid_net_inflow": null,
-      "small_net_inflow": null
-    },
-    {
       "name": "数据中心(AIDC)",
       "sector_type": "concept",
       "provider": "AKShare/THS",
@@ -3192,6 +3180,18 @@
       "provider": "AKShare/THS",
       "change_pct": -0.28,
       "main_net_inflow": -653000000.0,
+      "main_net_ratio": null,
+      "super_net_inflow": null,
+      "large_net_inflow": null,
+      "mid_net_inflow": null,
+      "small_net_inflow": null
+    },
+    {
+      "name": "硅能源",
+      "sector_type": "concept",
+      "provider": "AKShare/THS",
+      "change_pct": -0.28,
+      "main_net_inflow": -1126000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4039,11 +4039,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "华为概念",
+      "name": "小米概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.65,
-      "main_net_inflow": -4642000000.0,
+      "main_net_inflow": -5610000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4051,11 +4051,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "小米概念",
+      "name": "华为概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.65,
-      "main_net_inflow": -5610000000.0,
+      "main_net_inflow": -4642000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5251,11 +5251,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "租售同权",
+      "name": "华为鲲鹏",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.44,
-      "main_net_inflow": -744000000.0,
+      "main_net_inflow": -2364000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5263,11 +5263,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "华为鲲鹏",
+      "name": "租售同权",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.44,
-      "main_net_inflow": -2364000000.0,
+      "main_net_inflow": -744000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
