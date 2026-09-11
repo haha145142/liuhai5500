@@ -12,61 +12,86 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AiRouteImport } from './routes/ai'
 import { Route as BandRouteImport } from './routes/band'
+import { Route as CompareRouteImport } from './routes/compare'
 import { Route as FundsRouteImport } from './routes/funds'
+import { Route as GroupsRouteImport } from './routes/groups'
+import { Route as LookthroughRouteImport } from './routes/lookthrough'
 import { Route as MarketRouteImport } from './routes/market'
+import { Route as MarketPlusRouteImport } from './routes/market-plus'
 import { Route as MoreRouteImport } from './routes/more'
 import { Route as NewsRouteImport } from './routes/news'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as RotationRouteImport } from './routes/rotation'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ToolsRouteImport } from './routes/tools'
 
 const IndexRoute = IndexRouteImport.update({ id: '/', path: '/', getParentRoute: () => rootRouteImport } as any)
 const AiRoute = AiRouteImport.update({ id: '/ai', path: '/ai', getParentRoute: () => rootRouteImport } as any)
 const BandRoute = BandRouteImport.update({ id: '/band', path: '/band', getParentRoute: () => rootRouteImport } as any)
+const CompareRoute = CompareRouteImport.update({ id: '/compare', path: '/compare', getParentRoute: () => rootRouteImport } as any)
 const FundsRoute = FundsRouteImport.update({ id: '/funds', path: '/funds', getParentRoute: () => rootRouteImport } as any)
+const GroupsRoute = GroupsRouteImport.update({ id: '/groups', path: '/groups', getParentRoute: () => rootRouteImport } as any)
+const LookthroughRoute = LookthroughRouteImport.update({ id: '/lookthrough', path: '/lookthrough', getParentRoute: () => rootRouteImport } as any)
 const MarketRoute = MarketRouteImport.update({ id: '/market', path: '/market', getParentRoute: () => rootRouteImport } as any)
+const MarketPlusRoute = MarketPlusRouteImport.update({ id: '/market-plus', path: '/market-plus', getParentRoute: () => rootRouteImport } as any)
 const MoreRoute = MoreRouteImport.update({ id: '/more', path: '/more', getParentRoute: () => rootRouteImport } as any)
 const NewsRoute = NewsRouteImport.update({ id: '/news', path: '/news', getParentRoute: () => rootRouteImport } as any)
 const PortfolioRoute = PortfolioRouteImport.update({ id: '/portfolio', path: '/portfolio', getParentRoute: () => rootRouteImport } as any)
 const RotationRoute = RotationRouteImport.update({ id: '/rotation', path: '/rotation', getParentRoute: () => rootRouteImport } as any)
 const SettingsRoute = SettingsRouteImport.update({ id: '/settings', path: '/settings', getParentRoute: () => rootRouteImport } as any)
+const ToolsRoute = ToolsRouteImport.update({ id: '/tools', path: '/tools', getParentRoute: () => rootRouteImport } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
   '/band': typeof BandRoute
+  '/compare': typeof CompareRoute
   '/funds': typeof FundsRoute
+  '/groups': typeof GroupsRoute
+  '/lookthrough': typeof LookthroughRoute
   '/market': typeof MarketRoute
+  '/market-plus': typeof MarketPlusRoute
   '/more': typeof MoreRoute
   '/news': typeof NewsRoute
   '/portfolio': typeof PortfolioRoute
   '/rotation': typeof RotationRoute
   '/settings': typeof SettingsRoute
+  '/tools': typeof ToolsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
   '/band': typeof BandRoute
+  '/compare': typeof CompareRoute
   '/funds': typeof FundsRoute
+  '/groups': typeof GroupsRoute
+  '/lookthrough': typeof LookthroughRoute
   '/market': typeof MarketRoute
+  '/market-plus': typeof MarketPlusRoute
   '/more': typeof MoreRoute
   '/news': typeof NewsRoute
   '/portfolio': typeof PortfolioRoute
   '/rotation': typeof RotationRoute
   '/settings': typeof SettingsRoute
+  '/tools': typeof ToolsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
   '/band': typeof BandRoute
+  '/compare': typeof CompareRoute
   '/funds': typeof FundsRoute
+  '/groups': typeof GroupsRoute
+  '/lookthrough': typeof LookthroughRoute
   '/market': typeof MarketRoute
+  '/market-plus': typeof MarketPlusRoute
   '/more': typeof MoreRoute
   '/news': typeof NewsRoute
   '/portfolio': typeof PortfolioRoute
   '/rotation': typeof RotationRoute
   '/settings': typeof SettingsRoute
+  '/tools': typeof ToolsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -74,50 +99,70 @@ export interface FileRouteTypes {
     | '/'
     | '/ai'
     | '/band'
+    | '/compare'
     | '/funds'
+    | '/groups'
+    | '/lookthrough'
     | '/market'
+    | '/market-plus'
     | '/more'
     | '/news'
     | '/portfolio'
     | '/rotation'
     | '/settings'
+    | '/tools'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/ai'
     | '/band'
+    | '/compare'
     | '/funds'
+    | '/groups'
+    | '/lookthrough'
     | '/market'
+    | '/market-plus'
     | '/more'
     | '/news'
     | '/portfolio'
     | '/rotation'
     | '/settings'
+    | '/tools'
   id:
     | '__root__'
     | '/'
     | '/ai'
     | '/band'
+    | '/compare'
     | '/funds'
+    | '/groups'
+    | '/lookthrough'
     | '/market'
+    | '/market-plus'
     | '/more'
     | '/news'
     | '/portfolio'
     | '/rotation'
     | '/settings'
+    | '/tools'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AiRoute: typeof AiRoute
   BandRoute: typeof BandRoute
+  CompareRoute: typeof CompareRoute
   FundsRoute: typeof FundsRoute
+  GroupsRoute: typeof GroupsRoute
+  LookthroughRoute: typeof LookthroughRoute
   MarketRoute: typeof MarketRoute
+  MarketPlusRoute: typeof MarketPlusRoute
   MoreRoute: typeof MoreRoute
   NewsRoute: typeof NewsRoute
   PortfolioRoute: typeof PortfolioRoute
   RotationRoute: typeof RotationRoute
   SettingsRoute: typeof SettingsRoute
+  ToolsRoute: typeof ToolsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -125,13 +170,18 @@ declare module '@tanstack/react-router' {
     '/': { id: '/'; path: '/'; fullPath: '/'; preLoaderRoute: typeof IndexRouteImport; parentRoute: typeof rootRouteImport }
     '/ai': { id: '/ai'; path: '/ai'; fullPath: '/ai'; preLoaderRoute: typeof AiRouteImport; parentRoute: typeof rootRouteImport }
     '/band': { id: '/band'; path: '/band'; fullPath: '/band'; preLoaderRoute: typeof BandRouteImport; parentRoute: typeof rootRouteImport }
+    '/compare': { id: '/compare'; path: '/compare'; fullPath: '/compare'; preLoaderRoute: typeof CompareRouteImport; parentRoute: typeof rootRouteImport }
     '/funds': { id: '/funds'; path: '/funds'; fullPath: '/funds'; preLoaderRoute: typeof FundsRouteImport; parentRoute: typeof rootRouteImport }
+    '/groups': { id: '/groups'; path: '/groups'; fullPath: '/groups'; preLoaderRoute: typeof GroupsRouteImport; parentRoute: typeof rootRouteImport }
+    '/lookthrough': { id: '/lookthrough'; path: '/lookthrough'; fullPath: '/lookthrough'; preLoaderRoute: typeof LookthroughRouteImport; parentRoute: typeof rootRouteImport }
     '/market': { id: '/market'; path: '/market'; fullPath: '/market'; preLoaderRoute: typeof MarketRouteImport; parentRoute: typeof rootRouteImport }
+    '/market-plus': { id: '/market-plus'; path: '/market-plus'; fullPath: '/market-plus'; preLoaderRoute: typeof MarketPlusRouteImport; parentRoute: typeof rootRouteImport }
     '/more': { id: '/more'; path: '/more'; fullPath: '/more'; preLoaderRoute: typeof MoreRouteImport; parentRoute: typeof rootRouteImport }
     '/news': { id: '/news'; path: '/news'; fullPath: '/news'; preLoaderRoute: typeof NewsRouteImport; parentRoute: typeof rootRouteImport }
     '/portfolio': { id: '/portfolio'; path: '/portfolio'; fullPath: '/portfolio'; preLoaderRoute: typeof PortfolioRouteImport; parentRoute: typeof rootRouteImport }
     '/rotation': { id: '/rotation'; path: '/rotation'; fullPath: '/rotation'; preLoaderRoute: typeof RotationRouteImport; parentRoute: typeof rootRouteImport }
     '/settings': { id: '/settings'; path: '/settings'; fullPath: '/settings'; preLoaderRoute: typeof SettingsRouteImport; parentRoute: typeof rootRouteImport }
+    '/tools': { id: '/tools'; path: '/tools'; fullPath: '/tools'; preLoaderRoute: typeof ToolsRouteImport; parentRoute: typeof rootRouteImport }
   }
 }
 
@@ -139,13 +189,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute,
   AiRoute,
   BandRoute,
+  CompareRoute,
   FundsRoute,
+  GroupsRoute,
+  LookthroughRoute,
   MarketRoute,
+  MarketPlusRoute,
   MoreRoute,
   NewsRoute,
   PortfolioRoute,
   RotationRoute,
   SettingsRoute,
+  ToolsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
