@@ -129,3 +129,4 @@ export function calcPortfolioReturn(holdings:Holding[],funds:Record<string,FundQ
   const pricedHoldingPnlPct=pricedCostValue>0?holdingPnl/pricedCostValue*100:null; const fullHoldingPnlPct=costValue>0&&priced.length===holdings.length?holdingPnl/costValue*100:null; const todayPnlPct=todayPnl!=null&&todayBaseValue>0?todayPnl/todayBaseValue*100:null;
   return{costValue,marketValue,holdingPnl,holdingPnlPct:fullHoldingPnlPct,pricedHoldingPnlPct,todayPnl,todayPnlPct,pricedCount:priced.length,totalCount:holdings.length,pricedCostValue,coveragePct:holdings.length>0?priced.length/holdings.length*100:100};
 }
+export type PortfolioReturn = ReturnType<typeof calcPortfolioReturn>;
