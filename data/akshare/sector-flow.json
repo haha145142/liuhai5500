@@ -3,7 +3,7 @@
   "source": "AKShare",
   "provider": "akshare",
   "schemaVersion": 3,
-  "fetchedAt": "2026-09-15T15:31:16.761936+08:00",
+  "fetchedAt": "2026-09-15T15:49:14.235698+08:00",
   "marketDate": "2026-09-15",
   "rows": [
     {
@@ -2947,11 +2947,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "华为鲲鹏",
+      "name": "大飞机",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.23,
-      "main_net_inflow": -2968000000.0,
+      "main_net_inflow": -1484000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2959,11 +2959,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "大飞机",
+      "name": "华为鲲鹏",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.23,
-      "main_net_inflow": -1484000000.0,
+      "main_net_inflow": -2968000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3595,11 +3595,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "数据要素",
+      "name": "在线教育",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.44,
-      "main_net_inflow": -5046000000.0,
+      "main_net_inflow": -1893000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3607,11 +3607,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "在线教育",
+      "name": "数据要素",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.44,
-      "main_net_inflow": -1893000000.0,
+      "main_net_inflow": -5046000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4207,11 +4207,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "长三角一体化",
+      "name": "宠物经济",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.67,
-      "main_net_inflow": 215000000.0,
+      "main_net_inflow": -908000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4219,11 +4219,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "宠物经济",
+      "name": "长三角一体化",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.67,
-      "main_net_inflow": -908000000.0,
+      "main_net_inflow": 215000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4363,11 +4363,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "国企改革",
+      "name": "智慧城市",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.71,
-      "main_net_inflow": -20861000000.0,
+      "main_net_inflow": -5214000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4375,11 +4375,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "智慧城市",
+      "name": "国企改革",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.71,
-      "main_net_inflow": -5214000000.0,
+      "main_net_inflow": -20861000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4543,11 +4543,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "Web3.0",
+      "name": "军民融合",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.82,
-      "main_net_inflow": -1218000000.0,
+      "main_net_inflow": -4687000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4555,11 +4555,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "军民融合",
+      "name": "Web3.0",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.82,
-      "main_net_inflow": -4687000000.0,
+      "main_net_inflow": -1218000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4735,11 +4735,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "细胞免疫治疗",
+      "name": "中俄贸易概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.9,
-      "main_net_inflow": -709000000.0,
+      "main_net_inflow": -1308000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4747,11 +4747,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "中俄贸易概念",
+      "name": "细胞免疫治疗",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.9,
-      "main_net_inflow": -1308000000.0,
+      "main_net_inflow": -709000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5107,11 +5107,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "文化传媒概念",
+      "name": "PPP概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.14,
-      "main_net_inflow": -3636999999.9999995,
+      "main_net_inflow": -2026000000.0000002,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5119,11 +5119,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "PPP概念",
+      "name": "文化传媒概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.14,
-      "main_net_inflow": -2026000000.0000002,
+      "main_net_inflow": -3636999999.9999995,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
