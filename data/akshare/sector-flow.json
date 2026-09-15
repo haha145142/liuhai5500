@@ -3,7 +3,7 @@
   "source": "AKShare",
   "provider": "akshare",
   "schemaVersion": 3,
-  "fetchedAt": "2026-09-15T15:14:20.569898+08:00",
+  "fetchedAt": "2026-09-15T15:31:16.761936+08:00",
   "marketDate": "2026-09-15",
   "rows": [
     {
@@ -2491,11 +2491,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "C2M概念",
+      "name": "特高压",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.03,
-      "main_net_inflow": -200999999.99999997,
+      "main_net_inflow": -1669000000.0000002,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2503,11 +2503,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "特高压",
+      "name": "C2M概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.03,
-      "main_net_inflow": -1669000000.0000002,
+      "main_net_inflow": -200999999.99999997,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2947,11 +2947,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "大飞机",
+      "name": "华为鲲鹏",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.23,
-      "main_net_inflow": -1484000000.0,
+      "main_net_inflow": -2968000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2959,11 +2959,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "华为鲲鹏",
+      "name": "大飞机",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.23,
-      "main_net_inflow": -2968000000.0,
+      "main_net_inflow": -1484000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3283,11 +3283,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "金属铜",
+      "name": "眼科医疗",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.34,
-      "main_net_inflow": -3067000000.0,
+      "main_net_inflow": -488000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3295,11 +3295,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "眼科医疗",
+      "name": "金属铜",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.34,
-      "main_net_inflow": -488000000.0,
+      "main_net_inflow": -3067000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3595,18 +3595,6 @@
       "small_net_inflow": null
     },
     {
-      "name": "在线教育",
-      "sector_type": "concept",
-      "provider": "AKShare/THS",
-      "change_pct": -1.44,
-      "main_net_inflow": -1893000000.0,
-      "main_net_ratio": null,
-      "super_net_inflow": null,
-      "large_net_inflow": null,
-      "mid_net_inflow": null,
-      "small_net_inflow": null
-    },
-    {
       "name": "数据要素",
       "sector_type": "concept",
       "provider": "AKShare/THS",
@@ -3619,11 +3607,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "阿里巴巴概念",
+      "name": "在线教育",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.44,
-      "main_net_inflow": -6688000000.0,
+      "main_net_inflow": -1893000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3636,6 +3624,18 @@
       "provider": "AKShare/THS",
       "change_pct": -1.44,
       "main_net_inflow": -4236999999.9999995,
+      "main_net_ratio": null,
+      "super_net_inflow": null,
+      "large_net_inflow": null,
+      "mid_net_inflow": null,
+      "small_net_inflow": null
+    },
+    {
+      "name": "阿里巴巴概念",
+      "sector_type": "concept",
+      "provider": "AKShare/THS",
+      "change_pct": -1.44,
+      "main_net_inflow": -6688000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4027,11 +4027,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "血氧仪",
+      "name": "华为欧拉",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.58,
-      "main_net_inflow": -238000000.0,
+      "main_net_inflow": -670000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4039,11 +4039,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "华为欧拉",
+      "name": "血氧仪",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.58,
-      "main_net_inflow": -670000000.0,
+      "main_net_inflow": -238000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4519,11 +4519,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "水利",
+      "name": "互联网保险",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.81,
-      "main_net_inflow": -3439000000.0,
+      "main_net_inflow": -1310000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4531,11 +4531,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "互联网保险",
+      "name": "水利",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.81,
-      "main_net_inflow": -1310000000.0,
+      "main_net_inflow": -3439000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5107,11 +5107,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "PPP概念",
+      "name": "文化传媒概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.14,
-      "main_net_inflow": -2026000000.0000002,
+      "main_net_inflow": -3636999999.9999995,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5119,11 +5119,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "文化传媒概念",
+      "name": "PPP概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.14,
-      "main_net_inflow": -3636999999.9999995,
+      "main_net_inflow": -2026000000.0000002,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
