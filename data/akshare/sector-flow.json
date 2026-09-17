@@ -3,7 +3,7 @@
   "source": "AKShare",
   "provider": "akshare",
   "schemaVersion": 3,
-  "fetchedAt": "2026-09-17T15:12:51.277176+08:00",
+  "fetchedAt": "2026-09-17T15:29:55.759169+08:00",
   "marketDate": "2026-09-17",
   "rows": [
     {
@@ -1771,11 +1771,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "毛发医疗",
+      "name": "幽门螺杆菌概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.68,
-      "main_net_inflow": -231000000.0,
+      "main_net_inflow": -178000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -1783,11 +1783,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "幽门螺杆菌概念",
+      "name": "毛发医疗",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.68,
-      "main_net_inflow": -178000000.0,
+      "main_net_inflow": -231000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -1831,11 +1831,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "网约车",
+      "name": "露营经济",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.65,
-      "main_net_inflow": 124000000.0,
+      "main_net_inflow": -97000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -1843,11 +1843,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "露营经济",
+      "name": "网约车",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.65,
-      "main_net_inflow": -97000000.0,
+      "main_net_inflow": 124000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2203,18 +2203,6 @@
       "small_net_inflow": null
     },
     {
-      "name": "虚拟数字人",
-      "sector_type": "concept",
-      "provider": "AKShare/THS",
-      "change_pct": 0.45,
-      "main_net_inflow": -823000000.0,
-      "main_net_ratio": null,
-      "super_net_inflow": null,
-      "large_net_inflow": null,
-      "mid_net_inflow": null,
-      "small_net_inflow": null
-    },
-    {
       "name": "智能家居",
       "sector_type": "concept",
       "provider": "AKShare/THS",
@@ -2232,6 +2220,18 @@
       "provider": "AKShare/THS",
       "change_pct": 0.45,
       "main_net_inflow": 172000000.0,
+      "main_net_ratio": null,
+      "super_net_inflow": null,
+      "large_net_inflow": null,
+      "mid_net_inflow": null,
+      "small_net_inflow": null
+    },
+    {
+      "name": "虚拟数字人",
+      "sector_type": "concept",
+      "provider": "AKShare/THS",
+      "change_pct": 0.45,
+      "main_net_inflow": -823000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2371,11 +2371,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "共享单车",
+      "name": "芬太尼",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.39,
-      "main_net_inflow": -43000000.0,
+      "main_net_inflow": -4000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2383,11 +2383,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "芬太尼",
+      "name": "共享单车",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.39,
-      "main_net_inflow": -4000000.0,
+      "main_net_inflow": -43000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2899,11 +2899,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "玻璃基板",
+      "name": "腾讯概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.18,
-      "main_net_inflow": -1023000000.0,
+      "main_net_inflow": -6075000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2911,11 +2911,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "腾讯概念",
+      "name": "玻璃基板",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.18,
-      "main_net_inflow": -6075000000.0,
+      "main_net_inflow": -1023000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3019,11 +3019,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "无人零售",
+      "name": "机器人概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.13,
-      "main_net_inflow": -130000000.0,
+      "main_net_inflow": -8295000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3031,11 +3031,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "机器人概念",
+      "name": "无人零售",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.13,
-      "main_net_inflow": -8295000000.0,
+      "main_net_inflow": -130000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3091,18 +3091,6 @@
       "small_net_inflow": null
     },
     {
-      "name": "房屋检测",
-      "sector_type": "concept",
-      "provider": "AKShare/THS",
-      "change_pct": 0.09,
-      "main_net_inflow": -141000000.0,
-      "main_net_ratio": null,
-      "super_net_inflow": null,
-      "large_net_inflow": null,
-      "mid_net_inflow": null,
-      "small_net_inflow": null
-    },
-    {
       "name": "液冷服务器",
       "sector_type": "concept",
       "provider": "AKShare/THS",
@@ -3115,11 +3103,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "智慧灯杆",
+      "name": "房屋检测",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.09,
-      "main_net_inflow": 2433000000.0,
+      "main_net_inflow": -141000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3132,6 +3120,18 @@
       "provider": "AKShare/THS",
       "change_pct": 0.09,
       "main_net_inflow": -6673999999.999999,
+      "main_net_ratio": null,
+      "super_net_inflow": null,
+      "large_net_inflow": null,
+      "mid_net_inflow": null,
+      "small_net_inflow": null
+    },
+    {
+      "name": "智慧灯杆",
+      "sector_type": "concept",
+      "provider": "AKShare/THS",
+      "change_pct": 0.09,
+      "main_net_inflow": 2433000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3307,11 +3307,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "EDR概念",
+      "name": "算力租赁",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.04,
-      "main_net_inflow": -438999999.99999994,
+      "main_net_inflow": -3977000000.0000005,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3319,11 +3319,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "算力租赁",
+      "name": "EDR概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.04,
-      "main_net_inflow": -3977000000.0000005,
+      "main_net_inflow": -438999999.99999994,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3631,6 +3631,18 @@
       "small_net_inflow": null
     },
     {
+      "name": "赛马概念",
+      "sector_type": "concept",
+      "provider": "AKShare/THS",
+      "change_pct": -0.06,
+      "main_net_inflow": -28999999.999999996,
+      "main_net_ratio": null,
+      "super_net_inflow": null,
+      "large_net_inflow": null,
+      "mid_net_inflow": null,
+      "small_net_inflow": null
+    },
+    {
       "name": "钛白粉概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
@@ -3648,18 +3660,6 @@
       "provider": "AKShare/THS",
       "change_pct": -0.06,
       "main_net_inflow": -9484000000.0,
-      "main_net_ratio": null,
-      "super_net_inflow": null,
-      "large_net_inflow": null,
-      "mid_net_inflow": null,
-      "small_net_inflow": null
-    },
-    {
-      "name": "赛马概念",
-      "sector_type": "concept",
-      "provider": "AKShare/THS",
-      "change_pct": -0.06,
-      "main_net_inflow": -28999999.999999996,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3763,11 +3763,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "TOPCON电池",
+      "name": "鸿蒙概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.1,
-      "main_net_inflow": -459999999.99999994,
+      "main_net_inflow": -1474000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3775,11 +3775,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "鸿蒙概念",
+      "name": "TOPCON电池",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.1,
-      "main_net_inflow": -1474000000.0,
+      "main_net_inflow": -459999999.99999994,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4483,11 +4483,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "网络安全",
+      "name": "染料",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.32,
-      "main_net_inflow": -2229000000.0,
+      "main_net_inflow": -356000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4495,11 +4495,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "染料",
+      "name": "网络安全",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.32,
-      "main_net_inflow": -356000000.0,
+      "main_net_inflow": -2229000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5275,11 +5275,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "固态电池",
+      "name": "煤化工概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.66,
-      "main_net_inflow": -5277000000.0,
+      "main_net_inflow": -2879000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5563,11 +5563,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "超导概念",
+      "name": "PCB概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.22,
-      "main_net_inflow": -1588000000.0,
+      "main_net_inflow": -15299000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5575,11 +5575,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "PCB概念",
+      "name": "超导概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.22,
-      "main_net_inflow": -15299000000.0,
+      "main_net_inflow": -1588000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
