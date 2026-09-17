@@ -35,8 +35,13 @@ export type MultiSourceQuote = {
 };
 
 function symbol(code: string): string | null {
-  if (/^(6|68|58)\d{4,5}$/.test(code) || /^5\d{5}$/.test(code)) return `sh${code}`;
-  if (/^(0|3|15|16)\d{4}$/.test(code)) return `sz${code}`;
+  const normalized = code.trim();
+  const shIndexCodes = new Set(["000001", "000300", "000905", "000688"]);
+  const szIndexCodes = new Set(["399001", "399006"]);
+  if (shIndexCodes.has(normalized)) return `sh${normalized}`;
+  if (szIndexCodes.has(normalized)) return `sz${normalized}`;
+  if (/^(6|68|58)\d{4,5}$/.test(normalized) || /^5\d{5}$/.test(normalized)) return `sh${normalized}`;
+  if (/^(0|3|15|16)\d{4}$/.test(normalized)) return `sz${normalized}`;
   return null;
 }
 
