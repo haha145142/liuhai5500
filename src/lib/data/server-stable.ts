@@ -20,6 +20,22 @@ function finite(v:number|null|undefined){return typeof v==="number"&&Number.isFi
 function safePct(v:number|null|undefined){const x=finite(v);return x!=null&&Math.abs(x)<=30?x:null;}
 function safeMoney(v:number|null|undefined){const x=finite(v);return x!=null&&Math.abs(x)<=1e14?x:null;}
 
+async function fetchYahooIndex(code:string):Promise<IndexQuote|null>{
+  const symbols:Record<string,string>={"000001":"000001.SS","399001":"399001.SZ","000300":"000300.SS","000905":"000905.SS","399006":"399006.SZ","000688":"000688.SS"};
+  const symbol=symbols[code]; if(!symbol)return null;
+  try{
+    const raw=await fetchText(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=5d&interval=1d&includePrePost=false`,8000,{"User-Agent":"Mozilla/5.0"});
+    const j=JSON.parse(raw) as any; const result=j?.chart?.result?.[0]; if(!result)return null;
+    const meta=result.meta||{}; const q=result.indicators?.quote?.[0]||{};
+    const closes=Array.isArray(q.close)?q.close.filter((x:any)=>typeof x==="number"&&Number.isFinite(x)):[];
+    const price=closes.length?closes[closes.length-1]:finite(meta.regularMarketPrice);
+    const prev=closes.length>1?closes[closes.length-2]:finite(meta.chartPreviousClose??meta.previousClose);
+    const def=INDEX_DEFS.find(x=>x.code===code); if(!def||price==null||prev==null||prev===0)return null;
+    const pct=((price/prev)-1)*100;
+    return {name:def.name,code:def.code,secid:def.secid,price:safeMoney(price),pct:safePct(pct),change:safeMoney(price-prev)};
+  }catch{return null;}
+}
+
 async function fetchIndices():Promise<{list:IndexQuote[];source:DataSource;validation:Snapshot["validation"]}>{
   let emq:IndexQuote[]|null=null,tq:IndexQuote[]|null=null;
   try{const j=await em(`https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&fields=f12,f14,f2,f3,f4&secids=${INDEX_DEFS.map(x=>x.secid).join(",")}&ut=${EM_UT}&_=${Date.now()}`) as any;const arr=asArr(j?.data?.diff);const list=INDEX_DEFS.map(d=>{const x=arr.find(v=>String(v.f12)===d.code)||{};return{name:d.name,code:d.code,secid:d.secid,price:safeMoney(n(x.f2)),pct:safePct(n(x.f3)),change:safeMoney(n(x.f4))};});if(list.some(x=>x.pct!=null))emq=list;}catch{}
@@ -27,13 +43,32 @@ async function fetchIndices():Promise<{list:IndexQuote[];source:DataSource;valid
   if(emq&&tq){const ok=emq.every((x,i)=>tq?.[i]?.pct!=null&&Math.abs((x.pct??0)-(tq[i].pct??0))<=0.35);return{list:ok?emq:emq.map((x,i)=>tq?.[i]?.pct!=null?tq[i]:x),source:source("指数",true,ok?"东方财富 + 腾讯财经交叉验证":"双源有分歧，采用可用值并降级"),validation:ok?"cross_checked":"single_source"};}
   if(emq)return{list:emq,source:source("指数",true,"东方财富实时行情"),validation:"single_source"};
   if(tq)return{list:tq,source:source("指数",true,"腾讯财经兜底"),validation:"single_source"};
-  return{list:emptyIndices(),source:source("指数",false,"数据源暂不可用"),validation:"cached_latest_trading_day"};
+  const yahoo=await Promise.all(INDEX_DEFS.map(d=>fetchYahooIndex(d.code)));
+  const usable=yahoo.filter((x):x is IndexQuote=>!!x);
+  if(usable.length){
+    return {list:INDEX_DEFS.map(d=>usable.find(x=>x.code===d.code)||{name:d.name,code:d.code,secid:d.secid,price:null,pct:null,change:null}),source:source("指数",true,`Yahoo Finance 备用；有效 ${usable.length}/${INDEX_DEFS.length}`),validation:"single_source"};
+  }
+  return{list:emptyIndices(),source:source("指数",false,"实时与备用数据源均不可用"),validation:"cached_latest_trading_day"};
 }
 
 async function fetchBoards():Promise<{sectors:SectorQuote[];boards:BoardQuote[];source:DataSource}>{
   const fields="f12,f14,f3,f62,f66,f69,f72,f75,f6";
   async function clist(fs:string,type:"industry"|"concept"){const j=await em(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=80&po=1&np=1&fltt=2&invt=2&fid=f3&fs=${encodeURIComponent(fs)}&fields=${fields}&ut=${EM_UT}&_=${Date.now()}`,10000) as any;return asArr(j?.data?.diff).map(x=>({code:String(x.f12||""),name:String(x.f14||""),type,change:safePct(n(x.f3)),flow:safeMoney(n(x.f62)),extraLarge:safeMoney(n(x.f66)),large:safeMoney(n(x.f69)),mid:safeMoney(n(x.f72)),small:safeMoney(n(x.f75)),turnover:safeMoney(n(x.f6))}));}
-  try{const[ind,con]=await Promise.all([clist("m:90+t:2","industry"),clist("m:90+t:3","concept")]);const all=[...ind,...con];const boards=all.filter(x=>x.name&&x.change!=null).map(x=>({code:x.code,name:x.name,type:x.type,change:x.change,flow:x.flow}));const sectors=SECTOR_RULES.map(r=>{const hit=all.find(x=>x.code===r.bkCode)||all.find(x=>x.name===r.name)||all.find(x=>r.searchKeys.some(k=>x.name.includes(k)));const flowFields={flow:hit?.flow??null,super:hit?.extraLarge??null,large:hit?.large??null,mid:hit?.mid??null,small:hit?.small??null,turnover:hit?.turnover??null};return{id:r.id,name:r.name,bkCode:r.bkCode,change:hit?.change??null,...flowFields,available:hit?.change!=null,streak:0,etfCode:r.etf?.code,etfName:r.etf?.name,validation:hit?.change!=null?"single_source" as const:"unavailable" as const};});return{sectors,boards:boards.sort((a,b)=>(b.change??-999)-(a.change??-999)),source:source("板块",sectors.some(x=>x.available),"东方财富板块行情 + 资金字段；异常值已过滤")};}catch{return{sectors:SECTOR_RULES.map(r=>({id:r.id,name:r.name,bkCode:r.bkCode,change:null,flow:null,super:null,large:null,mid:null,small:null,turnover:null,available:false,streak:0,etfCode:r.etf?.code,etfName:r.etf?.name,validation:"unavailable" as const})),boards:[],source:source("板块",false,"数据源暂不可用")};}
+  try{const[ind,con]=await Promise.all([clist("m:90+t:2","industry"),clist("m:90+t:3","concept")]);const all=[...ind,...con];const boards=all.filter(x=>x.name&&x.change!=null).map(x=>({code:x.code,name:x.name,type:x.type,change:x.change,flow:x.flow}));const sectors=SECTOR_RULES.map(r=>{const hit=all.find(x=>x.code===r.bkCode)||all.find(x=>x.name===r.name)||all.find(x=>r.searchKeys.some(k=>x.name.includes(k)));const flowFields={flow:hit?.flow??null,super:hit?.extraLarge??null,large:hit?.large??null,mid:hit?.mid??null,small:hit?.small??null,turnover:hit?.turnover??null};return{id:r.id,name:r.name,bkCode:r.bkCode,change:hit?.change??null,...flowFields,available:hit?.change!=null,streak:0,etfCode:r.etf?.code,etfName:r.etf?.name,validation:hit?.change!=null?"single_source" as const:"unavailable" as const};});if(sectors.some(x=>x.available))return{sectors,boards:boards.sort((a,b)=>(b.change??-999)-(a.change??-999)),source:source("板块",true,"东方财富板块行情 + 资金字段；异常值已过滤")};}catch{}
+  try{
+    const raw=await fetchText("https://raw.githubusercontent.com/haha145142/liuhai5500/data/akshare/data/akshare/sector-flow.json",12000,{"User-Agent":"Mozilla/5.0"});
+    const j=JSON.parse(raw) as any;
+    const rows=asArr(j?.rows ?? j?.data?.rows ?? j?.items ?? j?.data?.items);
+    const validRows=rows.filter(x=>x&&String(x.name||x.sector_name||"")&&Number.isFinite(Number(x.change_pct ?? x.change ?? x.pct)));
+    const valueOf=(x:any,key:string)=>x?.[key] == null ? null : safeMoney(Number(x[key]));
+    const changeOf=(x:any)=>safePct(Number(x.change_pct ?? x.change ?? x.pct));
+    const nameOf=(x:any)=>String(x.name||x.sector_name||"");
+    const flowOf=(x:any)=>valueOf(x,"main_net_inflow") ?? valueOf(x,"mainNetInflow") ?? valueOf(x,"flow");
+    const sectors=SECTOR_RULES.map(r=>{const hit=validRows.find(x=>nameOf(x)===r.name)||validRows.find(x=>r.searchKeys.some(k=>nameOf(x).includes(k)));const change=hit?changeOf(hit):null;return{id:r.id,name:r.name,bkCode:r.bkCode,change,flow:hit?flowOf(hit):null,super:null,large:null,mid:null,small:null,turnover:null,available:change!=null,streak:0,etfCode:r.etf?.code,etfName:r.etf?.name,validation:change!=null?"single_source" as const:"unavailable" as const};});
+    const boards=validRows.map(x=>({code:nameOf(x),name:nameOf(x),type:String(x.sector_type||x.type)==="concept"?"concept" as const:"industry" as const,change:changeOf(x),flow:flowOf(x)})).filter(x=>x.change!=null);
+    if(sectors.some(x=>x.available))return{sectors,boards,source:source("板块",true,`AKShare 备用快照；交易日 ${String(j?.marketDate||j?.data?.marketDate||"未知")}`)};
+  }catch{}
+  return{sectors:SECTOR_RULES.map(r=>({id:r.id,name:r.name,bkCode:r.bkCode,change:null,flow:null,super:null,large:null,mid:null,small:null,turnover:null,available:false,streak:0,etfCode:r.etf?.code,etfName:r.etf?.name,validation:"unavailable" as const})),boards:[],source:source("板块",false,"东方财富与 AKShare 备用快照均不可用")};
 }
 
 async function fetchFlow():Promise<{flow:MarketOrder|null;source:DataSource}>{
