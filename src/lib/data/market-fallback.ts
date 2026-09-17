@@ -75,6 +75,7 @@ async function fetchYahooIndex(code: string): Promise<IndexQuote | null> {
 }
 
 function parseAkshareRows(value: unknown) {
+  if (Array.isArray(value)) return value;
   const json = value as any;
   return asArr(json?.rows ?? json?.data?.rows ?? json?.items ?? json?.data?.items);
 }
@@ -90,23 +91,23 @@ async function fetchAkshareSectors() {
 }
 
 function akshareChange(row: any) {
-  return cleanPct(row?.change_pct ?? row?.changePct ?? row?.change ?? row?.pct ?? row?.涨跌幅 ?? row?."涨跌幅");
+  return cleanPct(row?.change_pct ?? row?.changePct ?? row?.change ?? row?.pct ?? row?.涨跌幅);
 }
 function akshareFlow(row: any) {
-  return cleanMoney(row?.main_net_inflow ?? row?.mainNetInflow ?? row?.flow ?? row?.主力净流入 ?? row?."主力净流入");
+  return cleanMoney(row?.main_net_inflow ?? row?.mainNetInflow ?? row?.flow ?? row?.主力净流入);
 }
 function akshareName(row: any) {
-  return String(row?.name ?? row?.sector_name ?? row?.板块名称 ?? row?."板块名称" ?? "").trim();
+  return String(row?.name ?? row?.sector_name ?? row?.板块名称 ?? "").trim();
 }
 
 async function fetchLatestSnapshot() {
-  const [indexResult, sectorResult, tencentIndexResult, sinaIndexResult, akshareSectorResult, ...yahooResults] = await Promise.all([
+  const [indexResult, sectorResult, tencentIndexResult, sinaIndexResult, akshareSectorResult, yahooIndices] = await Promise.all([
     fetchText(`https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&fields=f12,f14,f2,f3,f4&secids=${INDEX_DEFS.map((x) => x.secid).join(",")}&ut=${EM_UT}&_=${Date.now()}`, 7000, { Referer: "https://quote.eastmoney.com/", Accept: "application/json,text/plain,*/*" }).then((value) => ({ status: "fulfilled" as const, value })).catch((reason) => ({ status: "rejected" as const, reason })),
     fetchText(`https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=1200&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:90+t:2,m:90+t:3&fields=f12,f14,f3,f62,f66,f69,f72,f75,f6&ut=${EM_UT}&_=${Date.now()}`, 7000, { Referer: "https://quote.eastmoney.com/", Accept: "application/json,text/plain,*/*" }).then((value) => ({ status: "fulfilled" as const, value })).catch((reason) => ({ status: "rejected" as const, reason })),
     fetchText("https://qt.gtimg.cn/q=sh000001,sz399001,sh000300,sh000905,sz399006,sh000688", 7000, { Referer: "https://qt.gtimg.cn/", Accept: "text/plain,*/*" }).then((value) => ({ status: "fulfilled" as const, value })).catch((reason) => ({ status: "rejected" as const, reason })),
     fetchText("https://hq.sinajs.cn/list=s_sh000001,s_sz399001,s_sh000300,s_sh000905,s_sz399006,s_sh000688", 7000, { Referer: "https://finance.sina.com.cn/", Accept: "text/plain,*/*" }).then((value) => ({ status: "fulfilled" as const, value })).catch((reason) => ({ status: "rejected" as const, reason })),
     fetchAkshareSectors(),
-    ...INDEX_DEFS.map((def) => fetchYahooIndex(def.code)),
+    Promise.all(INDEX_DEFS.map((def) => fetchYahooIndex(def.code))),
   ]);
 
   const indexJson = indexResult.status === "fulfilled" ? (parseMaybeJsonp(indexResult.value) as { data?: { diff?: unknown } } | null) : null;
@@ -115,7 +116,6 @@ async function fetchLatestSnapshot() {
   const boardRows = asArr(sectorJson?.data?.diff);
   const tencentIndices = tencentIndexResult.status === "fulfilled" ? parseTencentIndices(tencentIndexResult.value) : [];
   const sinaIndices = sinaIndexResult.status === "fulfilled" ? parseSinaIndices(sinaIndexResult.value) : [];
-  const yahooIndices = yahooResults.filter((x): x is IndexQuote | null => x != null) as Array<IndexQuote | null>;
   const akshareRows = parseAkshareRows(akshareSectorResult);
 
   const indices: IndexQuote[] = INDEX_DEFS.map((def, index) => {
