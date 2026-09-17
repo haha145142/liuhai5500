@@ -3,6 +3,7 @@ name: Vercel Production Deploy
 # 生产部署默认手动触发；最终部署提交允许通过本工作流文件自身的 push 触发，避免普通开发提交消耗部署次数。
 # 代码质量由独立 Quality Gate workflow 在 push/PR 上检查。
 # 手动推进生产时，通过修改本工作流文件可显式触发一次 --prod，确保生产别名切到目标提交。
+# Production promotion follows the current main commit after validation.
 on:
   workflow_dispatch:
   push:
