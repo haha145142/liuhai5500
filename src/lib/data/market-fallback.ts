@@ -161,7 +161,7 @@ async function fetchLatestSnapshot() {
       streak: 0,
       etfCode: rule.etf?.code,
       etfName: rule.etf?.name,
-      validation: row ? "single_source" : effectiveRow ? "snapshot_fallback" : "unavailable",
+      validation: row ? "single_source" : effectiveRow ? "single_source" : "unavailable",
     };
   });
 
