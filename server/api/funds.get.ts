@@ -4,7 +4,7 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const code = String(query.code ?? "").trim();
 
-  if (!/^\\d{6}$/.test(code)) {
+  if (!/^\d{6}$/.test(code)) {
     return new Response(JSON.stringify({
       ok: false,
       error: "invalid_code",
