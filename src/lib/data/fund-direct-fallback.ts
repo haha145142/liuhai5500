@@ -61,59 +61,61 @@ function parseDirect(text: string, code: string): ParsedDirect {
   };
 }
 
+export async function getDirectFundFallbackDirect(codeInput: string): Promise<FundQuote | null> {
+  const code = codeInput.trim();
+  if (!/^\d{6}$/.test(code)) return null;
+  const versions = [Date.now(), Date.now() - 60_000];
+  for (const version of versions) {
+    try {
+      const text = await fetchText(`${ROOT}/${code}.js?v=${version}`, 9000, { Referer: `https://fund.eastmoney.com/${code}.html` });
+      const parsed = parseDirect(text, code);
+      const latest = parsed.historyPoints.at(-1) || null;
+      const previous = parsed.historyPoints.at(-2) || null;
+      if (!latest) continue;
+      const history = parsed.historyPoints.map((x) => x.nav);
+      const metrics = calcIndicators(history);
+      const dayPct = latest.changePct ?? (previous?.nav ? (latest.nav / previous.nav - 1) * 100 : null);
+      const weekBase = parsed.historyPoints.at(-6)?.nav;
+      const monthBase = parsed.historyPoints.at(-22)?.nav;
+      const expectedDate = tradingDateLabel();
+      const officialToday = latest.date === expectedDate;
+      return {
+        code: parsed.code,
+        name: parsed.name,
+        type: parsed.type,
+        nav: latest.nav,
+        navDate: latest.date,
+        estimate: null,
+        estimatePct: null,
+        estimateTime: null,
+        dayPct,
+        weekPct: weekBase ? (latest.nav / weekBase - 1) * 100 : null,
+        monthPct: monthBase ? (latest.nav / monthBase - 1) * 100 : null,
+        history,
+        historyPoints: parsed.historyPoints,
+        metrics,
+        source: officialToday ? "东方财富 pingzhongdata · 今日历史净值" : "东方财富 pingzhongdata · 最近官方历史净值",
+        officialNavPublished: officialToday,
+        valuationStatus: officialToday ? "official_nav" : "waiting_official_nav",
+        estimateConfidence: "medium",
+        estimateMethod: "历史官方净值直接读取；无可靠盘中估值时不猜测",
+        estimateCoverage: 0,
+        externalEstimatePct: null,
+        estimateDeviation: null,
+        estimateValidation: officialToday ? "直接历史净值 · 今日已发布" : `直接历史净值 · 最近交易日 ${latest.date}`,
+        historyMae20: null,
+        historySample20: Math.min(20, parsed.historyPoints.length),
+        historyMaxError: null,
+        historyP95Error: null,
+        historyMae5: null,
+      };
+    } catch {
+      // try next version / fail closed
+    }
+  }
+  return null;
+}
+
 export const getDirectFundFallback = createServerFn({ method: "POST" })
   .validator((input: { code: string }) => input)
-  .handler(async ({ data }): Promise<FundQuote | null> => {
-    const code = data.code.trim();
-    if (!/^\d{6}$/.test(code)) return null;
-    const versions = [Date.now(), Date.now() - 60_000];
-    for (const version of versions) {
-      try {
-        const text = await fetchText(`${ROOT}/${code}.js?v=${version}`, 9000, { Referer: `https://fund.eastmoney.com/${code}.html` });
-        const parsed = parseDirect(text, code);
-        const latest = parsed.historyPoints.at(-1) || null;
-        const previous = parsed.historyPoints.at(-2) || null;
-        if (!latest) continue;
-        const history = parsed.historyPoints.map((x) => x.nav);
-        const metrics = calcIndicators(history);
-        const dayPct = latest.changePct ?? (previous?.nav ? (latest.nav / previous.nav - 1) * 100 : null);
-        const weekBase = parsed.historyPoints.at(-6)?.nav;
-        const monthBase = parsed.historyPoints.at(-22)?.nav;
-        const expectedDate = tradingDateLabel();
-        const officialToday = latest.date === expectedDate;
-        return {
-          code: parsed.code,
-          name: parsed.name,
-          type: parsed.type,
-          nav: latest.nav,
-          navDate: latest.date,
-          estimate: null,
-          estimatePct: null,
-          estimateTime: null,
-          dayPct,
-          weekPct: weekBase ? (latest.nav / weekBase - 1) * 100 : null,
-          monthPct: monthBase ? (latest.nav / monthBase - 1) * 100 : null,
-          history,
-          historyPoints: parsed.historyPoints,
-          metrics,
-          source: officialToday ? "东方财富 pingzhongdata · 今日历史净值" : "东方财富 pingzhongdata · 最近官方历史净值",
-          officialNavPublished: officialToday,
-          valuationStatus: officialToday ? "official_nav" : "waiting_official_nav",
-          estimateConfidence: "medium",
-          estimateMethod: "历史官方净值直接读取；无可靠盘中估值时不猜测",
-          estimateCoverage: 0,
-          externalEstimatePct: null,
-          estimateDeviation: null,
-          estimateValidation: officialToday ? "直接历史净值 · 今日已发布" : `直接历史净值 · 最近交易日 ${latest.date}`,
-          historyMae20: null,
-          historySample20: Math.min(20, parsed.historyPoints.length),
-          historyMaxError: null,
-          historyP95Error: null,
-          historyMae5: null,
-        };
-      } catch {
-        // try next version / fail closed
-      }
-    }
-    return null;
-  });
+  .handler(async ({ data }): Promise<FundQuote | null> => getDirectFundFallbackDirect(data.code));
