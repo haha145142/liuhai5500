@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AiRouteImport } from './routes/ai'
+import { Route as ApiFundsRouteImport } from './routes/api/funds'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as BandRouteImport } from './routes/band'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as FundsRouteImport } from './routes/funds'
@@ -27,6 +29,8 @@ import { Route as ToolsRouteImport } from './routes/tools'
 
 const IndexRoute = IndexRouteImport.update({ id: '/', path: '/', getParentRoute: () => rootRouteImport } as any)
 const AiRoute = AiRouteImport.update({ id: '/ai', path: '/ai', getParentRoute: () => rootRouteImport } as any)
+const ApiFundsRoute = ApiFundsRouteImport.update({ id: '/api/funds', path: '/api/funds', getParentRoute: () => rootRouteImport } as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({ id: '/api/health', path: '/api/health', getParentRoute: () => rootRouteImport } as any)
 const BandRoute = BandRouteImport.update({ id: '/band', path: '/band', getParentRoute: () => rootRouteImport } as any)
 const CompareRoute = CompareRouteImport.update({ id: '/compare', path: '/compare', getParentRoute: () => rootRouteImport } as any)
 const FundsRoute = FundsRouteImport.update({ id: '/funds', path: '/funds', getParentRoute: () => rootRouteImport } as any)
@@ -44,6 +48,14 @@ const ToolsRoute = ToolsRouteImport.update({ id: '/tools', path: '/tools', getPa
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
+  '/api/funds': typeof ApiFundsRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/funds': typeof ApiFundsRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/funds': typeof ApiFundsRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/funds': typeof ApiFundsRoute
+  '/api/health': typeof ApiHealthRoute
   '/band': typeof BandRoute
   '/compare': typeof CompareRoute
   '/funds': typeof FundsRoute
@@ -98,6 +110,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/ai'
+    | '/api/funds'
+    | '/api/health'
+    | '/api/funds'
+    | '/api/health'
+    | '/api/funds'
+    | '/api/health'
     | '/band'
     | '/compare'
     | '/funds'
@@ -150,6 +168,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AiRoute: typeof AiRoute
+  ApiFundsRoute: typeof ApiFundsRoute
+  ApiHealthRoute: typeof ApiHealthRoute
   BandRoute: typeof BandRoute
   CompareRoute: typeof CompareRoute
   FundsRoute: typeof FundsRoute
@@ -169,6 +189,8 @@ declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/': { id: '/'; path: '/'; fullPath: '/'; preLoaderRoute: typeof IndexRouteImport; parentRoute: typeof rootRouteImport }
     '/ai': { id: '/ai'; path: '/ai'; fullPath: '/ai'; preLoaderRoute: typeof AiRouteImport; parentRoute: typeof rootRouteImport }
+    '/api/funds': { id: '/api/funds'; path: '/api/funds'; fullPath: '/api/funds'; preLoaderRoute: typeof ApiFundsRouteImport; parentRoute: typeof rootRouteImport }
+    '/api/health': { id: '/api/health'; path: '/api/health'; fullPath: '/api/health'; preLoaderRoute: typeof ApiHealthRouteImport; parentRoute: typeof rootRouteImport }
     '/band': { id: '/band'; path: '/band'; fullPath: '/band'; preLoaderRoute: typeof BandRouteImport; parentRoute: typeof rootRouteImport }
     '/compare': { id: '/compare'; path: '/compare'; fullPath: '/compare'; preLoaderRoute: typeof CompareRouteImport; parentRoute: typeof rootRouteImport }
     '/funds': { id: '/funds'; path: '/funds'; fullPath: '/funds'; preLoaderRoute: typeof FundsRouteImport; parentRoute: typeof rootRouteImport }
@@ -188,6 +210,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute,
   AiRoute,
+  ApiFundsRoute,
+  ApiHealthRoute,
   BandRoute,
   CompareRoute,
   FundsRoute,
