@@ -29,4 +29,4 @@ npm test
 - Historical reference implementations are kept under `attachments/` for later feature comparison and consolidation.
 - Live fund valuation is calculated locally from disclosed holdings and live underlying prices; third-party estimates are validation references, not the displayed source of truth.
 
-<!-- production-deploy-sync: 2026-09-01 -->
+<!-- production-deploy-sync: 2026-09-19 -->
