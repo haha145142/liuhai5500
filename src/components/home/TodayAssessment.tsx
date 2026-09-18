@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { ChevronDown } from "lucide-react";
 import { Glass, Tone, DataStatus } from "@/components/ui/Glass";
 import { buildEvidence } from "@/lib/calc/evidence";
 import { calcMarketScoreV2 } from "@/lib/calc/market-score-v2";
+import { cn } from "@/lib/cn";
 import { useApp } from "@/lib/store";
 
 function actionFor(verdict: string, confidence: string, weekend: boolean) {
@@ -39,6 +41,7 @@ export function TodayAssessment() {
   const capitalSignal = signalFromStep(step3?.body, /净流入|共振/, /净流出/);
   const sentimentSignal = signalFromStep(step4?.body, /积极|利好|上涨|支持/, /谨慎|利空|下跌|风险/);
   const globalSignal = signalFromStep(step6?.body, /偏强|涨/, /偏弱|跌/);
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <section className="mt-3" aria-label="今日评估">
@@ -50,12 +53,17 @@ export function TodayAssessment() {
         <div className="mt-3 rounded-[18px] bg-white/58 p-3 ring-1 ring-white/80">
           <div className="flex items-end justify-between gap-3"><div><div className="text-[10px] text-muted">今日市场评分</div><Tone v={scoreTone} className="mt-0.5 block text-[28px] font-bold leading-none tracking-tight">{score == null ? "—" : score}</Tone></div><div className="text-right"><div className="text-[13px] font-semibold text-fg">{scoreLabel}</div><div className="mt-1 text-[9px] text-subtle">{coverage}</div></div></div>
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-gradient-to-r from-red-200 via-slate-200 to-emerald-200"><span className="block h-full w-2 rounded-full bg-slate-900/85 shadow-[0_0_0_3px_rgba(255,255,255,.8)]" style={{ marginLeft: `calc(${Math.max(4, Math.min(96, score ?? 50))}% - 4px)` }} /></div>
-          {quantitative?.factors.length ? <div className="mt-2 grid grid-cols-2 gap-1.5">{quantitative.factors.map((factor) => <div key={factor.name} className="rounded-[12px] bg-white/52 px-2 py-1.5"><div className="flex items-center justify-between gap-2 text-[9px]"><span className="font-medium text-slate-500">{factor.name}</span><b className={factor.score > 0 ? "text-up" : factor.score < 0 ? "text-down" : "text-slate-500"}>{factor.score > 0 ? "+" : ""}{factor.score.toFixed(0)}</b></div><div className="mt-0.5 truncate text-[9px] text-slate-400">{factor.detail}</div></div>)}</div> : null}
+          {expanded && quantitative?.factors.length ? <div className="mt-2 grid grid-cols-2 gap-1.5">{quantitative.factors.map((factor) => <div key={factor.name} className="rounded-[12px] bg-white/52 px-2 py-1.5"><div className="flex items-center justify-between gap-2 text-[9px]"><span className="font-medium text-slate-500">{factor.name}</span><b className={factor.score > 0 ? "text-up" : factor.score < 0 ? "text-down" : "text-slate-500"}>{factor.score > 0 ? "+" : ""}{factor.score.toFixed(0)}</b></div><div className="mt-0.5 truncate text-[9px] text-slate-400">{factor.detail}</div></div>)}</div> : null}
         </div>
         <div className="mt-2.5 rounded-[18px] bg-white/50 px-3 py-2.5"><div className="flex items-center justify-between gap-2"><div className="text-[12px] font-semibold text-fg">今天怎么做</div><span className="rounded-full bg-blue-500/10 px-2.5 py-1 text-[9px] font-semibold text-blue-700">{action}</span></div><p className="mt-1 text-[10px] leading-[1.55] text-muted">{quantitative?.score == null ? "核心指数或市场宽度数据不足，暂不强行给方向。" : quantitative.basis}</p></div>
+        {expanded ? <>
         <div className="mt-2 grid grid-cols-2 gap-2"><Signal label="主力" value={capitalSignal} /><Signal label="板块" value={sectorSignal} /><Signal label="情绪" value={sentimentSignal} /><Signal label="外围" value={globalSignal} /></div>
         {step7 ? <div className="mt-2 rounded-[16px] border border-blue-200/70 bg-blue-50/45 p-2.5"><div className="text-[10px] font-semibold text-blue-700">综合判断</div><p className="mt-1 text-[9px] leading-[1.5] text-muted">{step7.body}</p></div> : null}
         <div className="mt-2.5 grid grid-cols-2 gap-2">{result?.steps?.slice(0, 6).map((step) => <div key={step.id} className="rounded-[14px] bg-white/54 px-2.5 py-2 ring-1 ring-white/70"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-medium text-fg">{step.title}</span><span className="text-[9px] text-subtle">{step.evidence}</span></div><p className="mt-1 line-clamp-2 text-[9px] leading-[1.45] text-muted">{step.body}</p></div>)}</div>
+        </> : null}
+        <button type="button" onClick={() => setExpanded(v => !v)} className="mt-2.5 flex w-full items-center justify-center gap-1 rounded-[14px] bg-white/46 py-2 text-[11px] font-medium text-slate-500 active:bg-white/66">
+          {expanded ? "收起细节" : "展开评分细节"} <ChevronDown className={cn("size-3.5 transition-transform", expanded ? "rotate-180" : "")} />
+        </button>
         <div className="mt-2.5 flex items-center justify-between gap-2 text-[9px] text-subtle"><span>评分来自量化因子和可验证数据；证据不足时不输出确定方向。</span><Link to="/ai" className="shrink-0 rounded-full border border-blue-200/70 bg-white/55 px-2.5 py-1 text-[10px] font-medium text-blue-600">看完整证据链 →</Link></div>
       </Glass>
     </section>
