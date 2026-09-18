@@ -1,21 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { HomeDashboardV2 } from "@/components/home/HomeDashboardV2";
-import { IndexGrid } from "@/components/market/IndexGrid";
-import { useApp } from "@/lib/store";
-import { Glass, SectionTitle } from "@/components/ui/Glass";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
-  const indices = useApp((s) => s.snapshot?.indices ?? []);
-
-  return (
-    <>
-      <Glass className="mt-0 rounded-[26px] p-3">
-        <SectionTitle title="A股核心指数" hint="上证 · 深证 · 沪深300 · 中证500 · 创业板 · 科创50" />
-        <IndexGrid indices={indices} />
-      </Glass>
-      <HomeDashboardV2 />
-    </>
-  );
+  // 首页只放“我的钱”：持仓总收益 + 我的基金。
+  // 指数、板块、市场判断、新闻全部归到“市场”tab，不再堆在首页。
+  return <HomeDashboardV2 />;
 }
