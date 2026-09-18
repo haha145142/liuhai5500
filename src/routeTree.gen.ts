@@ -50,12 +50,6 @@ export interface FileRoutesByFullPath {
   '/ai': typeof AiRoute
   '/api/funds': typeof ApiFundsRoute
   '/api/health': typeof ApiHealthRoute
-  '/api/funds': typeof ApiFundsRoute
-  '/api/health': typeof ApiHealthRoute
-  '/api/funds': typeof ApiFundsRoute
-  '/api/health': typeof ApiHealthRoute
-  '/api/funds': typeof ApiFundsRoute
-  '/api/health': typeof ApiHealthRoute
   '/band': typeof BandRoute
   '/compare': typeof CompareRoute
   '/funds': typeof FundsRoute
@@ -110,10 +104,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/ai'
-    | '/api/funds'
-    | '/api/health'
-    | '/api/funds'
-    | '/api/health'
     | '/api/funds'
     | '/api/health'
     | '/band'
