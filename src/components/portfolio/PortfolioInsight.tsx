@@ -48,7 +48,8 @@ export function PortfolioInsight({ holdings, funds, sectors }: { holdings: Holdi
     const sync = () => setSelectedBoards(readSelectedBoards());
     sync();
     window.addEventListener("storage", sync);
-    return () => window.removeEventListener("storage", sync);
+    window.addEventListener("fund-ai-pro-board-watch-change", sync);
+    return () => { window.removeEventListener("storage", sync); window.removeEventListener("fund-ai-pro-board-watch-change", sync); };
   }, []);
 
   if (!holdings.length) return null;
