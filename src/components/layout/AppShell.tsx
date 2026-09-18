@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 import { SideDrawer } from "./SideDrawer";
 
 const NEWS_REFRESH_MS = 3 * 60_000;
-const PORTFOLIO_REFRESH_MS = 3 * 60_000;
+const PORTFOLIO_REFRESH_MS = 30_000;
 const BOOT_DELAY_MS = 80;
 const NEWS_BOOT_DELAY_MS = 450;
 const RESUME_DEBOUNCE_MS = 2_000;
