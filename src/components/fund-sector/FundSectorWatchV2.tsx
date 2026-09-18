@@ -18,7 +18,7 @@ const PREVIOUS_KEY = "fund_ai_pro_board_watch_v7";
 const LEGACY_KEY = "fund_ai_pro_board_watch_v6";
 const CANDIDATE_KEY = "fund_ai_pro_fund_candidates_v1";
 const LEGACY_DEFAULT_CODES = new Set(["BK0917", "BK1134", "BK1128", "BK1137", "BK1059", "BK1650", "BK1129", "BK0890"]);
-const BOARD_REFRESH_MS = 3 * 60_000;
+const BOARD_REFRESH_MS = 30_000;
 
 const BOARD_GROUPS: { id: BoardGroupId; label: string; ids: string[] }[] = [
   { id: "全部", label: "全部", ids: SECTOR_RULES.map((x) => x.id) },
