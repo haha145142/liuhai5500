@@ -2,9 +2,6 @@ import "@/styles/home-readability.css";
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, Plus, Sparkles, X } from "lucide-react";
-import { FundSectorWatchV2 } from "@/components/fund-sector/FundSectorWatchV2";
-import { TodayAssessment } from "@/components/home/TodayAssessment";
-import { OperationAdvice } from "@/components/market/OperationAdvice";
 import { Glass, Tone } from "@/components/ui/Glass";
 import { useApp } from "@/lib/store";
 import { calcHoldingReturn, calcPortfolioReturn } from "@/lib/calc/portfolio-returns";
@@ -14,17 +11,11 @@ import { fmtMoney, fmtPctShort } from "@/lib/format";
 type PeriodTab = "today" | "week" | "month" | "quarter" | "since";
 const SERVICES = [["/portfolio", "我的持仓", "💼"], ["/portfolio", "收益日历", "🗓️"], ["/portfolio", "止盈止损", "🎯"], ["/portfolio", "持仓分析", "🔎"], ["/band", "波段信号", "🌈"], ["/market", "行情中心", "📊"], ["/funds", "基金排行", "🏆"], ["/news", "市场资讯", "📰"], ["/ai", "AI证据链", "✨"], ["/settings", "设置", "⚙️"]] as const;
 
-function formatNewsTime(value: number | null) {
-  if (value == null || !Number.isFinite(value)) return "时间未知";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "时间未知" : date.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", month: "2-digit", day: "2-digit", hour12: false });
-}
 
 export function HomeDashboardV2() {
   const portfolio = useApp((s) => s.portfolio);
   const funds = useApp((s) => s.funds);
   const snapshot = useApp((s) => s.snapshot);
-  const news = useApp((s) => s.news);
   const [servicesOpen, setServicesOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [periodTab, setPeriodTab] = useState<PeriodTab>("today");
@@ -41,8 +32,6 @@ export function HomeDashboardV2() {
     return { label: summary.todayPnl == null ? "今日收益（已计价）" : "今日收益", amount: summary.todayPnl, pct: summary.todayPnlPct };
   }, [fullyPriced, periodTab, periods, summary]);
   const validation = snapshot?.validation === "cross_checked" ? "双源核验" : snapshot?.validation === "cached_latest_trading_day" ? "最近交易日" : snapshot?.validation === "single_source" ? "单源可用" : "等待可靠行情";
-  const latestNews = news?.items?.slice(0, 3) || [];
-  const benchPct = snapshot?.indices?.find((x) => x.code === "000300")?.pct ?? null;
 
   return <div className="home-dashboard-v3 pb-4">
     <section className="home-income-card" aria-label="持仓总收益">
@@ -60,16 +49,10 @@ export function HomeDashboardV2() {
       </Glass>
     </section>
 
-    <TodayAssessment />
-
     <section className="home-portfolio-section mt-3" aria-label="我的持仓"><div className="home-section-head mb-2 flex items-end justify-between"><div><div className="text-[17px] font-semibold tracking-tight text-slate-950">我的持仓</div><div className="text-[11px] text-slate-400">实时估值 · 持有收益 · 波段 / 趋势 / 做T</div></div><Link to="/portfolio" className="text-[11px] font-medium text-blue-600">全部 {portfolio.length || 0} 只</Link></div>{portfolio.length ? <Glass tight className="overflow-hidden p-0"><div className="divide-y divide-white/70">{visible.map((h) => { const f = funds[h.code]; const r = f ? calcHoldingReturn(h, f) : null; const liveLabel = r?.quoteMode === "live_estimate" ? `实时估值 ${r.price == null ? "—" : r.price.toFixed(4)}` : null; const official = f?.officialNavPublished === true && f.valuationStatus === "official_nav"; const referenceLabel = official && f?.nav != null ? `官方净值 ${f.nav.toFixed(4)}` : f?.referenceNav != null ? `参考净值 ${f.referenceNav.toFixed(4)}` : f?.nav == null ? "参考净值 —" : `最近官方净值 ${f.nav.toFixed(4)}`; return <Link key={h.code} to="/portfolio" className="home-fund-row flex min-h-[60px] items-center gap-2.5 px-3.5 py-2.5 active:bg-white/45"><span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-white/72 text-sm shadow-sm">📈</span><span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-slate-900">{f?.name || h.name}</span><span className="mt-0.5 block truncate text-[10px] text-slate-400">{h.code} · {liveLabel ? `${liveLabel} · ${referenceLabel}` : referenceLabel}</span></span><span className="shrink-0 text-right"><Tone v={r?.todayPnlPct ?? null} className="block text-[15px] font-bold tabular-nums">{r?.todayPnlPct == null ? "—" : fmtPctShort(r.todayPnlPct)}</Tone><Tone v={r?.holdingPnlPct ?? null} className="mt-0.5 block text-[10px] font-medium tabular-nums">持有 {r?.holdingPnlPct == null ? "—" : fmtPctShort(r.holdingPnlPct)}</Tone></span><ChevronRight className="size-4 shrink-0 text-slate-300" /></Link>; })}</div>{portfolio.length > 8 ? <button type="button" onClick={() => setExpanded((v) => !v)} className="home-expand-btn flex w-full items-center justify-center border-t border-white/70 py-2.5 text-[11px] font-medium text-slate-500">{expanded ? "收起全部" : `展开剩余 ${portfolio.length - 8} 只`}</button> : null}</Glass> : <Glass tight className="border-dashed text-center"><div className="py-3 text-[12px] text-slate-500">还没有持仓</div><Link to="/portfolio" className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-3 py-1.5 text-[11px] text-white"><Plus className="size-3.5" />添加基金</Link></Glass>}</section>
 
-    <section className="home-sector-section mt-3" aria-label="自选板块"><FundSectorWatchV2 /></section>
-    <OperationAdvice sectors={snapshot?.sectors || []} benchPct={benchPct} />
 
-    <section className="home-news-section mb-3 overflow-hidden rounded-[24px] border border-white/75 bg-white/48 p-3 shadow-[0_14px_38px_rgba(38,78,112,.07)] backdrop-blur-[20px]" aria-label="最新资讯"><div className="mb-2 flex items-center justify-between"><div><div className="text-[17px] font-semibold tracking-tight text-fg">最新资讯</div><div className="text-[10px] text-muted">{latestNews.length ? "只显示最新 3 条" : "当前没有可靠资讯"}</div></div><Link to="/news" className="text-[10px] text-blue-600">全部 →</Link></div>{latestNews.length ? <div className="space-y-1.5">{latestNews.map((item) => <a key={`${item.source}-${item.publishedAt}-${item.title}`} href={item.url || "#"} target="_blank" rel="noreferrer" className="block rounded-[14px] bg-white/58 px-2.5 py-2.5 active:bg-white/75"><div className="line-clamp-2 text-[11px] font-medium text-slate-800">{item.title}</div><div className="mt-1 text-[9px] text-slate-400">{item.source || "新闻"} · {formatNewsTime(item.publishedAt)}</div></a>)}</div> : <div className="rounded-[16px] bg-white/46 px-3 py-4 text-center"><div className="text-[11px] font-medium text-slate-600">暂无可靠资讯源</div><div className="mt-1 text-[9px] text-slate-400">数据恢复后这里会自动显示最新 3 条。</div></div>}</section>
-
-    <button type="button" onClick={() => setServicesOpen(true)} className="home-services-trigger mt-3 flex w-full items-center justify-between rounded-[21px] border border-white/75 bg-white/58 px-4 py-3 shadow-[0_10px_30px_rgba(38,78,112,.07)] backdrop-blur-[24px]" aria-label="打开全部服务"><span className="flex items-center gap-2.5"><span className="flex size-9 items-center justify-center rounded-full bg-white/80 shadow-sm"><Sparkles className="size-4 text-slate-700" /></span><span className="text-left"><span className="block text-[14px] font-semibold text-slate-900">全部服务</span><span className="block text-[10px] text-slate-400">低频功能集中收纳，不占首页空间</span></span></span><ChevronRight className="size-4 text-slate-400" /></button>
+    <button type="button" onClick={() => setServicesOpen(true)} className="home-services-trigger mt-3 flex w-full items-center justify-between rounded-[21px] border border-white/75 bg-white/58 px-4 py-3 shadow-[0_10px_30px_rgba(38,78,112,.07)] backdrop-blur-[24px]" aria-label="打开全部服务"><span className="flex items-center gap-2.5"><span className="flex size-9 items-center justify-center rounded-full bg-white/80 shadow-sm"><Sparkles className="size-4 text-slate-700" /></span><span className="text-left"><span className="block text-[14px] font-semibold text-slate-900">全部服务</span><span className="block text-[10px] text-slate-400">指数 · 板块 · 新闻 · 波段 · 设置都在这里</span></span></span><ChevronRight className="size-4 text-slate-400" /></button>
     {servicesOpen ? <div className="fixed inset-0 z-[7000] flex items-end bg-slate-950/20 backdrop-blur-[4px]" role="dialog" aria-modal="true" aria-label="全部服务" onClick={() => setServicesOpen(false)}><div className="w-full rounded-t-[30px] bg-white/82 px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-4 shadow-[0_-20px_70px_rgba(22,42,64,.20)] backdrop-blur-[32px]" onClick={(e) => e.stopPropagation()}><div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-300/70" /><div className="flex items-center justify-between"><div><div className="text-[18px] font-semibold text-slate-950">全部服务</div><div className="text-[10px] text-slate-400">只收纳当前已经存在的功能</div></div><button type="button" onClick={() => setServicesOpen(false)} aria-label="关闭全部服务" className="flex size-9 items-center justify-center rounded-full bg-white/72"><X className="size-4" /></button></div><div className="mt-4 grid grid-cols-3 gap-2.5">{SERVICES.map(([to, title, icon]) => <Link key={`${to}-${title}`} to={to} onClick={() => setServicesOpen(false)} className="rounded-[18px] bg-white/62 px-2 py-3 text-center ring-1 ring-white/80 active:scale-[0.98]"><span className="mx-auto flex size-10 items-center justify-center rounded-[14px] bg-white/78 text-lg shadow-sm">{icon}</span><span className="mt-1.5 block truncate text-[11px] font-semibold text-slate-800">{title}</span></Link>)}</div></div></div> : null}
   </div>;
 }
