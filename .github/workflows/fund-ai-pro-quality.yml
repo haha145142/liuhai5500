@@ -104,3 +104,4 @@ jobs:
           name: goutoujunshi-jev-chat-wechat-unified-apk
           path: /tmp/goutoujunshi-jev-chat/integrations/jev_android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+# one-shot Goutoujunshi APK build trigger
