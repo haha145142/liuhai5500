@@ -46,3 +46,61 @@ jobs:
           CI: true
 
       # Keep this workflow as the canonical code-quality gate.
+  goutoujunshi-android:
+    if: ${{ contains(github.event.head_commit.message, '[build-goutoujunshi-apk]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout build host repo
+        uses: actions/checkout@v4
+
+      - name: Checkout upstream Goutoujunshi Android
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/goutoujunshi-jev-chat
+          git clone --depth 1 --branch main \
+            https://github.com/shengjidaguai-china/goutoujunshi-jev-chat.git \
+            /tmp/goutoujunshi-jev-chat
+
+      - name: Apply WeChat and unified love pipeline
+        run: |
+          python3 tools/build_goutoujunshi_android.py
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - name: Build and test debug APK
+        working-directory: /tmp/goutoujunshi-jev-chat/integrations/jev_android
+        shell: bash
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=/tmp/goutoujunshi-jev-chat/integrations/jev_android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          ls -lh "$APK"
+          sha256sum "$APK"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: goutoujunshi-jev-chat-wechat-unified-apk
+          path: /tmp/goutoujunshi-jev-chat/integrations/jev_android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
