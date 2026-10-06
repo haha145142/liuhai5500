@@ -3,7 +3,7 @@
   "source": "AKShare",
   "provider": "akshare",
   "schemaVersion": 3,
-  "fetchedAt": "2026-10-05T23:04:04.495339+08:00",
+  "fetchedAt": "2026-10-06T15:01:15.932461+08:00",
   "marketDate": "2026-09-30",
   "rows": [
     {
@@ -2203,11 +2203,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "西部大开发",
+      "name": "磷化工",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.3,
-      "main_net_inflow": 806000000.0,
+      "main_net_inflow": -276000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2215,11 +2215,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "磷化工",
+      "name": "西部大开发",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.3,
-      "main_net_inflow": -276000000.0,
+      "main_net_inflow": 806000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3103,11 +3103,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "海工装备",
+      "name": "一体化压铸",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.13,
-      "main_net_inflow": -2798000000.0,
+      "main_net_inflow": -409000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3115,11 +3115,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "一体化压铸",
+      "name": "海工装备",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.13,
-      "main_net_inflow": -409000000.0,
+      "main_net_inflow": -2798000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3367,11 +3367,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "广东自贸区",
+      "name": "汽车拆解概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.26,
-      "main_net_inflow": -209000000.0,
+      "main_net_inflow": -198000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3379,11 +3379,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "汽车拆解概念",
+      "name": "广东自贸区",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.26,
-      "main_net_inflow": -198000000.0,
+      "main_net_inflow": -209000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3415,11 +3415,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "长安汽车概念",
+      "name": "2026中报预增",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.29,
-      "main_net_inflow": 242000000.0,
+      "main_net_inflow": -12540000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3427,11 +3427,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "2026中报预增",
+      "name": "长安汽车概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.29,
-      "main_net_inflow": -12540000000.0,
+      "main_net_inflow": 242000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4039,11 +4039,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "蚂蚁集团概念",
+      "name": "同花顺果指数",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.6,
-      "main_net_inflow": -218000000.00000003,
+      "main_net_inflow": -1218000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4051,11 +4051,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "同花顺果指数",
+      "name": "蚂蚁集团概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.6,
-      "main_net_inflow": -1218000000.0,
+      "main_net_inflow": -218000000.00000003,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4903,11 +4903,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "小米概念",
+      "name": "百度概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.08,
-      "main_net_inflow": -8741000000.0,
+      "main_net_inflow": -4722000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4915,11 +4915,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "百度概念",
+      "name": "小米概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.08,
-      "main_net_inflow": -4722000000.0,
+      "main_net_inflow": -8741000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5047,11 +5047,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "数据确权",
+      "name": "智谱AI",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.18,
-      "main_net_inflow": -899000000.0,
+      "main_net_inflow": -2021000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5059,11 +5059,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "智谱AI",
+      "name": "数据确权",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.18,
-      "main_net_inflow": -2021000000.0,
+      "main_net_inflow": -899000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
