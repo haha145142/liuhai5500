@@ -3,7 +3,7 @@
   "source": "AKShare",
   "provider": "akshare",
   "schemaVersion": 3,
-  "fetchedAt": "2026-10-06T22:07:50.847374+08:00",
+  "fetchedAt": "2026-10-07T14:42:12.244241+08:00",
   "marketDate": "2026-09-30",
   "rows": [
     {
@@ -2623,11 +2623,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "风电",
+      "name": "装配式建筑",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.06,
-      "main_net_inflow": -2717000000.0,
+      "main_net_inflow": 1395000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2635,11 +2635,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "装配式建筑",
+      "name": "风电",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.06,
-      "main_net_inflow": 1395000000.0,
+      "main_net_inflow": -2717000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2743,11 +2743,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "垃圾分类",
+      "name": "金属锌",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.0,
-      "main_net_inflow": -129000000.0,
+      "main_net_inflow": -124000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2755,11 +2755,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "金属锌",
+      "name": "垃圾分类",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.0,
-      "main_net_inflow": -124000000.0,
+      "main_net_inflow": -129000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4243,11 +4243,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "牙科医疗",
+      "name": "车联网(车路协同)",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.71,
-      "main_net_inflow": -580000000.0,
+      "main_net_inflow": -3981000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4255,11 +4255,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "车联网(车路协同)",
+      "name": "牙科医疗",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.71,
-      "main_net_inflow": -3981000000.0,
+      "main_net_inflow": -580000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
