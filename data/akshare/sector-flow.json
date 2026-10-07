@@ -3,7 +3,7 @@
   "source": "AKShare",
   "provider": "akshare",
   "schemaVersion": 3,
-  "fetchedAt": "2026-10-07T14:42:12.244241+08:00",
+  "fetchedAt": "2026-10-07T21:58:39.739607+08:00",
   "marketDate": "2026-09-30",
   "rows": [
     {
@@ -1867,11 +1867,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "信托概念",
+      "name": "参股券商",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.58,
-      "main_net_inflow": 409000000.0,
+      "main_net_inflow": 936999999.9999999,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -1879,11 +1879,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "参股券商",
+      "name": "信托概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.58,
-      "main_net_inflow": 936999999.9999999,
+      "main_net_inflow": 409000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2203,18 +2203,6 @@
       "small_net_inflow": null
     },
     {
-      "name": "磷化工",
-      "sector_type": "concept",
-      "provider": "AKShare/THS",
-      "change_pct": 0.3,
-      "main_net_inflow": -276000000.0,
-      "main_net_ratio": null,
-      "super_net_inflow": null,
-      "large_net_inflow": null,
-      "mid_net_inflow": null,
-      "small_net_inflow": null
-    },
-    {
       "name": "西部大开发",
       "sector_type": "concept",
       "provider": "AKShare/THS",
@@ -2227,11 +2215,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "碳交易",
+      "name": "磷化工",
       "sector_type": "concept",
       "provider": "AKShare/THS",
-      "change_pct": 0.29,
-      "main_net_inflow": 886999999.9999999,
+      "change_pct": 0.3,
+      "main_net_inflow": -276000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2244,6 +2232,18 @@
       "provider": "AKShare/THS",
       "change_pct": 0.29,
       "main_net_inflow": 466000000.0,
+      "main_net_ratio": null,
+      "super_net_inflow": null,
+      "large_net_inflow": null,
+      "mid_net_inflow": null,
+      "small_net_inflow": null
+    },
+    {
+      "name": "碳交易",
+      "sector_type": "concept",
+      "provider": "AKShare/THS",
+      "change_pct": 0.29,
+      "main_net_inflow": 886999999.9999999,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2623,11 +2623,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "装配式建筑",
+      "name": "风电",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.06,
-      "main_net_inflow": 1395000000.0,
+      "main_net_inflow": -2717000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2635,11 +2635,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "风电",
+      "name": "装配式建筑",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": 0.06,
-      "main_net_inflow": -2717000000.0,
+      "main_net_inflow": 1395000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2743,11 +2743,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "金属锌",
+      "name": "垃圾分类",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.0,
-      "main_net_inflow": -124000000.0,
+      "main_net_inflow": -129000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2755,11 +2755,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "垃圾分类",
+      "name": "金属锌",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.0,
-      "main_net_inflow": -129000000.0,
+      "main_net_inflow": -124000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4039,11 +4039,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "同花顺果指数",
+      "name": "蚂蚁集团概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.6,
-      "main_net_inflow": -1218000000.0,
+      "main_net_inflow": -218000000.00000003,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4051,11 +4051,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "蚂蚁集团概念",
+      "name": "同花顺果指数",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.6,
-      "main_net_inflow": -218000000.00000003,
+      "main_net_inflow": -1218000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4243,11 +4243,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "车联网(车路协同)",
+      "name": "牙科医疗",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.71,
-      "main_net_inflow": -3981000000.0,
+      "main_net_inflow": -580000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4255,11 +4255,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "牙科医疗",
+      "name": "车联网(车路协同)",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -0.71,
-      "main_net_inflow": -580000000.0,
+      "main_net_inflow": -3981000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
