@@ -3,7 +3,7 @@
   "source": "AKShare",
   "provider": "akshare",
   "schemaVersion": 3,
-  "fetchedAt": "2026-11-03T15:23:51.455311+08:00",
+  "fetchedAt": "2026-11-03T23:22:59.088111+08:00",
   "marketDate": "2026-11-03",
   "rows": [
     {
@@ -2899,6 +2899,18 @@
       "small_net_inflow": null
     },
     {
+      "name": "成飞概念",
+      "sector_type": "concept",
+      "provider": "AKShare/THS",
+      "change_pct": -0.65,
+      "main_net_inflow": -339000000.0,
+      "main_net_ratio": null,
+      "super_net_inflow": null,
+      "large_net_inflow": null,
+      "mid_net_inflow": null,
+      "small_net_inflow": null
+    },
+    {
       "name": "污水处理",
       "sector_type": "concept",
       "provider": "AKShare/THS",
@@ -2916,18 +2928,6 @@
       "provider": "AKShare/THS",
       "change_pct": -0.65,
       "main_net_inflow": -320000000.0,
-      "main_net_ratio": null,
-      "super_net_inflow": null,
-      "large_net_inflow": null,
-      "mid_net_inflow": null,
-      "small_net_inflow": null
-    },
-    {
-      "name": "成飞概念",
-      "sector_type": "concept",
-      "provider": "AKShare/THS",
-      "change_pct": -0.65,
-      "main_net_inflow": -339000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5275,11 +5275,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "MicroLED概念",
+      "name": "人形机器人",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.75,
-      "main_net_inflow": -326000000.0,
+      "main_net_inflow": -7709000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5443,11 +5443,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "OLED",
+      "name": "2026三季报预增",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -3.09,
-      "main_net_inflow": -2495000000.0,
+      "main_net_inflow": -5457000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5455,11 +5455,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "2026三季报预增",
+      "name": "OLED",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -3.09,
-      "main_net_inflow": -5457000000.0,
+      "main_net_inflow": -2495000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
