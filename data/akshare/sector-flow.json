@@ -3,8 +3,8 @@
   "source": "AKShare",
   "provider": "akshare",
   "schemaVersion": 3,
-  "fetchedAt": "2026-11-09T15:27:20.862467+08:00",
-  "marketDate": "2026-11-09",
+  "fetchedAt": "2026-11-10T01:43:08.698330+08:00",
+  "marketDate": "2026-11-10",
   "rows": [
     {
       "name": "电子",
@@ -5952,7 +5952,7 @@
       "provider": "AKShare/EastMoney",
       "change_pct": -0.81,
       "main_net_inflow": -4217397760.0,
-      "main_net_ratio": -3.09,
+      "main_net_ratio": -3.08,
       "super_net_inflow": -2413428224.0,
       "large_net_inflow": -1803969536.0,
       "mid_net_inflow": 179511808.0,
