@@ -3,7 +3,7 @@
   "source": "AKShare",
   "provider": "akshare",
   "schemaVersion": 3,
-  "fetchedAt": "2026-11-13T15:28:44.896716+08:00",
+  "fetchedAt": "2026-11-13T23:35:30.480375+08:00",
   "marketDate": "2026-11-13",
   "rows": [
     {
@@ -1963,11 +1963,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "AI应用",
+      "name": "煤化工概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.39,
-      "main_net_inflow": -7488000000.0,
+      "main_net_inflow": -369000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -1975,11 +1975,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "煤化工概念",
+      "name": "AI应用",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.39,
-      "main_net_inflow": -369000000.0,
+      "main_net_inflow": -7488000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2023,11 +2023,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "ERP概念",
+      "name": "数字货币",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.4,
-      "main_net_inflow": -3000000.0,
+      "main_net_inflow": -526000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2035,11 +2035,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "数字货币",
+      "name": "ERP概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.4,
-      "main_net_inflow": -526000000.0,
+      "main_net_inflow": -3000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2443,11 +2443,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "腾讯概念",
+      "name": "京津冀一体化",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.61,
-      "main_net_inflow": -10570000000.0,
+      "main_net_inflow": -4028000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -2455,11 +2455,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "京津冀一体化",
+      "name": "腾讯概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -1.61,
-      "main_net_inflow": -4028000000.0,
+      "main_net_inflow": -10570000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3415,11 +3415,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "股权转让(并购重组)",
+      "name": "ETC",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.03,
-      "main_net_inflow": -3996000000.0,
+      "main_net_inflow": -524000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3427,11 +3427,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "ETC",
+      "name": "股权转让(并购重组)",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.03,
-      "main_net_inflow": -524000000.0,
+      "main_net_inflow": -3996000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3715,11 +3715,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "汽车热管理",
+      "name": "两轮车",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.16,
-      "main_net_inflow": -1838000000.0,
+      "main_net_inflow": -712000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3727,11 +3727,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "两轮车",
+      "name": "汽车热管理",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.16,
-      "main_net_inflow": -712000000.0,
+      "main_net_inflow": -1838000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3811,11 +3811,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "毛发医疗",
+      "name": "脑机接口",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.18,
-      "main_net_inflow": -404000000.0,
+      "main_net_inflow": -1379000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3823,11 +3823,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "脑机接口",
+      "name": "毛发医疗",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.18,
-      "main_net_inflow": -1379000000.0,
+      "main_net_inflow": -404000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3955,11 +3955,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "长三角一体化",
+      "name": "独角兽概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.23,
-      "main_net_inflow": -3978000000.0,
+      "main_net_inflow": -3567000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -3967,11 +3967,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "独角兽概念",
+      "name": "长三角一体化",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.23,
-      "main_net_inflow": -3567000000.0,
+      "main_net_inflow": -3978000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4171,11 +4171,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "无人机",
+      "name": "MCU芯片",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.37,
-      "main_net_inflow": -10461000000.0,
+      "main_net_inflow": -2307000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4183,11 +4183,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "MCU芯片",
+      "name": "无人机",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.37,
-      "main_net_inflow": -2307000000.0,
+      "main_net_inflow": -10461000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4495,11 +4495,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "核电",
+      "name": "租售同权",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.47,
-      "main_net_inflow": -6138000000.0,
+      "main_net_inflow": -518000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4507,11 +4507,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "租售同权",
+      "name": "核电",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.47,
-      "main_net_inflow": -518000000.0,
+      "main_net_inflow": -6138000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4867,11 +4867,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "AI眼镜",
+      "name": "光伏概念",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.67,
-      "main_net_inflow": -6143000000.0,
+      "main_net_inflow": -18750000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -4879,11 +4879,11 @@
       "small_net_inflow": null
     },
     {
-      "name": "光伏概念",
+      "name": "AI眼镜",
       "sector_type": "concept",
       "provider": "AKShare/THS",
       "change_pct": -2.67,
-      "main_net_inflow": -18750000000.0,
+      "main_net_inflow": -6143000000.0,
       "main_net_ratio": null,
       "super_net_inflow": null,
       "large_net_inflow": null,
@@ -5735,7 +5735,7 @@
     {
       "sector_type": "industry",
       "provider": "AKShare/EastMoney",
-      "error": "ReadTimeout: HTTPSConnectionPool(host='push2.eastmoney.com', port=443): Read timed out. (read timeout=10)"
+      "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
     },
     {
       "sector_type": "concept",
